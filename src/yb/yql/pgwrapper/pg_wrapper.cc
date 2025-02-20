@@ -336,6 +336,8 @@ DEFINE_RUNTIME_PG_FLAG(int32, yb_major_version_upgrade_compatibility, 0,
     "11.");
 DEFINE_validator(ysql_yb_major_version_upgrade_compatibility, FLAG_IN_SET_VALIDATOR(0, 11));
 
+DEFINE_NON_RUNTIME_bool(enable_ms_documentdb, true, "Enable MS DocumentDB extension");
+
 DECLARE_bool(enable_pg_cron);
 
 using gflags::CommandLineFlagInfo;
@@ -545,6 +547,11 @@ Result<string> WritePostgresConfig(const PgProcessConf& conf) {
 
   if (FLAGS_enable_pg_cron) {
     metricsLibs.push_back("pg_cron");
+  }
+
+  if (FLAGS_enable_ms_documentdb) {
+    metricsLibs.push_back("pg_documentdb_core");
+    metricsLibs.push_back("pg_documentdb");
   }
 
   vector<string> lines;
