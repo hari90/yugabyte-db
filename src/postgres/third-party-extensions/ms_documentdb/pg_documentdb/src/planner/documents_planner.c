@@ -563,11 +563,11 @@ AddPointLookupQuery(List *restrictInfo, PlannerInfo *root, RelOptInfo *rel)
 				Relids outerRelids = NULL;
 				double loopCount = 1;
 				bool partialPath = false;
-				IndexPath *path = create_index_path(root, indexInfo, clauses, orderbys,
-													orderbyCols, pathKeys,
-													ForwardScanDirection, indexOnly,
-													outerRelids,
-													loopCount, partialPath);
+				IndexPath *path = create_index_path(
+					root, indexInfo, clauses,
+					NIL /* yb_bitmap_idx_pushdowns */, // YB_TODO
+					orderbys, orderbyCols, pathKeys, ForwardScanDirection,
+					indexOnly, outerRelids, loopCount, partialPath);
 				path->indextotalcost = 0;
 				path->path.startup_cost = 0;
 				path->path.total_cost = 0;

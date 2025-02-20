@@ -1,6 +1,6 @@
 
 
-LIBBSON := $(shell pkg-config --cflags libbson-static-1.0)
+LIBBSON := -pthread -DBSON_STATIC -isystem /usr/local/include/libbson-1.0
 INTEL_DECIMAL_MATH_LIB = $(shell pkg-config --cflags intelmathlib)
 PCRE2_LIB = $(shell pkg-config --cflags libpcre2-8)
 
@@ -13,8 +13,8 @@ DOCUMENTDB_INC_DIR = $(DOCUMENTDB_DIR)/include
 DOCUMENTDB_DISTRIBUTED_INC_DIR = $(DOCUMENTDB_DISTRIBUTED_DIR)/include
 
 
-PG_CPPFLAGS = $(shell pkg-config --cflags libbson-static-1.0) -I$(libpq_srcdir) $(INTEL_DECIMAL_MATH_LIB) $(PCRE2_LIB) -Isrc -Iinclude -Ibuild/include/
-PG_LDFLAGS = $(shell pkg-config --static --libs --cflags libbson-static-1.0) $(shell pkg-config --static --libs --cflags intelmathlib) $(shell pkg-config --static --libs --cflags libpcre2-8) -L/usr/lib
+PG_CPPFLAGS = $(LIBBSON) -I$(libpq_srcdir) $(INTEL_DECIMAL_MATH_LIB) $(PCRE2_LIB) -Isrc -Iinclude -Ibuild/include/
+PG_LDFLAGS = $(LIBBSON) -L/usr/local/lib64 -lbson-static-1.0 -pthread -lrt $(shell pkg-config --static --libs --cflags intelmathlib) $(shell pkg-config --static --libs --cflags libpcre2-8) -L/usr/lib
 PG_LDFLAGS += -Wl,-rpath=$(shell $(PG_CONFIG) --pkglibdir)
 
 ifeq ($(USE_DOCUMENTDB_CORE),1)
@@ -36,10 +36,11 @@ PG_LDFLAGS += -l:pg_documentdb_distributed.so -L $(DOCUMENTDB_DISTRIBUTED_DIR)
 endif
 
 ifeq ($(CC),gcc)
-    PG_CFLAGS = -std=gnu99 -Wall -Wextra -Werror -Wno-declaration-after-statement -Wno-unused-parameter -Wno-implicit-fallthrough $(LIBBSON) $(INTEL_DECIMAL_MATH_LIB) $(PCRE2_LIB)
+    PG_CFLAGS = -std=gnu99 -Wall -Wextra -Werror -Wno-declaration-after-statement -Wno-unused-parameter -Wno-implicit-fallthrough -Wno-typedef-redefinition -Wno-tautological-overlap-compare -Wno-non-literal-null-conversion -Wno-gnu-designator $(LIBBSON) $(INTEL_DECIMAL_MATH_LIB) $(PCRE2_LIB)
 else
-    PG_CFLAGS = -std=gnu99 -Wall -Wextra -Werror -Wno-declaration-after-statement -Wno-unused-parameter -Wno-implicit-fallthrough $(LIBBSON) $(INTEL_DECIMAL_MATH_LIB) $(PCRE2_LIB)
+    PG_CFLAGS = -std=gnu99 -Wall -Wextra -Werror -Wno-declaration-after-statement -Wno-unused-parameter -Wno-implicit-fallthrough -Wno-typedef-redefinition -Wno-tautological-overlap-compare -Wno-non-literal-null-conversion -Wno-gnu-designator $(LIBBSON) $(INTEL_DECIMAL_MATH_LIB) $(PCRE2_LIB)
 endif
+
 
 ifneq ($(SKIP_API_SCHEMA),yes)
     ifndef API_SCHEMA_NAME
