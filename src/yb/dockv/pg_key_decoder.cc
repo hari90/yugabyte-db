@@ -290,6 +290,7 @@ PgKeyColumnDecoder GetDecoder5(const ColumnSchema& column) {
   using Factory = DecodeColumnFactory<kConsumeGroupEnd, kMatchedId, kLastColumn, kSortOrder>;
   auto data_type = column.type()->main();
   switch (data_type) {
+    case DataType::BSON: FALLTHROUGH_INTENDED;
     case DataType::BINARY:
       return Factory::template ApplyStringColumn<false>();
     case DataType::STRING:
