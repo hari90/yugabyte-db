@@ -1,17 +1,18 @@
 DIRS = \
 	hypopg \
-	orafce \
 	ms_documentdb \
-	pgaudit \
+	orafce \
 	pg_cron \
 	pg_hint_plan \
-	pg_stat_monitor \
-	pgvector \
-	postgresql-hll \
-	postgresql_anonymizer \
 	pg_partman \
-	wal2json \
+	pg_stat_monitor \
+	pgaudit \
 	pgtap \
+	pgvector \
+	postgresql_anonymizer \
+	postgresql-hll \
+	rum \
+	wal2json \
 
 BUILDDIRS = $(DIRS:%=build-%)
 INSTALLDIRS = $(DIRS:%=install-%)
