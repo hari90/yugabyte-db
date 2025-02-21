@@ -83,6 +83,5 @@ CREATE INDEX collection_index_name
 ON __API_CATALOG_SCHEMA__.collection_indexes (collection_id, ((index_spec).index_name));
 
 -- Speeds up queries based on index_key.
--- YB_TODO: INDEX on column of type 'user_defined_type' not yet supported
--- CREATE INDEX collection_index_key
--- ON __API_CATALOG_SCHEMA__.collection_indexes (collection_id, ((index_spec).index_key));
+CREATE INDEX collection_index_key
+ON __API_CATALOG_SCHEMA__.collection_indexes (collection_id, ((index_spec).index_key));

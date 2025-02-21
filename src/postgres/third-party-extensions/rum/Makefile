@@ -32,6 +32,8 @@ REGRESS = security rum rum_validate rum_hash ruminv timestamp orderby orderby_ha
     macaddr inet cidr text varchar char bytea bit varbit \
 	numeric rum_weight
 
+PG_CPPFLAGS = -Wno-implicit-fallthrough
+
 ifdef USE_PGXS
 PG_CONFIG = pg_config
 PGXS := $(shell $(PG_CONFIG) --pgxs)
@@ -63,17 +65,6 @@ rum--$(EXTVERSION).sql: $(DATA_first) $(DATA_updates)
 # rule for updates, e.g. rum--1.0--1.1.sql
 rum--%.sql: gen_rum_sql--%.pl
 	perl $< > $@
-
-install: installincludes
-
-installincludes:
-	$(INSTALL) -d '$(DESTDIR)$(includedir_server)/'
-	$(INSTALL_DATA) $(addprefix $(srcdir)/, $(RELATIVE_INCLUDES)) '$(DESTDIR)$(includedir_server)/'
-
-uninstall: uninstallincludes
-
-uninstallincludes:
-	rm -f $(addprefix '$(DESTDIR)$(includedir_server)/', $(INCLUDES))
 
 ISOLATIONCHECKS= predicate-rum predicate-rum-2
 

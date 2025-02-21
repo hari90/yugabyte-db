@@ -3,5 +3,5 @@ default_version = '0.100-0'
 module_pathname = '$libdir/pg_documentdb'
 relocatable = false
 superuser = true
-requires = 'documentdb_core, pg_cron, tsm_system_rows, vector'
-# YB_TODO: , postgis, rum
+requires = 'documentdb_core, pg_cron, tsm_system_rows, vector, rum'
+# YB_TODO: , postgis
