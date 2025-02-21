@@ -1599,6 +1599,8 @@ YBPgTypeOidToStr(Oid type_id)
 			return "INT8MULTIRANGEARRAY";
 		case CSTRINGARRAYOID:
 			return "CSTRINGARRAY";
+		case BSONOID:
+			return "BSON";
 		default:
 			return "user_defined_type";
 	}
@@ -1673,6 +1675,8 @@ YBCPgDataTypeToStr(YbcPgDataType yb_type)
 			return "UINT32";
 		case YB_YQL_DATA_TYPE_UINT64:
 			return "UINT64";
+		case YB_YQL_DATA_TYPE_BSON:
+			return "BSON";
 		default:
 			return "unknown";
 	}

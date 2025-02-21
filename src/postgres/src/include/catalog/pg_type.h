@@ -24,6 +24,7 @@
 #include "nodes/nodes.h"
 
 #define VECTOROID			8078
+#define BSONOID				8085
 
 /* ----------------
  *		pg_type definition.  cpp turns this into

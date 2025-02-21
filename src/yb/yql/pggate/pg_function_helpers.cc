@@ -34,6 +34,7 @@ Result<QLValuePB> SetValueHelper<std::string>::Apply(
       value_pb.set_string_value(strval);
       break;
     case DataType::VECTOR: FALLTHROUGH_INTENDED;
+    case DataType::BSON: FALLTHROUGH_INTENDED;
     case DataType::BINARY:
       value_pb.set_binary_value(strval);
       break;

@@ -41,7 +41,8 @@
   case DataType::UINT32: FALLTHROUGH_INTENDED;    \
   case DataType::UINT64: FALLTHROUGH_INTENDED;    \
   case DataType::GIN_NULL: FALLTHROUGH_INTENDED;  \
-  case DataType::VECTOR
+  case DataType::VECTOR: FALLTHROUGH_INTENDED;  \
+  case DataType::BSON
 
 namespace yb {
 

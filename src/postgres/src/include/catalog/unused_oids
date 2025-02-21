@@ -40,6 +40,9 @@ push @{$oids}, $FirstGenbkiObjectId;
 # YB: We also reserve 8078 for VECTOROID
 push @{$oids}, 8078;
 
+# YB: BSONOID
+push @{$oids}, 8085;
+
 my $prev_oid = 0;
 my @sortedoids = sort { $a <=> $b } @{$oids};
 foreach my $oid (@sortedoids)

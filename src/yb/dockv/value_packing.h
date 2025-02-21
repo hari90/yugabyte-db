@@ -48,6 +48,8 @@ auto VisitDataType(DataType data_type, const F& f) {
       return f.template Primitive<double>();
     case DataType::VECTOR:
       return f.Vector();
+    case DataType::BSON:
+      return f.Binary();  // YB_TODO: Should we have custom type?
     default:
       break;
   }
