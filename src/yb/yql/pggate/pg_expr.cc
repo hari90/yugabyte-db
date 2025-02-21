@@ -513,6 +513,7 @@ struct PgColumnRefFactory {
         return ApplyNumeric<double>(direct);
 
       case YB_YQL_DATA_TYPE_VECTOR: [[fallthrough]];
+      case YB_YQL_DATA_TYPE_BSON: [[fallthrough]];
       case YB_YQL_DATA_TYPE_BINARY:
         return Apply<PgBinaryColumnRef<Base>>();
 
@@ -682,6 +683,7 @@ void DatumToQLValue(
       break;
 
     case YB_YQL_DATA_TYPE_VECTOR: [[fallthrough]];
+    case YB_YQL_DATA_TYPE_BSON: [[fallthrough]];
     case YB_YQL_DATA_TYPE_BINARY: {
         uint8_t *value;
         int64_t bytes = type_entity->datum_fixed_size;

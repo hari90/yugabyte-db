@@ -623,6 +623,7 @@ size_t KeyEntryValue::GetEncodedKeyEntryValueSize(DataType data_type) {
     case DataType::TIMEUUID: FALLTHROUGH_INTENDED;
     case DataType::STRING: FALLTHROUGH_INTENDED;
     case DataType::VECTOR: FALLTHROUGH_INTENDED;
+    case DataType::BSON: FALLTHROUGH_INTENDED;
     case DataType::BINARY: FALLTHROUGH_INTENDED;
     case DataType::DECIMAL: FALLTHROUGH_INTENDED;
     case DataType::VARINT: FALLTHROUGH_INTENDED;
@@ -1579,7 +1580,7 @@ Status PrimitiveValue::DecodeToQLValuePB(
     case ValueEntryType::kString:
       if (data_type == DataType::STRING) {
         ql_value->set_string_value(slice.cdata(), slice.size());
-      } else if (data_type == DataType::BINARY || data_type == DataType::VECTOR) {
+      } else if (data_type == DataType::BINARY || data_type == DataType::VECTOR  || data_type == DataType::BSON) {
         ql_value->set_binary_value(slice.cdata(), slice.size());
       } else {
         break;
@@ -2306,6 +2307,7 @@ bool SharedToQLValuePB(
       ql_value->set_string_value(value.GetString());
       return true;
     case DataType::VECTOR: FALLTHROUGH_INTENDED;
+    case DataType::BSON: FALLTHROUGH_INTENDED;
     case DataType::BINARY:
       ql_value->set_binary_value(value.GetString());
       return true;

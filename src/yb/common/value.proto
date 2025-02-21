@@ -135,6 +135,7 @@ enum PersistentDataType {
 
   GIN_NULL = 104;
   VECTOR = 105;
+  BSON = 106;
 }
 
 // Expression operators.

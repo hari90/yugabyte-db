@@ -515,6 +515,7 @@ void ValidateEncodedKeyEntryType(const DataType& data_type) {
       key_entry_value = KeyEntryValue::MakeTimestamp(Timestamp(1000));
       break;
     case DataType::VECTOR: FALLTHROUGH_INTENDED;
+    case DataType::BSON: FALLTHROUGH_INTENDED;
     case DataType::UUID: FALLTHROUGH_INTENDED;
     case DataType::TIMEUUID: FALLTHROUGH_INTENDED;
     case DataType::UNKNOWN_DATA: FALLTHROUGH_INTENDED;
