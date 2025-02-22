@@ -1081,7 +1081,7 @@ DeleteOneInternal(MongoCollection *collection, DeleteOneParams *deleteOneParams,
 	 */
 	StringInfoData selectQuery;
 	initStringInfo(&selectQuery);
-	appendStringInfo(&selectQuery, "WITH s AS MATERIALIZED (SELECT ctid FROM ");
+	appendStringInfo(&selectQuery, "WITH s AS MATERIALIZED (SELECT object_id FROM ");
 
 	if (collection->shardTableName[0] != '\0')
 	{
@@ -1152,8 +1152,8 @@ DeleteOneInternal(MongoCollection *collection, DeleteOneParams *deleteOneParams,
 	}
 
 	appendStringInfo(&deleteQuery,
-					 " d USING s WHERE d.ctid = s.ctid AND shard_key_value = $1"
-					 " RETURNING object_id");
+					 " d USING s WHERE d.object_id = s.object_id AND shard_key_value = $1"
+					 " RETURNING d.object_id");
 
 	if (deleteOneParams->returnDeletedDocument)
 	{
@@ -1259,7 +1259,6 @@ DeleteOneInternal(MongoCollection *collection, DeleteOneParams *deleteOneParams,
 
 	SPI_finish();
 }
-
 
 static pgbson *
 SerializeDeleteOneParams(const DeleteOneParams *deleteParams)
