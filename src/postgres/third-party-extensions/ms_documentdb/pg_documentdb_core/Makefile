@@ -34,7 +34,7 @@ ifeq ($(DEBUG),yes)
   PG_CFLAGS += -ggdb -O0 -g
 endif
 
-SHLIB_LINK = $(libpq)
+SHLIB_LINK = $(libpq) -lyb_pggate -lyb_pggate_util
 
 include $(OSS_SRC_DIR)/Makefile.global
 
