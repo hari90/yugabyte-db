@@ -1,7 +1,7 @@
 
 
 SET yb_binary_restore TO true;
-SELECT binary_upgrade_set_next_pg_type_oid(8079);
+SELECT binary_upgrade_set_next_pg_type_oid(8085);
 CREATE TYPE __CORE_SCHEMA__.bson;
 SET yb_binary_restore TO false;
 
