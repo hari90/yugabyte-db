@@ -1,6 +1,6 @@
 DIRS = \
 	hypopg \
-	ms_documentdb \
+	documentdb \
 	orafce \
 	pg_cron \
 	pg_hint_plan \
