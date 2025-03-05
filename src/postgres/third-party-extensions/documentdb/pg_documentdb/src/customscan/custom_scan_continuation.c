@@ -678,7 +678,7 @@ UpdatePathsWithExtensionCustomPlans(PlannerInfo *root, RelOptInfo *rel,
 		if (inputPath->pathtype != T_BitmapHeapScan &&
 			inputPath->pathtype != T_TidScan &&
 			inputPath->pathtype != T_TidRangeScan &&
-			!IsValidScanPath(inputPath))
+			inputPath->pathtype != T_IndexScan && !IsValidScanPath(inputPath))
 		{
 			/* For now just break if it's not a seq scan or bitmap scan */
 			elog(INFO, "Skipping unsupported path type %d", inputPath->pathtype);
