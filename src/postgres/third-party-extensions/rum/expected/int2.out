@@ -1,0 +1,80 @@
+set enable_seqscan=off;
+CREATE TABLE test_int2 (
+	i int2
+);
+INSERT INTO test_int2 VALUES (-2),(-1),(0),(1),(2),(3);
+CREATE INDEX idx_int2 ON test_int2 USING rum (i);
+SELECT * FROM test_int2 WHERE i<1::int2 ORDER BY i;
+ i  
+----
+ -2
+ -1
+  0
+(3 rows)
+
+SELECT * FROM test_int2 WHERE i<=1::int2 ORDER BY i;
+ i  
+----
+ -2
+ -1
+  0
+  1
+(4 rows)
+
+SELECT * FROM test_int2 WHERE i=1::int2 ORDER BY i;
+ i 
+---
+ 1
+(1 row)
+
+SELECT * FROM test_int2 WHERE i>=1::int2 ORDER BY i;
+ i 
+---
+ 1
+ 2
+ 3
+(3 rows)
+
+SELECT * FROM test_int2 WHERE i>1::int2 ORDER BY i;
+ i 
+---
+ 2
+ 3
+(2 rows)
+
+EXPLAIN (costs off)
+SELECT *, i <=> 0::int2 FROM test_int2 ORDER BY i <=> 0::int2;
+               QUERY PLAN               
+----------------------------------------
+ Index Scan using idx_int2 on test_int2
+   Order By: (i <=> '0'::smallint)
+(2 rows)
+
+SELECT *, i <=> 0::int2 FROM test_int2 ORDER BY i <=> 0::int2;
+ i  | ?column? 
+----+----------
+  0 |        0
+ -1 |        1
+  1 |        1
+ -2 |        2
+  2 |        2
+  3 |        3
+(6 rows)
+
+EXPLAIN (costs off)
+SELECT *, i <=> 1::int2 FROM test_int2 WHERE i<1::int2 ORDER BY i <=> 1::int2;
+               QUERY PLAN               
+----------------------------------------
+ Index Scan using idx_int2 on test_int2
+   Index Cond: (i < '1'::smallint)
+   Order By: (i <=> '1'::smallint)
+(3 rows)
+
+SELECT *, i <=> 1::int2 FROM test_int2 WHERE i<1::int2 ORDER BY i <=> 1::int2;
+ i  | ?column? 
+----+----------
+  0 |        1
+ -1 |        2
+ -2 |        3
+(3 rows)
+
