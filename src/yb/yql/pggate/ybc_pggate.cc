@@ -2954,6 +2954,12 @@ bool YBCPgHasExportedSnapshots() { return pgapi->HasExportedSnapshots(); }
 
 void YBCPgClearExportedTxnSnapshots() { pgapi->ClearExportedTxnSnapshots(); }
 
+void YBCPgStackDump() {
+  StackTrace s;
+  s.Collect();
+  LOG(WARNING) << s.Symbolize();
+}
+
 } // extern "C"
 
 } // namespace yb::pggate

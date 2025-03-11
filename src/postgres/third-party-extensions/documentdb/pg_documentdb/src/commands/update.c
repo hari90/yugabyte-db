@@ -2429,7 +2429,7 @@ UpdateOneInternal(MongoCollection *collection, UpdateOneParams *updateOneParams,
 				 * (in the same shard placement).
 				 */
 				if (IsYugaByteEnabled())
-					ybUpdateDocumentByOID(
+					result->isRowUpdated = ybUpdateDocumentByOID(
 						collection->collectionId, collection->shardTableName,
 						shardKeyHash, updateCandidate.objectId, updatedPgbson);
 				else
@@ -2446,9 +2446,9 @@ UpdateOneInternal(MongoCollection *collection, UpdateOneParams *updateOneParams,
 				 * reinsertion.
 				 */
 				if (IsYugaByteEnabled())
-					ybDeleteDocumentByOID(collection->collectionId,
-										  shardKeyHash,
-										  updateCandidate.objectId);
+					result->isRowUpdated = ybDeleteDocumentByOID(
+						collection->collectionId, shardKeyHash,
+						updateCandidate.objectId);
 				else
 					result->isRowUpdated =
 						DeleteDocumentByTID(collection->collectionId,
@@ -2771,7 +2771,9 @@ ybUpdateDocumentByOID(uint64 collectionId, const char *shardTableName,
 					  int64 shardKeyHash, Datum objectId,
 					  pgbson *updatedDocument)
 {
-	StringInfoData updateQuery;
+	int ret;
+	const char *current_search_path;
+	StringInfoData query;
 	int argCount = 3;
 	Oid argTypes[3];
 	Datum argValues[3];
@@ -2781,25 +2783,35 @@ ybUpdateDocumentByOID(uint64 collectionId, const char *shardTableName,
 
 	SPI_connect();
 
-	initStringInfo(&updateQuery);
+	initStringInfo(&query);
 
-	appendStringInfo(&updateQuery, "UPDATE ");
+	/* Add documentdb_core to the search_part so that we can compare by bson type */
+	current_search_path = GetConfigOption("search_path", false, false);
+	appendStringInfo(&query, "SET LOCAL search_path TO %s, %s",
+					 current_search_path, CoreSchemaNameV2);
+
+	/* Set the new extended search_path */
+	ret = SPI_exec(query.data, /*tcount=*/0);
+	if (ret != SPI_OK_UTILITY)
+		elog(ERROR, "Failed to set extended search_path");
+
+	resetStringInfo(&query);
+	appendStringInfo(&query, "UPDATE ");
 
 	if (shardTableName != NULL && shardTableName[0] != '\0')
 	{
-		appendStringInfo(&updateQuery, "%s.%s", ApiDataSchemaName,
-						 shardTableName);
+		appendStringInfo(&query, "%s.%s", ApiDataSchemaName, shardTableName);
 	}
 	else
 	{
-		appendStringInfo(&updateQuery, "%s.documents_" UINT64_FORMAT,
+		appendStringInfo(&query, "%s.documents_" UINT64_FORMAT,
 						 ApiDataSchemaName, collectionId);
 	}
 
-	appendStringInfo(&updateQuery,
+	appendStringInfo(&query,
 					 " SET document = $3::%s"
-					 " WHERE object_id = $2 AND shard_key_value = $1",
-					 FullBsonTypeName);
+					 " WHERE object_id = $2::%s AND shard_key_value = $1",
+					 FullBsonTypeName, FullBsonTypeName);
 
 	argTypes[0] = INT8OID;
 	argValues[0] = Int64GetDatum(shardKeyHash);
@@ -2815,7 +2827,7 @@ ybUpdateDocumentByOID(uint64 collectionId, const char *shardTableName,
 	long maxTupleCount = 0;
 
 	SPIPlanPtr plan = GetSPIQueryPlanWithLocalShard(
-		collectionId, shardTableName, QUERY_ID_UPDATE_BY_TID, updateQuery.data,
+		collectionId, shardTableName, QUERY_ID_UPDATE_BY_TID, query.data,
 		argTypes, argCount);
 
 	SPI_execute_plan(plan, argValues, argNulls, readOnly, maxTupleCount);
