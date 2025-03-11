@@ -73,6 +73,7 @@
 #include "executor/spi.h"
 #include "lib/stringinfo.h"
 #include "utils/builtins.h"
+#include "utils/guc_utils.h"
 #include "utils/typcache.h"
 
 #include "io/bson_core.h"
@@ -2771,9 +2772,7 @@ ybUpdateDocumentByOID(uint64 collectionId, const char *shardTableName,
 					  int64 shardKeyHash, Datum objectId,
 					  pgbson *updatedDocument)
 {
-	int ret;
-	const char *current_search_path;
-	StringInfoData query;
+	StringInfoData updateQuery;
 	int argCount = 3;
 	Oid argTypes[3];
 	Datum argValues[3];
@@ -2781,34 +2780,26 @@ ybUpdateDocumentByOID(uint64 collectionId, const char *shardTableName,
 	/* whitespace means not null, n means null */
 	char argNulls[3] = {' ', ' ', ' '};
 
+	/* Add documentdb_core to the search_part so that we can compare by bson type */
+	int savedGUCLevel = ybAppendToSearchPathGUC(CoreSchemaName);
+
 	SPI_connect();
 
-	initStringInfo(&query);
-
-	/* Add documentdb_core to the search_part so that we can compare by bson type */
-	current_search_path = GetConfigOption("search_path", false, false);
-	appendStringInfo(&query, "SET LOCAL search_path TO %s, %s",
-					 current_search_path, CoreSchemaNameV2);
-
-	/* Set the new extended search_path */
-	ret = SPI_exec(query.data, /*tcount=*/0);
-	if (ret != SPI_OK_UTILITY)
-		elog(ERROR, "Failed to set extended search_path");
-
-	resetStringInfo(&query);
-	appendStringInfo(&query, "UPDATE ");
+	initStringInfo(&updateQuery);
+	appendStringInfoString(&updateQuery, "UPDATE ");
 
 	if (shardTableName != NULL && shardTableName[0] != '\0')
 	{
-		appendStringInfo(&query, "%s.%s", ApiDataSchemaName, shardTableName);
+		appendStringInfo(&updateQuery, "%s.%s", ApiDataSchemaName,
+						 shardTableName);
 	}
 	else
 	{
-		appendStringInfo(&query, "%s.documents_" UINT64_FORMAT,
+		appendStringInfo(&updateQuery, "%s.documents_" UINT64_FORMAT,
 						 ApiDataSchemaName, collectionId);
 	}
 
-	appendStringInfo(&query,
+	appendStringInfo(&updateQuery,
 					 " SET document = $3::%s"
 					 " WHERE object_id = $2::%s AND shard_key_value = $1",
 					 FullBsonTypeName, FullBsonTypeName);
@@ -2827,13 +2818,15 @@ ybUpdateDocumentByOID(uint64 collectionId, const char *shardTableName,
 	long maxTupleCount = 0;
 
 	SPIPlanPtr plan = GetSPIQueryPlanWithLocalShard(
-		collectionId, shardTableName, QUERY_ID_UPDATE_BY_TID, query.data,
+		collectionId, shardTableName, QUERY_ID_UPDATE_BY_TID, updateQuery.data,
 		argTypes, argCount);
 
 	SPI_execute_plan(plan, argValues, argNulls, readOnly, maxTupleCount);
 	Assert(SPI_processed == 1);
 
 	SPI_finish();
+
+	RollbackGUCChange(savedGUCLevel);
 
 	return true;
 }
@@ -2895,16 +2888,17 @@ ybDeleteDocumentByOID(uint64 collectionId, int64 shardKeyHash, Datum objectId)
 	Oid argTypes[2];
 	Datum argValues[2];
 
+	/* Add documentdb_core to the search_part so that we can compare by bson
+	 * type */
+	int savedGUCLevel = ybAppendToSearchPathGUC(CoreSchemaName);
+
 	SPI_connect();
 
 	initStringInfo(&deleteQuery);
 	appendStringInfo(&deleteQuery,
 					 "DELETE FROM %s.documents_" UINT64_FORMAT " WHERE "
-					 "object_id = $2 "
-					 "AND "
-					 "shard_key_"
-					 "value = $1",
-					 ApiDataSchemaName, collectionId);
+					 "object_id = $2::%s AND shard_key_value = $1",
+					 ApiDataSchemaName, collectionId, FullBsonTypeName);
 
 	argTypes[0] = INT8OID;
 	argValues[0] = Int64GetDatum(shardKeyHash);
@@ -2924,6 +2918,8 @@ ybDeleteDocumentByOID(uint64 collectionId, int64 shardKeyHash, Datum objectId)
 	Assert(SPI_processed == 1);
 
 	SPI_finish();
+
+	RollbackGUCChange(savedGUCLevel);
 
 	return true;
 }

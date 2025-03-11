@@ -33,6 +33,7 @@
 #include "utils/error_utils.h"
 #include "utils/documentdb_errors.h"
 #include "utils/feature_counter.h"
+#include "utils/guc_utils.h"
 #include "utils/version_utils.h"
 #include "utils/query_utils.h"
 #include "api_hooks.h"
@@ -1061,6 +1062,11 @@ DeleteOneInternal(MongoCollection *collection, DeleteOneParams *deleteOneParams,
 
 	Oid *argTypes = palloc(sizeof(Oid) * argCount);
 	Datum *argValues = palloc(sizeof(Datum) * argCount);
+
+	/* Add documentdb_core to the search_part so that we can compare by bson
+	 * type */
+	int savedGUCLevel = ybAppendToSearchPathGUC(CoreSchemaName);
+
 	SPI_connect();
 
 	/*
@@ -1262,6 +1268,7 @@ DeleteOneInternal(MongoCollection *collection, DeleteOneParams *deleteOneParams,
 		}
 	}
 
+	RollbackGUCChange(savedGUCLevel);
 	SPI_finish();
 }
 
