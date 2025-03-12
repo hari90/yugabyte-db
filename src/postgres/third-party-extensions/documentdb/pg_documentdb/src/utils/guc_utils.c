@@ -40,31 +40,3 @@ SetGUCLocally(const char *name, const char *value)
 					  (superuser() ? PGC_SUSET : PGC_USERSET), PGC_S_SESSION,
 					  GUC_ACTION_LOCAL, true, 0, false);
 }
-
-/*
- * Adds a new path to the search_path GUC.
- * To early rollback the changes done by this function (i.e.: before the
- * transaction commits/rollbacks), example usage is as follows:
- *
- *   int savedGUCLevel = ybAppendToSearchPathGUC();
- *
- *   // perform the stuff that requires above GUC change
- *
- *   RollbackGUCChange(savedGUCLevel);
- */
-int
-ybAppendToSearchPathGUC(const char *path)
-{
-	StringInfoData buf;
-	int savedGUCLevel;
-	const char *current_search_path;
-
-	savedGUCLevel = NewGUCNestLevel();
-	current_search_path = GetConfigOption("search_path", false, false);
-
-	initStringInfo(&buf);
-	appendStringInfo(&buf, "%s, %s", current_search_path, path);
-	SetGUCLocally("search_path", buf.data);
-
-	return savedGUCLevel;
-}

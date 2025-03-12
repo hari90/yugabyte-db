@@ -27,6 +27,4 @@ RollbackGUCChange(int savedGUCLevel)
 	AtEOXact_GUC(commitGUCChanges, savedGUCLevel);
 }
 
-int ybAppendToSearchPathGUC();
-
 #endif

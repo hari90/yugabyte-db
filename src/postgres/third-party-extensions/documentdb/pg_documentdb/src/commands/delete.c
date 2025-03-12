@@ -33,7 +33,6 @@
 #include "utils/error_utils.h"
 #include "utils/documentdb_errors.h"
 #include "utils/feature_counter.h"
-#include "utils/guc_utils.h"
 #include "utils/version_utils.h"
 #include "utils/query_utils.h"
 #include "api_hooks.h"
@@ -1063,10 +1062,6 @@ DeleteOneInternal(MongoCollection *collection, DeleteOneParams *deleteOneParams,
 	Oid *argTypes = palloc(sizeof(Oid) * argCount);
 	Datum *argValues = palloc(sizeof(Datum) * argCount);
 
-	/* Add documentdb_core to the search_part so that we can compare by bson
-	 * type */
-	int savedGUCLevel = ybAppendToSearchPathGUC(CoreSchemaName);
-
 	SPI_connect();
 
 	/*
@@ -1087,7 +1082,8 @@ DeleteOneInternal(MongoCollection *collection, DeleteOneParams *deleteOneParams,
 	 */
 	StringInfoData selectQuery;
 	initStringInfo(&selectQuery);
-	appendStringInfo(&selectQuery, "WITH s AS MATERIALIZED (SELECT object_id FROM ");
+	/* In Yb use the ybctid instead of ctid. */
+	appendStringInfo(&selectQuery, "WITH s AS MATERIALIZED (SELECT ybctid FROM ");
 
 	if (collection->shardTableName[0] != '\0')
 	{
@@ -1162,10 +1158,10 @@ DeleteOneInternal(MongoCollection *collection, DeleteOneParams *deleteOneParams,
 						 collection->collectionId);
 	}
 
+	/* In Yb use the ybctid instead of ctid. */
 	appendStringInfo(&deleteQuery,
-					 " d USING s WHERE d.object_id = s.object_id AND shard_key_value = $1"
-					 " RETURNING d.object_id");
-
+					 " d USING s WHERE d.ybctid = s.ybctid AND shard_key_value = $1"
+					 " RETURNING object_id");
 	if (deleteOneParams->returnDeletedDocument)
 	{
 		planId = QUERY_DELETE_ONE_ID_RETURN_DOCUMENT;
@@ -1268,7 +1264,6 @@ DeleteOneInternal(MongoCollection *collection, DeleteOneParams *deleteOneParams,
 		}
 	}
 
-	RollbackGUCChange(savedGUCLevel);
 	SPI_finish();
 }
 

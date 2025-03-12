@@ -73,7 +73,6 @@
 #include "executor/spi.h"
 #include "lib/stringinfo.h"
 #include "utils/builtins.h"
-#include "utils/guc_utils.h"
 #include "utils/typcache.h"
 
 #include "io/bson_core.h"
@@ -144,6 +143,9 @@ typedef struct
 
 	/* updated value of the document */
 	Datum updatedDocument;
+
+	/* updated value of the document */
+	Datum ybctid;
 } UpdateCandidate;
 
 
@@ -323,12 +325,12 @@ static bool UpdateDocumentByTID(uint64 collectionId, const char *shardTableName,
 								ItemPointer tid, pgbson *updatedDocument);
 static bool ybUpdateDocumentByOID(uint64 collectionId,
 								  const char *shardTableName,
-								  int64 shardKeyHash, Datum objectid,
+								  int64 shardKeyHash, Datum ybctid,
 								  pgbson *updatedDocument);
 static bool DeleteDocumentByTID(uint64 collectionId, int64 shardKeyHash,
 								ItemPointer tid);
 static bool ybDeleteDocumentByOID(uint64 collectionId, int64 shardKeyHash,
-								  Datum objectId);
+								  Datum ybctid);
 static void UpdateOneObjectId(MongoCollection *collection,
 							  UpdateOneParams *updateOneParams,
 							  bson_value_t *objectId, text *transactionId,
@@ -2432,7 +2434,7 @@ UpdateOneInternal(MongoCollection *collection, UpdateOneParams *updateOneParams,
 				if (IsYugaByteEnabled())
 					result->isRowUpdated = ybUpdateDocumentByOID(
 						collection->collectionId, collection->shardTableName,
-						shardKeyHash, updateCandidate.objectId, updatedPgbson);
+						shardKeyHash, updateCandidate.ybctid, updatedPgbson);
 				else
 					result->isRowUpdated = UpdateDocumentByTID(
 						collection->collectionId, collection->shardTableName,
@@ -2449,7 +2451,7 @@ UpdateOneInternal(MongoCollection *collection, UpdateOneParams *updateOneParams,
 				if (IsYugaByteEnabled())
 					result->isRowUpdated = ybDeleteDocumentByOID(
 						collection->collectionId, shardKeyHash,
-						updateCandidate.objectId);
+						updateCandidate.ybctid);
 				else
 					result->isRowUpdated =
 						DeleteDocumentByTID(collection->collectionId,
@@ -2534,8 +2536,8 @@ SelectUpdateCandidate(uint64 collectionId, const char *shardTableName, int64 sha
 
 	initStringInfo(&updateQuery);
 
-	appendStringInfo(&updateQuery, "SELECT CAST(1 AS OID), object_id, document "
-								   "FROM");
+	/* In Yb use the ybctid instead of ctid. */
+	appendStringInfo(&updateQuery, "SELECT ybctid, object_id, document FROM");
 
 	if (shardTableName != NULL && shardTableName[0] != '\0')
 	{
@@ -2636,15 +2638,21 @@ SelectUpdateCandidate(uint64 collectionId, const char *shardTableName, int64 sha
 		bool isNull = false;
 
 		int columnNumber = 1;
-		// Datum tidDatum = SPI_getbinval(SPI_tuptable->vals[rowIndex],
-		// 							   SPI_tuptable->tupdesc,
-		// 							   columnNumber, &isNull);
-		// Assert(!isNull);
+		Datum tidDatum = SPI_getbinval(SPI_tuptable->vals[rowIndex],
+									   SPI_tuptable->tupdesc, columnNumber,
+									   &isNull);
+		Assert(!isNull);
 
 		int typeLength = sizeof(ItemPointerData);
-		// tidDatum = SPI_datumTransfer(tidDatum, typeByValue, typeLength);
+		if (IsYugaByteEnabled())
+			typeLength = -1;
 
-		// updateCandidate->tid = DatumGetItemPointer(tidDatum);
+		tidDatum = SPI_datumTransfer(tidDatum, typeByValue, typeLength);
+
+		if (IsYugaByteEnabled())
+			updateCandidate->ybctid = tidDatum;
+		else
+			updateCandidate->tid = DatumGetItemPointer(tidDatum);
 
 		columnNumber = 2;
 		Datum objectIdDatum = SPI_getbinval(SPI_tuptable->vals[rowIndex],
@@ -2769,7 +2777,7 @@ UpdateDocumentByTID(uint64 collectionId, const char *shardTableName,
  */
 static bool
 ybUpdateDocumentByOID(uint64 collectionId, const char *shardTableName,
-					  int64 shardKeyHash, Datum objectId,
+					  int64 shardKeyHash, Datum ybctid,
 					  pgbson *updatedDocument)
 {
 	StringInfoData updateQuery;
@@ -2779,9 +2787,6 @@ ybUpdateDocumentByOID(uint64 collectionId, const char *shardTableName,
 
 	/* whitespace means not null, n means null */
 	char argNulls[3] = {' ', ' ', ' '};
-
-	/* Add documentdb_core to the search_part so that we can compare by bson type */
-	int savedGUCLevel = ybAppendToSearchPathGUC(CoreSchemaName);
 
 	SPI_connect();
 
@@ -2801,14 +2806,14 @@ ybUpdateDocumentByOID(uint64 collectionId, const char *shardTableName,
 
 	appendStringInfo(&updateQuery,
 					 " SET document = $3::%s"
-					 " WHERE object_id = $2::%s AND shard_key_value = $1",
-					 FullBsonTypeName, FullBsonTypeName);
+					 " WHERE ybctid = $2 AND shard_key_value = $1",
+					 FullBsonTypeName);
 
 	argTypes[0] = INT8OID;
 	argValues[0] = Int64GetDatum(shardKeyHash);
 
 	argTypes[1] = BYTEAOID;
-	argValues[1] = objectId;
+	argValues[1] = ybctid;
 
 	/* we use bytea because bson may not have the same OID on all nodes */
 	argTypes[2] = BYTEAOID;
@@ -2825,8 +2830,6 @@ ybUpdateDocumentByOID(uint64 collectionId, const char *shardTableName,
 	Assert(SPI_processed == 1);
 
 	SPI_finish();
-
-	RollbackGUCChange(savedGUCLevel);
 
 	return true;
 }
@@ -2881,30 +2884,26 @@ DeleteDocumentByTID(uint64 collectionId, int64 shardKeyHash, ItemPointer tid)
  * transaction.
  */
 static bool
-ybDeleteDocumentByOID(uint64 collectionId, int64 shardKeyHash, Datum objectId)
+ybDeleteDocumentByOID(uint64 collectionId, int64 shardKeyHash, Datum ybctid)
 {
 	StringInfoData deleteQuery;
 	int argCount = 2;
 	Oid argTypes[2];
 	Datum argValues[2];
 
-	/* Add documentdb_core to the search_part so that we can compare by bson
-	 * type */
-	int savedGUCLevel = ybAppendToSearchPathGUC(CoreSchemaName);
-
 	SPI_connect();
 
 	initStringInfo(&deleteQuery);
 	appendStringInfo(&deleteQuery,
 					 "DELETE FROM %s.documents_" UINT64_FORMAT " WHERE "
-					 "object_id = $2::%s AND shard_key_value = $1",
-					 ApiDataSchemaName, collectionId, FullBsonTypeName);
+					 "ybctid = $2 AND shard_key_value = $1",
+					 ApiDataSchemaName, collectionId);
 
 	argTypes[0] = INT8OID;
 	argValues[0] = Int64GetDatum(shardKeyHash);
 
 	argTypes[1] = BYTEAOID;
-	argValues[1] = objectId;
+	argValues[1] = ybctid;
 
 	char *argNulls = NULL;
 	bool readOnly = false;
@@ -2918,8 +2917,6 @@ ybDeleteDocumentByOID(uint64 collectionId, int64 shardKeyHash, Datum objectId)
 	Assert(SPI_processed == 1);
 
 	SPI_finish();
-
-	RollbackGUCChange(savedGUCLevel);
 
 	return true;
 }
