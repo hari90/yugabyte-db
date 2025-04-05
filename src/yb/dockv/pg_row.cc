@@ -65,6 +65,7 @@ size_t FixedSize(DataType data_type) {
 
     case DataType::STRING: FALLTHROUGH_INTENDED;
     case DataType::VECTOR: FALLTHROUGH_INTENDED;
+    case DataType::BSON: FALLTHROUGH_INTENDED;
     case DataType::BINARY: FALLTHROUGH_INTENDED;
     case DataType::DECIMAL: FALLTHROUGH_INTENDED;
     case DataType::VARINT:
@@ -245,6 +246,7 @@ Status DoDecodeValue(
       *value = BinaryAppender::AppendString(slice, buffer);
       return Status::OK();
     case DataType::VECTOR: [[fallthrough]];
+    case DataType::BSON: [[fallthrough]];
     case DataType::BINARY:
       *value =  BinaryAppender::Append(slice, buffer);
       return Status::OK();
@@ -734,6 +736,7 @@ QLValuePB PgValue::ToQLValuePB(DataType data_type) const {
   QLValuePB result;
   switch (data_type) {
     case DataType::VECTOR: FALLTHROUGH_INTENDED;
+    case DataType::BSON: FALLTHROUGH_INTENDED;
     case DataType::BINARY: {
       auto data = binary_value();
       result.set_binary_value(data.cdata(), data.size());

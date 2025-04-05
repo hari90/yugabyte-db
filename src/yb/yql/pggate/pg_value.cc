@@ -72,6 +72,7 @@ Status PgValueToDatum(const YbcPgTypeEntity *type_entity,
     }
 
     case YB_YQL_DATA_TYPE_VECTOR: FALLTHROUGH_INTENDED;
+    case YB_YQL_DATA_TYPE_BSON: FALLTHROUGH_INTENDED;
     case YB_YQL_DATA_TYPE_BINARY: {
       auto str = value.binary_value();
       *datum = type_entity->yb_to_datum(str.data(), str.size(), &type_attrs);
@@ -174,6 +175,7 @@ Status PBToDatum(const YbcPgTypeEntity *type_entity,
     }
 
     case YB_YQL_DATA_TYPE_VECTOR: FALLTHROUGH_INTENDED;
+    case YB_YQL_DATA_TYPE_BSON: FALLTHROUGH_INTENDED;
     case YB_YQL_DATA_TYPE_BINARY: {
       auto str = value.binary_value();
       *datum = type_entity->yb_to_datum(str.data(), str.size(), &type_attrs);
@@ -287,6 +289,7 @@ Status PgValueToPB(const YbcPgTypeEntity *type_entity,
       break;
     }
     case YB_YQL_DATA_TYPE_VECTOR: FALLTHROUGH_INTENDED;
+    case YB_YQL_DATA_TYPE_BSON: FALLTHROUGH_INTENDED;
     case YB_YQL_DATA_TYPE_BINARY: {
       uint8_t *value;
       int64_t bytes = type_entity->datum_fixed_size;
