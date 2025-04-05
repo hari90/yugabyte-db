@@ -33,7 +33,13 @@ CREATE TYPE __API_CATALOG_SCHEMA__.index_spec_type_internal AS (
     index_version int,
 
     -- document expiry threshold for ttl index
-    index_expire_after_seconds int
+    index_expire_after_seconds int,
+
+-- YB_TODO: ERROR:  ALTER TYPE ADD ATTRIBUTE not supported yet
+    cosmos_search_options __CORE_SCHEMA__.bson,
+
+-- YB_TODO: ERROR:  ALTER TYPE ADD ATTRIBUTE not supported yet
+    index_options __CORE_SCHEMA__.bson
 );
 
 CREATE DOMAIN __API_CATALOG_SCHEMA__.index_spec_type AS __API_CATALOG_SCHEMA__.index_spec_type_internal
@@ -77,5 +83,6 @@ CREATE INDEX collection_index_name
 ON __API_CATALOG_SCHEMA__.collection_indexes (collection_id, ((index_spec).index_name));
 
 -- Speeds up queries based on index_key.
-CREATE INDEX collection_index_key
-ON __API_CATALOG_SCHEMA__.collection_indexes (collection_id, ((index_spec).index_key));
+-- YB_TODO: INDEX on column of type 'user_defined_type' not yet supported
+-- CREATE INDEX collection_index_key
+-- ON __API_CATALOG_SCHEMA__.collection_indexes (collection_id, ((index_spec).index_key));

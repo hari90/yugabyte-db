@@ -5096,11 +5096,16 @@ YBGetCollationInfo(Oid collation_id,
 		 * regex purposes on the indexed type text. Add an exception here for
 		 * int32. Since this relaxes the assert for other situations involving
 		 * int32, a proper fix should be done in the future.
+		 *
+		 * bson has key type bool, but it can have a collation. Add an exception
+		 * here for bool. Since this relaxes the assert for other situations
+		 * involving bool, a proper fix should be done in the future.
 		 */
 		Assert(collation_id == InvalidOid ||
 			   type_entity->yb_type == YB_YQL_DATA_TYPE_BINARY ||
 			   type_entity->yb_type == YB_YQL_DATA_TYPE_GIN_NULL ||
-			   type_entity->yb_type == YB_YQL_DATA_TYPE_INT32);
+			   type_entity->yb_type == YB_YQL_DATA_TYPE_INT32 ||
+			   type_entity->yb_type == YB_YQL_DATA_TYPE_BOOL);
 		collation_info->collate_is_valid_non_c = false;
 		collation_info->sortkey = NULL;
 		return;

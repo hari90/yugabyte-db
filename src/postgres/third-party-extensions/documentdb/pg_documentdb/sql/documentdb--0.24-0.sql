@@ -42,14 +42,15 @@ CREATE SCHEMA documentdb_data;
 /*
  * Region: geospatial
  */
-#include "udfs/aggregation/bson_geonear_functions--0.18-0.sql"
-#include "udfs/query/bson_dollar_geospatial--0.10-0.sql"
-#include "operators/bson_geospatial_operators--0.16-0.sql"
-#include "operators/bson_geospatial_operators--0.18-0.sql"
-#include "udfs/geospatial/bson_gist_extensibility_functions--0.16-0.sql"
-#include "operators/bson_gist_geospatial_op_classes--0.16-0.sql"
-#include "operators/bson_gist_geospatial_op_classes_members--0.16-0.sql"
-#include "operators/bson_gist_geospatial_op_classes_members--0.18-0.sql"
+-- YB_TDO: Support postgis
+-- #include "udfs/aggregation/bson_geonear_functions--0.18-0.sql"
+-- #include "udfs/query/bson_dollar_geospatial--0.10-0.sql"
+-- #include "operators/bson_geospatial_operators--0.16-0.sql"
+-- #include "operators/bson_geospatial_operators--0.18-0.sql"
+-- #include "udfs/geospatial/bson_gist_extensibility_functions--0.16-0.sql"
+-- #include "operators/bson_gist_geospatial_op_classes--0.16-0.sql"
+-- #include "operators/bson_gist_geospatial_op_classes_members--0.16-0.sql"
+-- #include "operators/bson_gist_geospatial_op_classes_members--0.18-0.sql"
 
 
 /*
@@ -74,24 +75,25 @@ CREATE SCHEMA documentdb_data;
 #include "operators/bson_dollar_operators--0.16-0.sql"
 #include "operators/bson_dollar_negation_operators--0.16-0.sql"
 
-#include "udfs/rum/handler--0.10-0.sql"
-#include "schema/rum_access_method--0.10-0.sql"
-#include "schema/unique_shard_path_operator_class--0.24-0.sql"
-#include "schema/bson_rum_exclusion_operator_class--0.23-0.sql"
-#include "operators/bson_dollar_text_operators--0.24-0.sql"
-#include "udfs/rum/bson_rum_text_path_funcs--0.24-0.sql"
-#include "schema/bson_rum_text_path_ops--0.24-0.sql"
-#include "udfs/rum/extensibility_functions--0.10-0.sql"
-#include "udfs/rum/single_path_extensibility_functions--0.10-0.sql"
-#include "schema/single_path_operator_class--0.10-0.sql"
-#include "udfs/rum/wildcard_project_path_extensibility_functions--0.12-0.sql"
-#include "schema/wildcard_project_path_operator_class--0.12-0.sql"
+-- YB_TDO: Support rum
+-- #include "udfs/rum/handler--0.10-0.sql"
+-- #include "schema/rum_access_method--0.10-0.sql"
+-- #include "schema/unique_shard_path_operator_class--0.24-0.sql"
+-- #include "schema/bson_rum_exclusion_operator_class--0.23-0.sql"
+-- #include "operators/bson_dollar_text_operators--0.24-0.sql"
+-- #include "udfs/rum/bson_rum_text_path_funcs--0.24-0.sql"
+-- #include "schema/bson_rum_text_path_ops--0.24-0.sql"
+-- #include "udfs/rum/extensibility_functions--0.10-0.sql"
+-- #include "udfs/rum/single_path_extensibility_functions--0.10-0.sql"
+-- #include "schema/single_path_operator_class--0.10-0.sql"
+-- #include "udfs/rum/wildcard_project_path_extensibility_functions--0.12-0.sql"
+-- #include "schema/wildcard_project_path_operator_class--0.12-0.sql"
 
-#include "udfs/rum/bson_rum_hashed_ops_functions--0.23-0.sql"
-#include "schema/bson_hash_operator_class--0.23-0.sql"
+-- #include "udfs/rum/bson_rum_hashed_ops_functions--0.23-0.sql"
+-- #include "schema/bson_hash_operator_class--0.23-0.sql"
 
-#include "schema/index_operator_classes_negation--0.16-0.sql"
-#include "schema/index_operator_classes_range--0.23-0.sql"
+-- #include "schema/index_operator_classes_negation--0.16-0.sql"
+-- #include "schema/index_operator_classes_range--0.23-0.sql"
 
 /*
  * Region: Aggregation operators.

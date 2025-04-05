@@ -98,6 +98,9 @@
 
 #include "api_hooks.h"
 
+/* YB includes */
+#include "pg_yb_utils.h"
+
 /* from tid.c */
 #define DatumGetItemPointer(X) ((ItemPointer) DatumGetPointer(X))
 #define ItemPointerGetDatum(X) PointerGetDatum(X)
@@ -140,6 +143,9 @@ typedef struct
 
 	/* updated value of the document */
 	Datum updatedDocument;
+
+	/* updated value of the document */
+	Datum ybctid;
 } UpdateCandidate;
 
 
@@ -317,8 +323,14 @@ static bool SelectUpdateCandidate(uint64 collectionId, const char *shardTableNam
 static bool UpdateDocumentByTID(uint64 collectionId, const char *shardTableName, int64
 								shardKeyHash,
 								ItemPointer tid, pgbson *updatedDocument);
+static bool ybUpdateDocumentByOID(uint64 collectionId,
+								  const char *shardTableName,
+								  int64 shardKeyHash, Datum ybctid,
+								  pgbson *updatedDocument);
 static bool DeleteDocumentByTID(uint64 collectionId, int64 shardKeyHash,
 								ItemPointer tid);
+static bool ybDeleteDocumentByOID(uint64 collectionId, int64 shardKeyHash,
+								  Datum ybctid);
 static void UpdateOneObjectId(MongoCollection *collection,
 							  UpdateOneParams *updateOneParams,
 							  bson_value_t *objectId, text *transactionId,
@@ -2419,11 +2431,14 @@ UpdateOneInternal(MongoCollection *collection, UpdateOneParams *updateOneParams,
 				 * Shard key is not affected by the update. Do an "in-place" update
 				 * (in the same shard placement).
 				 */
-				result->isRowUpdated =
-					UpdateDocumentByTID(collection->collectionId,
-										collection->shardTableName,
-										shardKeyHash, updateCandidate.tid,
-										updatedPgbson);
+				if (IsYugaByteEnabled())
+					result->isRowUpdated = ybUpdateDocumentByOID(
+						collection->collectionId, collection->shardTableName,
+						shardKeyHash, updateCandidate.ybctid, updatedPgbson);
+				else
+					result->isRowUpdated = UpdateDocumentByTID(
+						collection->collectionId, collection->shardTableName,
+						shardKeyHash, updateCandidate.tid, updatedPgbson);
 
 				result->reinsertDocument = NULL;
 			}
@@ -2433,9 +2448,14 @@ UpdateOneInternal(MongoCollection *collection, UpdateOneParams *updateOneParams,
 				 * Shard key is changed by the update. Delete the row and request
 				 * reinsertion.
 				 */
-				result->isRowUpdated =
-					DeleteDocumentByTID(collection->collectionId, shardKeyHash,
-										updateCandidate.tid);
+				if (IsYugaByteEnabled())
+					result->isRowUpdated = ybDeleteDocumentByOID(
+						collection->collectionId, shardKeyHash,
+						updateCandidate.ybctid);
+				else
+					result->isRowUpdated =
+						DeleteDocumentByTID(collection->collectionId,
+											shardKeyHash, updateCandidate.tid);
 
 				result->reinsertDocument = updatedPgbson;
 			}
@@ -2516,7 +2536,8 @@ SelectUpdateCandidate(uint64 collectionId, const char *shardTableName, int64 sha
 
 	initStringInfo(&updateQuery);
 
-	appendStringInfo(&updateQuery, "SELECT ctid, object_id, document FROM");
+	/* In Yb use the ybctid instead of ctid. */
+	appendStringInfo(&updateQuery, "SELECT ybctid, object_id, document FROM");
 
 	if (shardTableName != NULL && shardTableName[0] != '\0')
 	{
@@ -2618,14 +2639,20 @@ SelectUpdateCandidate(uint64 collectionId, const char *shardTableName, int64 sha
 
 		int columnNumber = 1;
 		Datum tidDatum = SPI_getbinval(SPI_tuptable->vals[rowIndex],
-									   SPI_tuptable->tupdesc,
-									   columnNumber, &isNull);
+									   SPI_tuptable->tupdesc, columnNumber,
+									   &isNull);
 		Assert(!isNull);
 
 		int typeLength = sizeof(ItemPointerData);
+		if (IsYugaByteEnabled())
+			typeLength = -1;
+
 		tidDatum = SPI_datumTransfer(tidDatum, typeByValue, typeLength);
 
-		updateCandidate->tid = DatumGetItemPointer(tidDatum);
+		if (IsYugaByteEnabled())
+			updateCandidate->ybctid = tidDatum;
+		else
+			updateCandidate->tid = DatumGetItemPointer(tidDatum);
 
 		columnNumber = 2;
 		Datum objectIdDatum = SPI_getbinval(SPI_tuptable->vals[rowIndex],
@@ -2742,6 +2769,70 @@ UpdateDocumentByTID(uint64 collectionId, const char *shardTableName,
 	return true;
 }
 
+/*
+ * ybUpdateDocumentByOID performs a OID update on a single shard.
+ *
+ * The OID must be obtained via SelectUpdateCandidate in the current
+ * transaction.
+ */
+static bool
+ybUpdateDocumentByOID(uint64 collectionId, const char *shardTableName,
+					  int64 shardKeyHash, Datum ybctid,
+					  pgbson *updatedDocument)
+{
+	StringInfoData updateQuery;
+	int argCount = 3;
+	Oid argTypes[3];
+	Datum argValues[3];
+
+	/* whitespace means not null, n means null */
+	char argNulls[3] = {' ', ' ', ' '};
+
+	SPI_connect();
+
+	initStringInfo(&updateQuery);
+	appendStringInfoString(&updateQuery, "UPDATE ");
+
+	if (shardTableName != NULL && shardTableName[0] != '\0')
+	{
+		appendStringInfo(&updateQuery, "%s.%s", ApiDataSchemaName,
+						 shardTableName);
+	}
+	else
+	{
+		appendStringInfo(&updateQuery, "%s.documents_" UINT64_FORMAT,
+						 ApiDataSchemaName, collectionId);
+	}
+
+	appendStringInfo(&updateQuery,
+					 " SET document = $3::%s"
+					 " WHERE ybctid = $2 AND shard_key_value = $1",
+					 FullBsonTypeName);
+
+	argTypes[0] = INT8OID;
+	argValues[0] = Int64GetDatum(shardKeyHash);
+
+	argTypes[1] = BYTEAOID;
+	argValues[1] = ybctid;
+
+	/* we use bytea because bson may not have the same OID on all nodes */
+	argTypes[2] = BYTEAOID;
+	argValues[2] = PointerGetDatum(CastPgbsonToBytea(updatedDocument));
+
+	bool readOnly = false;
+	long maxTupleCount = 0;
+
+	SPIPlanPtr plan = GetSPIQueryPlanWithLocalShard(
+		collectionId, shardTableName, QUERY_ID_UPDATE_BY_TID, updateQuery.data,
+		argTypes, argCount);
+
+	SPI_execute_plan(plan, argValues, argNulls, readOnly, maxTupleCount);
+	Assert(SPI_processed == 1);
+
+	SPI_finish();
+
+	return true;
+}
 
 /*
  * DeleteDocumentByTID performs a TID delete on a single shard.
@@ -2786,6 +2877,49 @@ DeleteDocumentByTID(uint64 collectionId, int64 shardKeyHash, ItemPointer tid)
 	return true;
 }
 
+/*
+ * ybDeleteDocumentByOID performs a TID delete on a single shard.
+ *
+ * The TID must be obtained via SelectUpdateCandidate in the current
+ * transaction.
+ */
+static bool
+ybDeleteDocumentByOID(uint64 collectionId, int64 shardKeyHash, Datum ybctid)
+{
+	StringInfoData deleteQuery;
+	int argCount = 2;
+	Oid argTypes[2];
+	Datum argValues[2];
+
+	SPI_connect();
+
+	initStringInfo(&deleteQuery);
+	appendStringInfo(&deleteQuery,
+					 "DELETE FROM %s.documents_" UINT64_FORMAT " WHERE "
+					 "ybctid = $2 AND shard_key_value = $1",
+					 ApiDataSchemaName, collectionId);
+
+	argTypes[0] = INT8OID;
+	argValues[0] = Int64GetDatum(shardKeyHash);
+
+	argTypes[1] = BYTEAOID;
+	argValues[1] = ybctid;
+
+	char *argNulls = NULL;
+	bool readOnly = false;
+	long maxTupleCount = 0;
+
+	SPIPlanPtr plan = GetSPIQueryPlan(collectionId, QUERY_ID_DELETE_BY_TID,
+									  deleteQuery.data, argTypes, argCount);
+
+	SPI_execute_plan(plan, argValues, argNulls, readOnly, maxTupleCount);
+
+	Assert(SPI_processed == 1);
+
+	SPI_finish();
+
+	return true;
+}
 
 /*
  * UpdateOneObjectId handles the case where we are updating a single document

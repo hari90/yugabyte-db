@@ -1,6 +1,7 @@
 DIRS = \
 	hypopg \
 	orafce \
+	documentdb \
 	pgaudit \
 	pg_cron \
 	pg_hint_plan \
