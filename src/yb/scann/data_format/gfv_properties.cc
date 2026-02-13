@@ -20,7 +20,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 string_view GfvFeatureTypeName(int gfv_feature_type) {
   switch (gfv_feature_type) {
@@ -131,4 +131,4 @@ bool IsGfvDenseOrDie(const GenericFeatureVector& gfv) {
   return ValueOrDie(IsGfvDense(gfv));
 }
 
-}  // namespace research_scann
+}  // namespace yb

@@ -21,7 +21,7 @@
 
 HWY_BEFORE_NAMESPACE();
 
-namespace research_scann {
+namespace yb {
 namespace asymmetric_hashing_internal {
 
 namespace HWY_NAMESPACE {
@@ -859,11 +859,11 @@ SCANN_GET_TOP_FLOAT_DISTANCES_SPILLED(9);
 
 }  // namespace HWY_NAMESPACE
 }  // namespace asymmetric_hashing_internal
-}  // namespace research_scann
+}  // namespace yb
 HWY_AFTER_NAMESPACE();
 
 #if HWY_ONCE
-namespace research_scann {
+namespace yb {
 namespace asymmetric_hashing_internal {
 
 #define SCANN_EXPORT_ALL_PREFETCH_STRATEGIES(base_fn, batch_size) \
@@ -975,6 +975,6 @@ LUT16Highway<kNumQueries, kPrefetch>::GetTopFloatDistances(
 #undef SCANN_HWY_DYNAMIC_DISPATCH
 
 }  // namespace asymmetric_hashing_internal
-}  // namespace research_scann
+}  // namespace yb
 #endif
 #endif

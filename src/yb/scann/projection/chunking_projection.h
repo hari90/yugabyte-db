@@ -28,7 +28,7 @@
 #include "scann/proto/projection.pb.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 class ChunkingProjection;
@@ -168,6 +168,6 @@ class ChunkingProjection : public ChunkingProjectionUntyped {
 
 SCANN_INSTANTIATE_TYPED_CLASS(extern, ChunkingProjection);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

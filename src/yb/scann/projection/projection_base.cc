@@ -16,7 +16,7 @@
 
 #include "scann/utils/util_functions.h"
 
-namespace research_scann {
+namespace yb {
 
 StatusOr<shared_ptr<const TypedDataset<float>>>
 UntypedProjection::GetDirections() const {
@@ -31,4 +31,4 @@ std::optional<SerializedProjection> UntypedProjection::SerializeToProto()
 
 SCANN_INSTANTIATE_TYPED_CLASS(, Projection);
 
-}  // namespace research_scann
+}  // namespace yb

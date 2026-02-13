@@ -19,7 +19,7 @@
 
 #include "scann/utils/intrinsics/attributes.h"
 
-namespace research_scann {
+namespace yb {
 namespace asymmetric_hashing_internal {
 
 void Avx512Swizzle128(const uint8_t* src, uint8_t* dst);
@@ -30,7 +30,7 @@ void Avx512PlatformSpecificSwizzle(uint8_t* packed_dataset, int num_datapoints,
                                    int num_codes_per_dp);
 
 }  // namespace asymmetric_hashing_internal
-}  // namespace research_scann
+}  // namespace yb
 
 #endif
 #endif

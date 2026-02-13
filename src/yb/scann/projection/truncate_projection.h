@@ -24,7 +24,7 @@
 #include "scann/projection/projection_base.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 class TruncateProjection : public Projection<T> {
@@ -45,6 +45,6 @@ class TruncateProjection : public Projection<T> {
 
 SCANN_INSTANTIATE_TYPED_CLASS(extern, TruncateProjection);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

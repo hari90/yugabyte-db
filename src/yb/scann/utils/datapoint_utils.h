@@ -28,7 +28,7 @@
 #include "scann/utils/reduction.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 inline T RoundIfFixedPoint(float num) {
@@ -833,6 +833,6 @@ bool PointerIsBinary(const DatapointPtr<T>& pointer) {
                            : SparsePointerIsBinary(pointer);
 }
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

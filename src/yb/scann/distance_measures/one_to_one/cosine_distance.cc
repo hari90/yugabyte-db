@@ -26,7 +26,7 @@
 #include "scann/oss_wrappers/scann_bits.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 SCANN_DEFINE_DISTANCE_MEASURE_VIRTUAL_METHODS(CosineDistance,
                                               kEarlyStoppingNotSupported);
@@ -78,4 +78,4 @@ double BinaryCosineDistance::GetDistanceHybrid(
 
 SCANN_REGISTER_DISTANCE_MEASURE(BinaryCosineDistance)
 
-}  // namespace research_scann
+}  // namespace yb

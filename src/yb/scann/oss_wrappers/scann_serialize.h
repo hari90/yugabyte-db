@@ -20,7 +20,7 @@
 
 #include "absl/strings/string_view.h"
 
-namespace research_scann {
+namespace yb {
 namespace strings {
 
 std::string Uint32ToKey(uint32_t u32);
@@ -36,6 +36,6 @@ void KeyFromFloat(float x, std::string* key);
 std::string FloatToKey(float x);
 
 }  // namespace strings
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

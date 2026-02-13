@@ -19,7 +19,7 @@
 #include "absl/strings/str_cat.h"
 #include "scann/oss_wrappers/scann_malloc_extension.h"
 
-namespace research_scann {
+namespace yb {
 
 std::string GetTcMallocLogString() {
   size_t allocated_bytes = *tcmalloc::MallocExtension::GetNumericProperty(
@@ -38,4 +38,4 @@ std::string GetTcMallocLogString() {
                       "MB.");
 }
 
-}  // namespace research_scann
+}  // namespace yb

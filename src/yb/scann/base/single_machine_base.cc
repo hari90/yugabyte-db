@@ -54,7 +54,7 @@
 #include "scann/utils/util_functions.h"
 #include "scann/utils/zip_sort.h"
 
-namespace research_scann {
+namespace yb {
 
 UntypedSingleMachineSearcherBase::~UntypedSingleMachineSearcherBase() {}
 
@@ -834,4 +834,4 @@ bool SingleMachineSearcherBase<T>::fixed_point_reordering_enabled() const {
 
 SCANN_INSTANTIATE_TYPED_CLASS(, SingleMachineSearcherBase);
 
-}  // namespace research_scann
+}  // namespace yb

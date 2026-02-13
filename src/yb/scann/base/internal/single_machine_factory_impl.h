@@ -41,7 +41,7 @@
 #include "scann/utils/single_machine_autopilot.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 class DenseDataset;
@@ -202,6 +202,6 @@ StatusOrSearcherUntyped AsymmetricHasherFactory(
 }
 
 }  // namespace internal
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

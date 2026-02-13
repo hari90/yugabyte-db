@@ -20,7 +20,7 @@
 
 #include "scann/utils/common.h"
 
-namespace research_scann {
+namespace yb {
 
 AlignedBuffer MakeCacheAlignedCopy(ConstSpan<uint8_t> span) {
   const size_t padded_size1 = NextMultipleOf(span.size(), 64);
@@ -38,4 +38,4 @@ AlignedBuffer MakeCacheAlignedCopy(ConstSpan<uint8_t> span) {
   return {std::move(padded), ptr};
 }
 
-}  // namespace research_scann
+}  // namespace yb

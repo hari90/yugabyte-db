@@ -25,7 +25,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 namespace asymmetric_hashing_internal {
 
 #ifdef __SSE4_1__
@@ -283,4 +283,4 @@ void WriteDistancesToTopN(const RestrictAllowlist* whitelist_or_null,
 #endif
 
 }  // namespace asymmetric_hashing_internal
-}  // namespace research_scann
+}  // namespace yb

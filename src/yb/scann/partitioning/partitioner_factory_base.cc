@@ -27,7 +27,7 @@
 #include "scann/utils/random/reservoir_sampling.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 namespace {
 
@@ -172,4 +172,4 @@ SCANN_INSTANTIATE_PARTITIONER_FACTORY(, int64_t);
 SCANN_INSTANTIATE_PARTITIONER_FACTORY(, float);
 SCANN_INSTANTIATE_PARTITIONER_FACTORY(, double);
 
-}  // namespace research_scann
+}  // namespace yb

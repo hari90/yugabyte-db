@@ -19,7 +19,7 @@
 
 #include "scann/utils/common.h"
 
-namespace research_scann {
+namespace yb {
 
 struct AlignedBuffer {
   unique_ptr<uint8_t[]> storage;
@@ -28,6 +28,6 @@ struct AlignedBuffer {
 
 AlignedBuffer MakeCacheAlignedCopy(ConstSpan<uint8_t> span);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

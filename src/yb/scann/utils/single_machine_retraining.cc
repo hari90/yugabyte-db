@@ -34,7 +34,7 @@
 #include "scann/utils/scann_config_utils.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 StatusOrSearcherUntyped RetrainAndReindexSearcherImpl(
@@ -86,4 +86,4 @@ StatusOrSearcherUntyped RetrainAndReindexSearcher(
       searcher_pointer_mutex, config, std::move(parallelization_pool));
 }
 
-}  // namespace research_scann
+}  // namespace yb

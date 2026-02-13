@@ -22,7 +22,7 @@
 #include "absl/base/internal/endian.h"
 #include "absl/strings/string_view.h"
 
-namespace research_scann {
+namespace yb {
 namespace strings {
 namespace {
 
@@ -101,4 +101,4 @@ float KeyToFloat(absl::string_view key) {
 }
 
 }  // namespace strings
-}  // namespace research_scann
+}  // namespace yb

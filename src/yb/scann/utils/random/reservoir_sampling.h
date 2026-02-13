@@ -25,7 +25,7 @@
 #include "absl/random/uniform_int_distribution.h"
 #include "absl/random/uniform_real_distribution.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 std::vector<size_t> ReservoirSampleIdxs(T&& rng, size_t n, size_t sample_size) {
@@ -59,6 +59,6 @@ std::vector<size_t> ReservoirSampleIdxs(T&& rng, size_t n, size_t sample_size) {
   }
   return result;
 }
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

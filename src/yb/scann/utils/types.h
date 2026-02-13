@@ -31,7 +31,7 @@
 #include "scann/proto/input_output.pb.h"
 #include "scann/utils/common.h"
 
-namespace research_scann {
+namespace yb {
 
 // Undefine the standard absl log macros.
 #ifdef DCHECK_OK
@@ -272,131 +272,129 @@ T NonFpTagErrorOrCrash(uint8_t tag) {
 
 #ifndef SCANN_DISABLE_UNCOMMON_TYPES
 
-#define SCANN_CALL_FUNCTION_BY_TAG(tag, function, ...)                 \
-  [&]() ABSL_NO_THREAD_SAFETY_ANALYSIS {                               \
-    using ReturnT = decltype(function<float>(__VA_ARGS__));            \
-    switch (tag) {                                                     \
-      case ::research_scann::InputOutputConfig::INT8:                  \
-        return function<int8_t>(__VA_ARGS__);                          \
-      case ::research_scann::InputOutputConfig::UINT8:                 \
-        return function<uint8_t>(__VA_ARGS__);                         \
-      case ::research_scann::InputOutputConfig::INT16:                 \
-        return function<int16_t>(__VA_ARGS__);                         \
-      case ::research_scann::InputOutputConfig::INT32:                 \
-        return function<int32_t>(__VA_ARGS__);                         \
-      case ::research_scann::InputOutputConfig::UINT32:                \
-        return function<uint32_t>(__VA_ARGS__);                        \
-      case ::research_scann::InputOutputConfig::INT64:                 \
-        return function<int64_t>(__VA_ARGS__);                         \
-      case ::research_scann::InputOutputConfig::FLOAT:                 \
-        return function<float>(__VA_ARGS__);                           \
-      case ::research_scann::InputOutputConfig::DOUBLE:                \
-        return function<double>(__VA_ARGS__);                          \
-      default:                                                         \
-        return ::research_scann::InvalidTagErrorOrCrash<ReturnT>(tag); \
-    }                                                                  \
+#define SCANN_CALL_FUNCTION_BY_TAG(tag, function, ...) \
+  [&]() ABSL_NO_THREAD_SAFETY_ANALYSIS { \
+    using ReturnT = decltype(function<float>(__VA_ARGS__)); \
+    switch (tag) { \
+      case ::yb::InputOutputConfig::INT8: \
+        return function<int8_t>(__VA_ARGS__); \
+      case ::yb::InputOutputConfig::UINT8: \
+        return function<uint8_t>(__VA_ARGS__); \
+      case ::yb::InputOutputConfig::INT16: \
+        return function<int16_t>(__VA_ARGS__); \
+      case ::yb::InputOutputConfig::INT32: \
+        return function<int32_t>(__VA_ARGS__); \
+      case ::yb::InputOutputConfig::UINT32: \
+        return function<uint32_t>(__VA_ARGS__); \
+      case ::yb::InputOutputConfig::INT64: \
+        return function<int64_t>(__VA_ARGS__); \
+      case ::yb::InputOutputConfig::FLOAT: \
+        return function<float>(__VA_ARGS__); \
+      case ::yb::InputOutputConfig::DOUBLE: \
+        return function<double>(__VA_ARGS__); \
+      default: \
+        return ::yb::InvalidTagErrorOrCrash<ReturnT>(tag); \
+    } \
   }()
 
-#define SCANN_CALL_FUNCTION_BY_TAG_NV(tag, function, ...)              \
-  [&] {                                                                \
-    using ReturnT = decltype(function<float>(__VA_ARGS__));            \
-    switch (tag) {                                                     \
-      case ::research_scann::InputOutputConfig::                       \
-          IN_MEMORY_DATA_TYPE_NOT_SPECIFIED:                           \
-        return function<NoValue>(__VA_ARGS__);                         \
-      case ::research_scann::InputOutputConfig::INT8:                  \
-        return function<int8_t>(__VA_ARGS__);                          \
-      case ::research_scann::InputOutputConfig::UINT8:                 \
-        return function<uint8_t>(__VA_ARGS__);                         \
-      case ::research_scann::InputOutputConfig::INT16:                 \
-        return function<int16_t>(__VA_ARGS__);                         \
-      case ::research_scann::InputOutputConfig::INT32:                 \
-        return function<int32_t>(__VA_ARGS__);                         \
-      case ::research_scann::InputOutputConfig::UINT32:                \
-        return function<uint32_t>(__VA_ARGS__);                        \
-      case ::research_scann::InputOutputConfig::INT64:                 \
-        return function<int64_t>(__VA_ARGS__);                         \
-      case ::research_scann::InputOutputConfig::FLOAT:                 \
-        return function<float>(__VA_ARGS__);                           \
-      case ::research_scann::InputOutputConfig::DOUBLE:                \
-        return function<double>(__VA_ARGS__);                          \
-      default:                                                         \
-        return ::research_scann::InvalidTagErrorOrCrash<ReturnT>(tag); \
-    }                                                                  \
+#define SCANN_CALL_FUNCTION_BY_TAG_NV(tag, function, ...) \
+  [&] { \
+    using ReturnT = decltype(function<float>(__VA_ARGS__)); \
+    switch (tag) { \
+      case ::yb::InputOutputConfig::IN_MEMORY_DATA_TYPE_NOT_SPECIFIED: \
+        return function<NoValue>(__VA_ARGS__); \
+      case ::yb::InputOutputConfig::INT8: \
+        return function<int8_t>(__VA_ARGS__); \
+      case ::yb::InputOutputConfig::UINT8: \
+        return function<uint8_t>(__VA_ARGS__); \
+      case ::yb::InputOutputConfig::INT16: \
+        return function<int16_t>(__VA_ARGS__); \
+      case ::yb::InputOutputConfig::INT32: \
+        return function<int32_t>(__VA_ARGS__); \
+      case ::yb::InputOutputConfig::UINT32: \
+        return function<uint32_t>(__VA_ARGS__); \
+      case ::yb::InputOutputConfig::INT64: \
+        return function<int64_t>(__VA_ARGS__); \
+      case ::yb::InputOutputConfig::FLOAT: \
+        return function<float>(__VA_ARGS__); \
+      case ::yb::InputOutputConfig::DOUBLE: \
+        return function<double>(__VA_ARGS__); \
+      default: \
+        return ::yb::InvalidTagErrorOrCrash<ReturnT>(tag); \
+    } \
   }()
 
 #else
 
-#define SCANN_CALL_FUNCTION_BY_TAG(tag, function, ...)                  \
-  [&]() ABSL_NO_THREAD_SAFETY_ANALYSIS {                                \
-    using ReturnT = decltype(function<float>(__VA_ARGS__));             \
-    switch (tag) {                                                      \
-      case ::research_scann::InputOutputConfig::FLOAT:                  \
-        return function<float>(__VA_ARGS__);                            \
-      case ::research_scann::InputOutputConfig::UINT8:                  \
-        return function<uint8_t>(__VA_ARGS__);                          \
-      case ::research_scann::InputOutputConfig::INT8:                   \
-      case ::research_scann::InputOutputConfig::INT16:                  \
-      case ::research_scann::InputOutputConfig::UINT16:                 \
-      case ::research_scann::InputOutputConfig::INT32:                  \
-      case ::research_scann::InputOutputConfig::UINT32:                 \
-      case ::research_scann::InputOutputConfig::INT64:                  \
-      case ::research_scann::InputOutputConfig::UINT64:                 \
-      case ::research_scann::InputOutputConfig::DOUBLE:                 \
-        return ::research_scann::DisabledTagErrorOrCrash<ReturnT>(tag); \
-      default:                                                          \
-        return ::research_scann::InvalidTagErrorOrCrash<ReturnT>(tag);  \
-    }                                                                   \
+#define SCANN_CALL_FUNCTION_BY_TAG(tag, function, ...) \
+  [&]() ABSL_NO_THREAD_SAFETY_ANALYSIS { \
+    using ReturnT = decltype(function<float>(__VA_ARGS__)); \
+    switch (tag) { \
+      case ::yb::InputOutputConfig::FLOAT: \
+        return function<float>(__VA_ARGS__); \
+      case ::yb::InputOutputConfig::UINT8: \
+        return function<uint8_t>(__VA_ARGS__); \
+      case ::yb::InputOutputConfig::INT8: \
+      case ::yb::InputOutputConfig::INT16: \
+      case ::yb::InputOutputConfig::UINT16: \
+      case ::yb::InputOutputConfig::INT32: \
+      case ::yb::InputOutputConfig::UINT32: \
+      case ::yb::InputOutputConfig::INT64: \
+      case ::yb::InputOutputConfig::UINT64: \
+      case ::yb::InputOutputConfig::DOUBLE: \
+        return ::yb::DisabledTagErrorOrCrash<ReturnT>(tag); \
+      default: \
+        return ::yb::InvalidTagErrorOrCrash<ReturnT>(tag); \
+    } \
   }()
 
-#define SCANN_CALL_FUNCTION_BY_TAG_NV(tag, function, ...)               \
-  [&] {                                                                 \
-    using ReturnT = decltype(function<float>(__VA_ARGS__));             \
-    switch (tag) {                                                      \
-      case ::research_scann::InputOutputConfig::                        \
-          IN_MEMORY_DATA_TYPE_NOT_SPECIFIED:                            \
-        return function<NoValue>(__VA_ARGS__);                          \
-      case ::research_scann::InputOutputConfig::FLOAT:                  \
-        return function<float>(__VA_ARGS__);                            \
-      case ::research_scann::InputOutputConfig::UINT8:                  \
-        return function<uint8_t>(__VA_ARGS__);                          \
-      case ::research_scann::InputOutputConfig::INT8:                   \
-      case ::research_scann::InputOutputConfig::INT16:                  \
-      case ::research_scann::InputOutputConfig::UINT16:                 \
-      case ::research_scann::InputOutputConfig::INT32:                  \
-      case ::research_scann::InputOutputConfig::UINT32:                 \
-      case ::research_scann::InputOutputConfig::INT64:                  \
-      case ::research_scann::InputOutputConfig::UINT64:                 \
-      case ::research_scann::InputOutputConfig::DOUBLE:                 \
-        return ::research_scann::DisabledTagErrorOrCrash<ReturnT>(tag); \
-      default:                                                          \
-        return ::research_scann::InvalidTagErrorOrCrash<ReturnT>(tag);  \
-    }                                                                   \
+#define SCANN_CALL_FUNCTION_BY_TAG_NV(tag, function, ...) \
+  [&] { \
+    using ReturnT = decltype(function<float>(__VA_ARGS__)); \
+    switch (tag) { \
+      case ::yb::InputOutputConfig::IN_MEMORY_DATA_TYPE_NOT_SPECIFIED: \
+        return function<NoValue>(__VA_ARGS__); \
+      case ::yb::InputOutputConfig::FLOAT: \
+        return function<float>(__VA_ARGS__); \
+      case ::yb::InputOutputConfig::UINT8: \
+        return function<uint8_t>(__VA_ARGS__); \
+      case ::yb::InputOutputConfig::INT8: \
+      case ::yb::InputOutputConfig::INT16: \
+      case ::yb::InputOutputConfig::UINT16: \
+      case ::yb::InputOutputConfig::INT32: \
+      case ::yb::InputOutputConfig::UINT32: \
+      case ::yb::InputOutputConfig::INT64: \
+      case ::yb::InputOutputConfig::UINT64: \
+      case ::yb::InputOutputConfig::DOUBLE: \
+        return ::yb::DisabledTagErrorOrCrash<ReturnT>(tag); \
+      default: \
+        return ::yb::InvalidTagErrorOrCrash<ReturnT>(tag); \
+    } \
   }()
 
 #endif
 
-#define SCANN_CALL_FUNCTION_BY_FPTAG(tag, function, ...)               \
-  [&] {                                                                \
-    using ReturnT = decltype(function<float>(__VA_ARGS__));            \
-    switch (tag) {                                                     \
-      case ::research_scann::InputOutputConfig::INT8:                  \
-        return function<int8_t>(__VA_ARGS__);                          \
-      case ::research_scann::InputOutputConfig::UINT8:                 \
-        return function<uint8_t>(__VA_ARGS__);                         \
-      case ::research_scann::InputOutputConfig::INT16:                 \
-        return function<int16_t>(__VA_ARGS__);                         \
-      case ::research_scann::InputOutputConfig::UINT16:                \
-      case ::research_scann::InputOutputConfig::INT32:                 \
-      case ::research_scann::InputOutputConfig::UINT32:                \
-      case ::research_scann::InputOutputConfig::INT64:                 \
-      case ::research_scann::InputOutputConfig::UINT64:                \
-      case ::research_scann::InputOutputConfig::FLOAT:                 \
-      case ::research_scann::InputOutputConfig::DOUBLE:                \
-        return ::research_scann::NonFpTagErrorOrCrash<ReturnT>(tag);   \
-      default:                                                         \
-        return ::research_scann::InvalidTagErrorOrCrash<ReturnT>(tag); \
-    }                                                                  \
+#define SCANN_CALL_FUNCTION_BY_FPTAG(tag, function, ...) \
+  [&] { \
+    using ReturnT = decltype(function<float>(__VA_ARGS__)); \
+    switch (tag) { \
+      case ::yb::InputOutputConfig::INT8: \
+        return function<int8_t>(__VA_ARGS__); \
+      case ::yb::InputOutputConfig::UINT8: \
+        return function<uint8_t>(__VA_ARGS__); \
+      case ::yb::InputOutputConfig::INT16: \
+        return function<int16_t>(__VA_ARGS__); \
+      case ::yb::InputOutputConfig::UINT16: \
+      case ::yb::InputOutputConfig::INT32: \
+      case ::yb::InputOutputConfig::UINT32: \
+      case ::yb::InputOutputConfig::INT64: \
+      case ::yb::InputOutputConfig::UINT64: \
+      case ::yb::InputOutputConfig::FLOAT: \
+      case ::yb::InputOutputConfig::DOUBLE: \
+        return ::yb::NonFpTagErrorOrCrash<ReturnT>(tag); \
+      default: \
+        return ::yb::InvalidTagErrorOrCrash<ReturnT>(tag); \
+    } \
   }()
 
 template <typename T>
@@ -480,6 +478,6 @@ static constexpr int kNumDatapointsPerBlock = 32;
 static constexpr int kPackedDataSetBlockSizeBits = 4;
 static constexpr int kPackedDatasetBlockSize = 1 << 4;
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

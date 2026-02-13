@@ -23,7 +23,7 @@
 #include "scann/utils/factory_helpers.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 StatusOrPtr<UntypedSingleMachineSearcherBase> TreeXHybridFactory(
@@ -59,6 +59,6 @@ StatusOrPtr<UntypedSingleMachineSearcherBase> TreeXHybridFactory(
 
 SCANN_INSTANTIATE_TREE_X_HYBRID_FACTORY(extern);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

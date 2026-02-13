@@ -16,7 +16,7 @@
 
 syntax = "proto2";
 
-package research_scann;
+package yb;
 
 import "scann/proto/distance_measure.proto";
 

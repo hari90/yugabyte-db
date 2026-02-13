@@ -21,7 +21,7 @@
 #include "hwy/contrib/sort/vqsort-inl.h"
 #include "scann/utils/common.h"
 
-namespace research_scann {
+namespace yb {
 
 static constexpr uint32_t FloatToUint32Sortkey(float val) {
   uint32_t temp = absl::bit_cast<uint32_t>(val);
@@ -54,6 +54,6 @@ inline void KVSort(MutableSpan<float> keys, MutableSpan<uint32_t> values,
   }
 }
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

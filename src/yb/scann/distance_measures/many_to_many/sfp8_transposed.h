@@ -27,7 +27,7 @@
 #include "scann/utils/intrinsics/flags.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 class SFP8SimdBlockTransposedDatabase {
  public:
@@ -94,6 +94,6 @@ inline std::ostream& operator<<(std::ostream& os,
             << ", payload_bytes_=" << db.payload_bytes_ << "}";
 }
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

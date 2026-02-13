@@ -26,7 +26,7 @@
 #include "scann/oss_wrappers/scann_bits.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 namespace zip_sort_internal {
 
 enum : size_t { kInsertionSortSize = 20, kSelectionSortSize = 15 };
@@ -527,6 +527,6 @@ size_t ZipPartition(Predicate pred, T begin, T end, U... rest) {
   return less_iter - begin;
 }
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

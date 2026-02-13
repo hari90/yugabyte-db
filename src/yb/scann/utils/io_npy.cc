@@ -18,7 +18,7 @@
 #include <string>
 #include <type_traits>
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 struct assert_false : std::false_type {};
@@ -68,4 +68,4 @@ std::string numpy_type_name<double>() {
   return "'<f8'";
 }
 
-}  // namespace research_scann
+}  // namespace yb

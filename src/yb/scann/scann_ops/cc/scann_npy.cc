@@ -33,7 +33,7 @@
 #include "scann/utils/single_machine_autopilot.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 using MutationOptions = UntypedSingleMachineSearcherBase::MutationOptions;
 using PrecomputedMutationArtifacts =
     UntypedSingleMachineSearcherBase::PrecomputedMutationArtifacts;
@@ -276,4 +276,4 @@ void ScannNumpy::InitializeHealthStats() {
   RuntimeErrorIfNotOk("Error initializing health stats: ", status);
 }
 
-}  // namespace research_scann
+}  // namespace yb

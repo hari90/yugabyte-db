@@ -27,7 +27,7 @@
 #include "scann/utils/types.h"
 #include "scann/utils/zip_sort.h"
 
-namespace research_scann {
+namespace yb {
 
 namespace {
 
@@ -113,4 +113,4 @@ void PcaUtils::ComputePcaWithSignificanceThreshold(
                                eigenvectors, eigenvalues);
 }
 
-}  // namespace research_scann
+}  // namespace yb

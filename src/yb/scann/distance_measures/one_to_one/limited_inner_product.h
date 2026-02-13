@@ -26,7 +26,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 class LimitedInnerProductDistance final : public DistanceMeasure {
  public:
@@ -73,6 +73,6 @@ class LimitedInnerProductDistance final : public DistanceMeasure {
   }
 };
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

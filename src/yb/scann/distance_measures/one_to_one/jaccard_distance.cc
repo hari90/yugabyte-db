@@ -24,7 +24,7 @@
 #include "scann/distance_measures/one_to_one/common.h"
 #include "scann/oss_wrappers/scann_aligned_malloc.h"
 
-namespace research_scann {
+namespace yb {
 
 SCANN_DEFINE_DISTANCE_MEASURE_VIRTUAL_METHODS(GeneralJaccardDistance,
                                               kEarlyStoppingNotSupported);
@@ -114,4 +114,4 @@ double BinaryJaccardDistance::GetDistanceSparse(
 
 SCANN_REGISTER_DISTANCE_MEASURE(BinaryJaccardDistance)
 
-}  // namespace research_scann
+}  // namespace yb

@@ -14,7 +14,7 @@
 
 syntax = "proto2";
 
-package research_scann;
+package yb;
 
 import "scann/trees/kmeans_tree/kmeans_tree.proto";
 

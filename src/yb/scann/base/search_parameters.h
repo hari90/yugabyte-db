@@ -28,7 +28,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 class SearcherSpecificOptionalParameters : public VirtualDestructor {};
 
@@ -194,6 +194,6 @@ class SearchParameters {
       unlocked_query_preprocessing_results_;
 };
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

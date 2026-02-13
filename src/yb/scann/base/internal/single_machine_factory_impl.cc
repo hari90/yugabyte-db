@@ -20,7 +20,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/fixed_point/pre_quantized_fixed_point.h"
 
-namespace research_scann {
+namespace yb {
 namespace internal {
 
 std::vector<float> InverseMultiplier(PreQuantizedFixedPoint* fixed_point) {
@@ -34,4 +34,4 @@ std::vector<float> InverseMultiplier(PreQuantizedFixedPoint* fixed_point) {
 }
 
 }  // namespace internal
-}  // namespace research_scann
+}  // namespace yb

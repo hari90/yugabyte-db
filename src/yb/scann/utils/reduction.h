@@ -25,7 +25,7 @@
 #include "scann/oss_wrappers/scann_aligned_malloc.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T, typename U, typename Reduce>
 
@@ -395,6 +395,6 @@ struct DoNothingReduce {
   bool IsNoop() { return true; }
 };
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

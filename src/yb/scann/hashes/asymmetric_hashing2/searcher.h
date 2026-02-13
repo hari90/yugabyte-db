@@ -40,7 +40,7 @@
 #include "scann/utils/types.h"
 #include "scann/utils/util_functions.h"
 
-namespace research_scann {
+namespace yb {
 
 class TreeAHHybridResidual;
 
@@ -165,7 +165,7 @@ class SearcherBase : public SingleMachineSearcherBase<T> {
 
   std::vector<float> norm_inv_or_bias_ = {};
 
-  friend class ::research_scann::TreeAHHybridResidual;
+  friend class ::yb::TreeAHHybridResidual;
 };
 
 template <typename T>
@@ -285,7 +285,7 @@ class Searcher final : public SearcherBase<T> {
 
   mutable std::unique_ptr<typename Searcher<T>::Mutator> mutator_ = nullptr;
 
-  friend class ::research_scann::TreeAHHybridResidual;
+  friend class ::yb::TreeAHHybridResidual;
 };
 
 class AsymmetricHashingOptionalParameters
@@ -340,6 +340,6 @@ SCANN_INSTANTIATE_TYPED_CLASS(extern, Searcher);
 SCANN_INSTANTIATE_TYPED_CLASS(extern, PrecomputedAsymmetricLookupTableCreator);
 
 }  // namespace asymmetric_hashing2
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

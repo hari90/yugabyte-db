@@ -19,7 +19,7 @@
 
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 class InfiniteOneIterator {
@@ -62,6 +62,6 @@ class InfiniteOneMatrix {
   InfiniteOneArray<T> back() const { return InfiniteOneArray<T>(); }
 };
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

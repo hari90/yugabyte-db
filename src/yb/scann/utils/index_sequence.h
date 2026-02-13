@@ -19,7 +19,7 @@
 #include <type_traits>
 #include <utility>
 
-namespace research_scann {
+namespace yb {
 
 using ::std::index_sequence;
 using ::std::make_index_sequence;
@@ -65,6 +65,6 @@ static_assert(std::is_same_v<index_sequence_all_but_last_t<1, 2, 3>,
 static_assert(std::is_same_v<index_sequence_all_but_last_t<3, 5, 4, 7>,
                              std::index_sequence<3, 5, 4>>);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

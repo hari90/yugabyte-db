@@ -17,7 +17,7 @@
 
 #include "scann/utils/common.h"
 
-namespace research_scann {
+namespace yb {
 
 size_t HwyCompact(uint32_t* indices, float* values, const uint32_t* masks,
                   size_t n_masks);

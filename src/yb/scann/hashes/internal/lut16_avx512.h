@@ -21,7 +21,7 @@
 #include "scann/hashes/internal/lut16_args.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 namespace asymmetric_hashing_internal {
 
 void Avx512PlatformSpecificSwizzle(uint8_t* packed_dataset, int num_datapoints,
@@ -43,7 +43,7 @@ class LUT16Avx512 {
 SCANN_INSTANTIATE_CLASS_FOR_LUT16_BATCH_SIZES(extern, LUT16Avx512);
 
 }  // namespace asymmetric_hashing_internal
-}  // namespace research_scann
+}  // namespace yb
 
 #endif
 #endif

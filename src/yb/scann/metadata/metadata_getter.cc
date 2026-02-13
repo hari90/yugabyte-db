@@ -20,7 +20,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 Status UntypedMetadataGetter::AppendMetadata(const GenericFeatureVector& gfv) {
   return OkStatus();
@@ -39,4 +39,4 @@ Status UntypedMetadataGetter::RemoveMetadata(DatapointIndex removed_idx) {
 
 UntypedMetadataGetter::~UntypedMetadataGetter() {}
 
-}  // namespace research_scann
+}  // namespace yb

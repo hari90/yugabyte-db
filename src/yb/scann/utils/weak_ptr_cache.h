@@ -24,7 +24,7 @@
 #include "absl/synchronization/mutex.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename Output, typename... Inputs>
 StatusOr<shared_ptr<const Output>> WeakPtrCache(
@@ -54,6 +54,6 @@ StatusOr<shared_ptr<const Output>> WeakPtrCache(
   return create_new_output();
 }
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

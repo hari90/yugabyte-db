@@ -23,7 +23,7 @@
 #include "scann/proto/scann.pb.h"
 #include "scann/utils/common.h"
 
-namespace research_scann {
+namespace yb {
 
 struct GenericSearchParameters {
   Status PopulateValuesFromScannConfig(const ScannConfig& config);
@@ -43,6 +43,6 @@ struct GenericSearchParameters {
   float post_reordering_epsilon = numeric_limits<float>::quiet_NaN();
 };
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

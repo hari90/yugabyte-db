@@ -24,7 +24,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 StatusOr<unique_ptr<Bfloat16BruteForceSearcher::Mutator>>
 Bfloat16BruteForceSearcher::Mutator::Create(
@@ -129,4 +129,4 @@ Bfloat16BruteForceSearcher::Mutator::LookupDatapointIndexOrError(
   return index;
 }
 
-}  // namespace research_scann
+}  // namespace yb

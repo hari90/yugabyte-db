@@ -34,7 +34,7 @@
 #include "scann/utils/gmm_utils.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 namespace asymmetric_hashing_internal {
 
 namespace {
@@ -470,4 +470,4 @@ Status StackedQuantizers<T>::InitializeCodes(
 SCANN_INSTANTIATE_TYPED_CLASS(, StackedQuantizers);
 
 }  // namespace asymmetric_hashing_internal
-}  // namespace research_scann
+}  // namespace yb

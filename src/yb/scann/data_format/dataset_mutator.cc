@@ -21,7 +21,7 @@
 #include "scann/utils/datapoint_utils.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 StatusOr<unique_ptr<typename DenseDataset<T>::Mutator>>
@@ -120,4 +120,4 @@ StatusOr<Datapoint<T>> DenseDataset<T>::Mutator::GetDatapoint(
 
 SCANN_INSTANTIATE_TYPED_CLASS(, DenseDataset);
 
-}  // namespace research_scann
+}  // namespace yb

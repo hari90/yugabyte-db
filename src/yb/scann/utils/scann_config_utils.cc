@@ -41,7 +41,7 @@
 
 using absl::StartsWith;
 
-namespace research_scann {
+namespace yb {
 
 namespace {
 
@@ -369,4 +369,4 @@ Status EnsureCorrectNormalizationForDistanceMeasure(ScannConfig* config) {
   return OkStatus();
 }
 
-}  // namespace research_scann
+}  // namespace yb

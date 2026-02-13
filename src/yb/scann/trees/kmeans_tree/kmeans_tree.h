@@ -41,7 +41,7 @@
 #include "scann/utils/util_functions.h"
 #include "scann/utils/zip_sort.h"
 
-namespace research_scann {
+namespace yb {
 
 struct KMeansTreeSearchResult {
   const KMeansTreeNode* node = nullptr;
@@ -550,6 +550,6 @@ Status KMeansTree::ApplyAvq(
   return OkStatus();
 }
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

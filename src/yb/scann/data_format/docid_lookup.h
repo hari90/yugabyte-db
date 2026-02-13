@@ -21,7 +21,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 class DocidLookup {
  public:
@@ -49,6 +49,6 @@ class DocidLookup {
   virtual string_view ImplName() const = 0;
 };
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

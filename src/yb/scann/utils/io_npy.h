@@ -29,7 +29,7 @@
 #include "scann/utils/io_oss_wrapper.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 std::string numpy_type_name();
@@ -113,6 +113,6 @@ StatusOr<pair<std::vector<T>, std::vector<size_t>>> NumpyToVectorAndShape(
   return std::make_pair(std::move(buffer), std::move(shape));
 }
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

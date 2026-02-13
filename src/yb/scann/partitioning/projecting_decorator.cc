@@ -27,7 +27,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/datapoint_utils.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 ProjectingDecoratorInterface<T>::~ProjectingDecoratorInterface() = default;
@@ -179,4 +179,4 @@ StatusOr<Datapoint<float>> KMeansTreeProjectingDecorator<T>::ResidualizeToFloat(
 
 SCANN_INSTANTIATE_PROJECTING_DECORATOR_ALL();
 
-}  // namespace research_scann
+}  // namespace yb

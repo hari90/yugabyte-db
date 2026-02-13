@@ -36,7 +36,7 @@
 #include "scann/utils/top_n_amortized_constant.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 BruteForceSearcher<T>::BruteForceSearcher(
@@ -576,4 +576,4 @@ BruteForceSearcher<T>::GetMutator() const {
 
 SCANN_INSTANTIATE_TYPED_CLASS(, BruteForceSearcher);
 
-}  // namespace research_scann
+}  // namespace yb

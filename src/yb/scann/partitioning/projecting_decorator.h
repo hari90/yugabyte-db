@@ -27,7 +27,7 @@
 #include "scann/partitioning/partitioner_base.h"
 #include "scann/projection/projection_base.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 class ProjectingDecoratorInterface {
@@ -193,6 +193,6 @@ class KMeansTreeProjectingDecorator final
 
 SCANN_INSTANTIATE_PROJECTING_DECORATOR_ALL(extern);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

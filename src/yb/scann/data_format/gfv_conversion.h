@@ -27,7 +27,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename VecT>
 Status GfvValuesToVector(const GenericFeatureVector& gfv, VecT* result);
@@ -202,6 +202,6 @@ inline void UnpackBinaryToInt64<double>(ConstSpan<double> packed,
   LOG(FATAL) << "Cannot treat double arrays as bit-packed binary data.";
 }
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

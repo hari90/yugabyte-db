@@ -61,7 +61,7 @@
 #include "scann/utils/top_n_amortized_constant.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 TreeXHybridSMMD<T>::TreeXHybridSMMD(
@@ -1174,7 +1174,7 @@ Status TreeXHybridSMMD<T>::PreprocessQueryIntoParamsUnlocked(
 
 template <typename T>
 vector<uint32_t> TreeXHybridSMMD<T>::SizeByPartition() const {
-  return ::research_scann::SizeByPartition(datapoints_by_token_);
+  return ::yb::SizeByPartition(datapoints_by_token_);
 }
 
 template <typename T>
@@ -1190,4 +1190,4 @@ TreeXHybridSMMD<T>::GetHealthStats() const {
 
 SCANN_INSTANTIATE_TREE_X_HYBRID_SMMD();
 
-}  // namespace research_scann
+}  // namespace yb

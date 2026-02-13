@@ -21,7 +21,7 @@
 #include "scann/base/single_machine_factory_options.h"
 #include "scann/utils/factory_helpers.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 class TypedDataset;
@@ -85,6 +85,6 @@ StatusOrSearcherUntyped SingleMachineFactoryLeafSearcherScann(
 
 SCANN_INSTANTIATE_SINGLE_MACHINE_FACTORY_SCANN(extern);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

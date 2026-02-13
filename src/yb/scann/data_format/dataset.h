@@ -37,7 +37,7 @@
 #include "scann/utils/types.h"
 #include "scann/utils/util_functions.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 class TypedDataset;
@@ -83,7 +83,7 @@ class Dataset : public VirtualDestructor {
 
   virtual void clear() = 0;
 
-  virtual research_scann::TypeTag TypeTag() const = 0;
+  virtual yb::TypeTag TypeTag() const = 0;
 
   virtual void GetDatapoint(size_t index, Datapoint<double>* result) const = 0;
 
@@ -201,7 +201,7 @@ class TypedDataset : public Dataset {
   explicit TypedDataset(unique_ptr<DocidCollectionInterface> docids)
       : Dataset(std::move(docids)) {}
 
-  research_scann::TypeTag TypeTag() const final { return TagForType<T>(); }
+  yb::TypeTag TypeTag() const final { return TagForType<T>(); }
 
   bool is_float() const final { return std::is_floating_point<T>::value; }
 
@@ -427,7 +427,7 @@ class DenseDatasetView : VirtualDestructor {
 
   virtual size_t size() const = 0;
 
-  virtual research_scann::TypeTag TypeTag() const { return TagForType<T>(); }
+  virtual yb::TypeTag TypeTag() const { return TagForType<T>(); }
 
   virtual bool IsConsecutiveStorage() const { return false; }
 
@@ -739,6 +739,6 @@ SCANN_INSTANTIATE_TYPED_CLASS(extern, TypedDataset);
 SCANN_INSTANTIATE_TYPED_CLASS(extern, SparseDataset);
 SCANN_INSTANTIATE_TYPED_CLASS(extern, DenseDataset);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

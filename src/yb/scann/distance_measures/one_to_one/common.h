@@ -21,7 +21,7 @@
 #include "scann/oss_wrappers/scann_bits.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T, typename U>
 inline double SparseDenseDispatch(
@@ -196,6 +196,6 @@ SCANN_INLINE double GetDistanceDenseEarlyStopping(const DistanceT& dist,
 #define SCANN_REGISTER_DISTANCE_MEASURE(CLASS) \
   string_view CLASS::name() const { return #CLASS; }
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

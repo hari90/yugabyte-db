@@ -14,7 +14,7 @@
 
 #include "scann/distance_measures/distance_measure_factory.h"
 
-namespace research_scann {
+namespace yb {
 
 StatusOr<shared_ptr<DistanceMeasure>> GetDistanceMeasure(
     const DistanceMeasureConfig& config) {
@@ -59,4 +59,4 @@ StatusOr<shared_ptr<DistanceMeasure>> GetDistanceMeasure(string_view name) {
   return InvalidArgumentError("Invalid distance_measure: '%s'", name);
 }
 
-}  // namespace research_scann
+}  // namespace yb

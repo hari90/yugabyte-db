@@ -35,7 +35,7 @@
 
 ABSL_DECLARE_FLAG(bool, enable_scann_brute_force_determinism);
 
-namespace research_scann {
+namespace yb {
 
 namespace mm_internal {
 
@@ -223,6 +223,6 @@ DenseDistanceManyToManySFP8PretransposedTop1(
   return result;
 }
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

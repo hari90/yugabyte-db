@@ -22,7 +22,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/gmm_utils.h"
 
-namespace research_scann {
+namespace yb {
 
 KMeansTreeTrainingOptions::KMeansTreeTrainingOptions() {}
 
@@ -69,4 +69,4 @@ KMeansTreeTrainingOptions::KMeansTreeTrainingOptions(
   }
 }
 
-}  // namespace research_scann
+}  // namespace yb

@@ -29,7 +29,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 namespace asymmetric_hashing_internal {
 
 class CodesList;
@@ -216,6 +216,6 @@ void StackedQuantizers<T>::NoiseShapeQuantizedVector(
 SCANN_INSTANTIATE_TYPED_CLASS(extern, StackedQuantizers);
 
 }  // namespace asymmetric_hashing_internal
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

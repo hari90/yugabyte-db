@@ -19,7 +19,7 @@
 #include "scann/data_format/datapoint.h"
 #include "scann/distance_measures/one_to_one/common.h"
 
-namespace research_scann {
+namespace yb {
 
 SCANN_DEFINE_DISTANCE_MEASURE_VIRTUAL_METHODS(GeneralHammingDistance, 32)
 SCANN_REGISTER_DISTANCE_MEASURE(GeneralHammingDistance)
@@ -31,4 +31,4 @@ double BinaryHammingDistance::GetDistanceDense(
 
 SCANN_REGISTER_DISTANCE_MEASURE(BinaryHammingDistance);
 
-}  // namespace research_scann
+}  // namespace yb

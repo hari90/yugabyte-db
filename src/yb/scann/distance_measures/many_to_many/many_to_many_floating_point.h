@@ -32,7 +32,7 @@
 
 ABSL_DECLARE_FLAG(bool, enable_scann_brute_force_determinism);
 
-namespace research_scann {
+namespace yb {
 
 namespace mm_internal {
 
@@ -143,6 +143,6 @@ inline void DenseDistanceManyToManyTopKRemapped(
                                            eps_callback);
 }
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

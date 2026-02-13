@@ -33,7 +33,7 @@
 #include "scann/utils/types.h"
 #include "scann/utils/util_functions.h"
 
-namespace research_scann {
+namespace yb {
 
 class GmmUtilsImplInterface;
 
@@ -255,6 +255,6 @@ class GmmUtilsImplInterface : public VirtualDestructor {
   ThreadPool* parallelization_pool_;
 };
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

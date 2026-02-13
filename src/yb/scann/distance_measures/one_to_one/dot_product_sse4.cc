@@ -23,7 +23,7 @@
 
 #include "scann/utils/common.h"
 
-namespace research_scann {
+namespace yb {
 namespace dp_internal {
 
 template <typename Byte, typename SseFuncs>
@@ -545,6 +545,6 @@ SCANN_SSE4_OUTLINE double DenseDotProductSse4(const DatapointPtr<int8_t>& a,
 }
 
 }  // namespace dp_internal
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

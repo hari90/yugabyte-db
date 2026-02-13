@@ -30,7 +30,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename Searcher, typename InDataType,
 
@@ -476,5 +476,5 @@ void HealthStatsCollector<Searcher, InDataType, InAccamulationType,
   }
 }
 
-}  // namespace research_scann
+}  // namespace yb
 #endif

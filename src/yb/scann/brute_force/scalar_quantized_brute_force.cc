@@ -42,7 +42,7 @@
 #include "scann/utils/scalar_quantization_helpers.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 Status CheckValidDistanceTag(
     AbsDotProductDistance::SpeciallyOptimizedDistanceTag distance_tag) {
@@ -502,4 +502,4 @@ ScalarQuantizedBruteForceSearcher::
       default_epsilon);
 }
 
-}  // namespace research_scann
+}  // namespace yb

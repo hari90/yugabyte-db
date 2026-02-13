@@ -31,7 +31,7 @@
 #include "scann/utils/factory_helpers.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 namespace internal {
 
@@ -78,6 +78,6 @@ SCANN_INSTANTIATE_TYPED_CLASS(extern, TrainedAsymmetricHashingResults);
 SCANN_INSTANTIATE_TYPED_CLASS(extern, HashLeafHelpers);
 
 }  // namespace internal
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

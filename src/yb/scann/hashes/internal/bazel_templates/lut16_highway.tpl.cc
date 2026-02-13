@@ -16,7 +16,7 @@
 
 #include "scann/hashes/internal/lut16_highway.inc"
 
-namespace research_scann {
+namespace yb {
 namespace asymmetric_hashing_internal {
 
 template class LUT16Highway<{BATCH_SIZE}, PrefetchStrategy::kOff>;
@@ -24,6 +24,6 @@ template class LUT16Highway<{BATCH_SIZE}, PrefetchStrategy::kSeq>;
 template class LUT16Highway<{BATCH_SIZE}, PrefetchStrategy::kSmart>;
 
 }  // namespace asymmetric_hashing_internal
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

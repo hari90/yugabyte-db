@@ -47,7 +47,7 @@
 #include "scann/utils/types.h"
 #include "scann/utils/util_functions.h"
 
-namespace research_scann {
+namespace yb {
 namespace asymmetric_hashing2 {
 
 struct LookupTable {
@@ -116,7 +116,7 @@ struct QueryerOptions {
   PostprocessFunctor postprocessing_functor;
 };
 
-namespace ai = ::research_scann::asymmetric_hashing_internal;
+namespace ai = ::yb::asymmetric_hashing_internal;
 
 class AsymmetricQueryerBase {
  public:
@@ -864,6 +864,6 @@ extern template Datapoint<uint8_t> GetLUT16Hash<PackedDatasetMutableView>(
 SCANN_INSTANTIATE_TYPED_CLASS(extern, AsymmetricQueryer);
 
 }  // namespace asymmetric_hashing2
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

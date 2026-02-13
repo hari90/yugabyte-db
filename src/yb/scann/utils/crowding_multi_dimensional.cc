@@ -22,7 +22,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 CrowdingMultiDimensional::CrowdingMultiDimensional(
     ConstSpan<int64_t> datapoint_index_to_crowding_attribute,
@@ -193,4 +193,4 @@ absl::Status CrowdingAttributesGuard::AppendMultiDimensional(
   return OkStatus();
 }
 
-}  // namespace research_scann
+}  // namespace yb

@@ -16,11 +16,11 @@
 
 #include <string>
 
-namespace research_scann {
+namespace yb {
 
 const std::string& EmptyString() {
   static const std::string* kEmptyString = new std::string("");
   return *kEmptyString;
 }
 
-}  // namespace research_scann
+}  // namespace yb

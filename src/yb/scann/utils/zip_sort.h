@@ -19,7 +19,7 @@
 
 #include "scann/utils/zip_sort_impl.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename Predicate, typename T, typename... U>
 size_t ZipPartition(Predicate pred, T begin, T end, U... rest);
@@ -111,6 +111,6 @@ class NanAwareLess {
   }
 };
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

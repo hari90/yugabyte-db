@@ -29,7 +29,7 @@
 #include "scann/utils/datapoint_utils.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 namespace {
 
@@ -124,4 +124,4 @@ void KMeansTree::CheckIfFlat() {
   if (all_children_are_leaves) is_flat_ = true;
 }
 
-}  // namespace research_scann
+}  // namespace yb

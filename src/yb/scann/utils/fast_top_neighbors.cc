@@ -32,7 +32,7 @@
 #include "scann/utils/intrinsics/flags.h"
 #include "scann/utils/zip_sort.h"
 
-namespace research_scann {
+namespace yb {
 namespace {
 
 constexpr bool kShouldLog = false;
@@ -200,4 +200,4 @@ SCANN_INSTANTIATE_FAST_TOP_NEIGHBORS(, float, absl::uint128);
 SCANN_INSTANTIATE_FAST_TOP_NEIGHBORS(, float, VectorDBDatapointIndexT);
 SCANN_INSTANTIATE_FAST_TOP_NEIGHBORS(, float, std::shared_ptr<std::string>);
 
-}  // namespace research_scann
+}  // namespace yb

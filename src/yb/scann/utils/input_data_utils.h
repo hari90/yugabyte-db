@@ -22,7 +22,7 @@
 #include "scann/proto/scann.pb.h"
 #include "scann/utils/fixed_point/pre_quantized_fixed_point.h"
 
-namespace research_scann {
+namespace yb {
 
 StatusOr<DatapointIndex> ComputeConsistentNumPointsFromIndex(
     const Dataset* dataset, const DenseDataset<uint8_t>* hashed_dataset,
@@ -37,6 +37,6 @@ StatusOr<DimensionIndex> ComputeConsistentDimensionalityFromIndex(
     const PreQuantizedFixedPoint* pre_quantized_fixed_point,
     const DenseDataset<int16_t>* bfloat16_dataset);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

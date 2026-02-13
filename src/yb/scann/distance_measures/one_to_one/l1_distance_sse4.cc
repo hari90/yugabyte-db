@@ -22,7 +22,7 @@
 #include "scann/utils/intrinsics/attributes.h"
 #ifdef __x86_64__
 
-namespace research_scann {
+namespace yb {
 namespace l1_internal {
 
 SCANN_SSE4_OUTLINE double DenseL1NormSse4(const DatapointPtr<float>& a,
@@ -143,6 +143,6 @@ SCANN_SSE4_OUTLINE double DenseL1NormSse4(const DatapointPtr<double>& a,
 }
 
 }  // namespace l1_internal
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

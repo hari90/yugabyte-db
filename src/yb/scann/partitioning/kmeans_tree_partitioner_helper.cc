@@ -33,7 +33,7 @@
 #include "scann/utils/reordering_helper.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 namespace internal {
 
@@ -110,4 +110,4 @@ CreateRecommendedAsymmetricSearcher(
 }
 
 }  // namespace internal
-}  // namespace research_scann
+}  // namespace yb

@@ -16,7 +16,7 @@
 
 #include <utility>
 
-namespace research_scann {
+namespace yb {
 
 AvqAccumulator::AvqAccumulator(size_t dimensionality, float eta)
     : dimensionality_(dimensionality),
@@ -104,4 +104,4 @@ std::pair<double, double> ComputeRescaleFraction(
   return std::make_pair(centroid_sum_dp, n_points * centroid_sq_norm);
 }
 
-}  // namespace research_scann
+}  // namespace yb

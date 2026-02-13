@@ -24,7 +24,7 @@
 #include "scann/utils/reduction.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 class NonzeroIntersectDistance final : public DistanceMeasure {
  public:
@@ -70,6 +70,6 @@ class NonzeroIntersectDistance final : public DistanceMeasure {
   }
 };
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

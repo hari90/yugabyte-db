@@ -24,7 +24,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 namespace one_to_many_low_level {
 
 using one_to_many_low_level::SetDistanceFunctor;
@@ -184,4 +184,4 @@ void DenseDotProductDistanceOneToManyScaledUint4Float(
       indices.data(), result, SetDistanceFunctor<float>(result));
 }
 
-}  // namespace research_scann
+}  // namespace yb

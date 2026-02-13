@@ -28,7 +28,7 @@
 #include "scann/utils/parallel_for.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 DenseDataset<int16_t> Bfloat16QuantizeFloatDataset(
     const DenseDataset<float>& dataset) {
@@ -138,4 +138,4 @@ DenseDataset<int16_t> Bfloat16QuantizeFloatDatasetWithNoiseShaping(
   return DenseDataset<int16_t>(std::move(result), dataset.size());
 }
 
-}  // namespace research_scann
+}  // namespace yb

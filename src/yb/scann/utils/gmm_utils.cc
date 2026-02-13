@@ -51,7 +51,7 @@
 #include "scann/utils/util_functions.h"
 #include "scann/utils/zip_sort.h"
 
-namespace research_scann {
+namespace yb {
 
 GmmUtils::GmmUtils(shared_ptr<const DistanceMeasure> distance, Options opts)
     : distance_(std::move(distance)), opts_(opts), random_(opts_.seed) {}
@@ -1550,4 +1550,4 @@ template Status GmmUtils::PCAKmeansReinitialization(
     bool spherical, DenseDatasetView<double>* centroids,
     std::vector<double>* convergence_means) const;
 
-}  // namespace research_scann
+}  // namespace yb

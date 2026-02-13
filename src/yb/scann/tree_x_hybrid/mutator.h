@@ -55,7 +55,7 @@
 #include "scann/utils/types.h"
 #include "scann/utils/zip_sort.h"
 
-namespace research_scann {
+namespace yb {
 
 class TreeAHHybridResidual;
 class TreeXHybridIncrementalOptions;
@@ -1325,6 +1325,6 @@ Status TreeXHybridMutator<Searcher>::CheckGlobalToLocalConsistency() const {
 
 #undef SCANN_DISPATCH_ON_GLOBAL_TO_LOCAL
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

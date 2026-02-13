@@ -23,7 +23,7 @@
 #include "absl/log/check.h"
 #include "absl/strings/string_view.h"
 
-namespace research_scann {
+namespace yb {
 
 class ThreadPool::Impl {
  public:
@@ -91,4 +91,4 @@ void ThreadPool::Schedule(std::function<void()> fn) { impl_->Schedule(std::move(
 
 int ThreadPool::NumThreads() const { return impl_->NumThreads(); }
 
-}  // namespace research_scann
+}  // namespace yb

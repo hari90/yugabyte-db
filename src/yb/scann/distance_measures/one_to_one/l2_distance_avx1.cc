@@ -19,7 +19,7 @@
 #include "scann/utils/intrinsics/attributes.h"
 #ifdef __x86_64__
 
-namespace research_scann {
+namespace yb {
 namespace l2_internal {
 
 SCANN_AVX1_INLINE __m256d AddTerms256(__m256d accumulator, const double* aptr,
@@ -79,6 +79,6 @@ SCANN_AVX1_OUTLINE double DenseSquaredL2DistanceAvx1(
 }
 
 }  // namespace l2_internal
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

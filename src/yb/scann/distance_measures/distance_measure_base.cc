@@ -14,8 +14,8 @@
 
 #include "scann/distance_measures/distance_measure_base.h"
 
-namespace research_scann {
+namespace yb {
 
 void DistanceMeasure::UnusedKeyMethod() {}
 
-}  // namespace research_scann
+}  // namespace yb

@@ -24,7 +24,7 @@ ABSL_DECLARE_FLAG(bool, ignore_avx512);
 
 ABSL_DECLARE_FLAG(bool, ignore_avx2);
 
-namespace research_scann {
+namespace yb {
 namespace flags_internal {
 
 extern bool should_use_avx2;
@@ -144,6 +144,6 @@ class ScopedPlatformOverride {
 
 ScopedPlatformOverride TestHookOverridePlatform(PlatformGeneration generation);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

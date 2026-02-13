@@ -41,7 +41,7 @@
 
 #include "yb/util/tostring.h"
 
-namespace research_scann {
+namespace yb {
 namespace asymmetric_hashing2 {
 
 template <typename T>
@@ -325,7 +325,7 @@ StatusOr<FloatingTypeFor<T>> Indexer<T>::DistanceBetweenOriginalAndHashed(
     case DistanceMeasure::L2:
       return std::sqrt(ComputeDistance(original, hashed, flattend_model_,
                                        subspace_sizes_, SquaredL2ReduceTwo()));
-    case research_scann::DistanceMeasure::L1:
+    case yb::DistanceMeasure::L1:
       return ComputeDistance(original, hashed, flattend_model_, subspace_sizes_,
                              L1ReduceTwo());
 
@@ -447,4 +447,4 @@ Status Indexer<T>::ComputeResidual(const DatapointPtr<T>& original,
 SCANN_INSTANTIATE_TYPED_CLASS(, Indexer);
 
 }  // namespace asymmetric_hashing2
-}  // namespace research_scann
+}  // namespace yb

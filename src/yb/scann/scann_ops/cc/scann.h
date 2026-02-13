@@ -36,7 +36,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/threads.h"
 
-namespace research_scann {
+namespace yb {
 
 /// High-level interface for SCANN (Scalable Approximate Nearest Neighbor)
 /// search. Manages configuration, indexing, and querying of vector datasets
@@ -321,6 +321,6 @@ Status ParseTextProto(T* proto, absl::string_view proto_str) {
   return OkStatus();
 }
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

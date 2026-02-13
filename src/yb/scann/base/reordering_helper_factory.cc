@@ -25,7 +25,7 @@
 #include "scann/utils/reordering_helper.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 using StatusOrHelper = StatusOr<unique_ptr<ReorderingInterface<T>>>;
@@ -207,4 +207,4 @@ ReorderingHelperFactory<T>::Build(
 
 SCANN_INSTANTIATE_TYPED_CLASS(, ReorderingHelperFactory);
 
-}  // namespace research_scann
+}  // namespace yb

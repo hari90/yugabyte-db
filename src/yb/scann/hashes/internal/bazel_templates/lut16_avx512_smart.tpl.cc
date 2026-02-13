@@ -15,12 +15,12 @@
 #ifdef __x86_64__
 #include "scann/hashes/internal/lut16_avx512.inc"
 
-namespace research_scann {
+namespace yb {
 namespace asymmetric_hashing_internal {
 
 template class LUT16Avx512<{BATCH_SIZE}, PrefetchStrategy::kSmart>;
 
 }
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

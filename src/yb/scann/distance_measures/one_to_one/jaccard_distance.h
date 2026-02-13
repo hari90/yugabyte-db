@@ -28,7 +28,7 @@
 #include "scann/utils/reduction.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 class GeneralJaccardDistance final : public DistanceMeasure {
  public:
@@ -132,6 +132,6 @@ double GeneralJaccardDistance::GetDistanceSparseImpl(
   return 1.0 - ratio;
 }
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

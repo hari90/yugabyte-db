@@ -26,7 +26,7 @@
 
 #include "scann/utils/common.h"
 
-namespace research_scann {
+namespace yb {
 
 #ifdef __x86_64__
 SCANN_AVX2_OUTLINE size_t Avx2GatherCreateLeafLocalAllowlist(
@@ -250,4 +250,4 @@ StatusOr<SingleMachineFactoryOptions> FinishMergeAHLeafOptions(
 
 }  // namespace tree_ah_utils_internal
 
-}  // namespace research_scann
+}  // namespace yb

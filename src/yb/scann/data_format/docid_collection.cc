@@ -43,7 +43,7 @@ ABSL_FLAG(bool, use_memory_optimized_immutable_docid_collection, false,
           "Controls which implementation is used for immutable "
           "VariableLengthDocidCollection");
 
-namespace research_scann {
+namespace yb {
 namespace {
 
 void AmortizedAppend(std::vector<char>& v, size_t to_add) {
@@ -876,4 +876,4 @@ Status FixedLengthDocidCollection::Mutator::RemoveDatapoint(
   return OkStatus();
 }
 
-}  // namespace research_scann
+}  // namespace yb

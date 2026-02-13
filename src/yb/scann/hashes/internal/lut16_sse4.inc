@@ -10,7 +10,7 @@
 #include "scann/utils/bits.h"
 #include "scann/utils/intrinsics/sse4.h"
 
-namespace research_scann {
+namespace yb {
 namespace asymmetric_hashing_internal {
 namespace {
 
@@ -418,6 +418,6 @@ SCANN_SSE4_OUTLINE void LUT16Sse4<kNumQueries, kPrefetch>::GetTopFloatDistances(
 }
 
 }  // namespace asymmetric_hashing_internal
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

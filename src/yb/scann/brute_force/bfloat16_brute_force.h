@@ -27,7 +27,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 class Bfloat16BruteForceSearcher final
     : public SingleMachineSearcherBase<float> {
@@ -117,6 +117,6 @@ class Bfloat16BruteForceSearcher final
   mutable unique_ptr<Mutator> mutator_ = nullptr;
 };
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

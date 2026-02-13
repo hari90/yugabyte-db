@@ -14,7 +14,7 @@
 
 syntax = "proto2";
 
-package research_scann;
+package yb;
 
 message MinDistanceConfig {
   optional float min_distance = 1 [default = -inf];

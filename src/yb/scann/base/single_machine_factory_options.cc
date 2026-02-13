@@ -16,7 +16,7 @@
 
 #include "scann/utils/input_data_utils.h"
 
-namespace research_scann {
+namespace yb {
 
 StatusOr<DimensionIndex>
 SingleMachineFactoryOptions::ComputeConsistentDimensionality(
@@ -26,4 +26,4 @@ SingleMachineFactoryOptions::ComputeConsistentDimensionality(
       bfloat16_dataset.get());
 }
 
-}  // namespace research_scann
+}  // namespace yb

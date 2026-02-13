@@ -31,7 +31,7 @@
 #include "scann/utils/intrinsics/simd.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename FloatT>
 using ManyToManyResultsCallback =
@@ -462,6 +462,6 @@ struct IsOptimizedCallback<ManyToManyTopKCallback> {
   SCANN_INSTANTIATE_MANY_TO_MANY_FP8_1(EXTERN_OR_NOTHING, METHOD_NAME,     \
                                        EpsilonFilteringOffsetWrapper<float>);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

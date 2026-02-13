@@ -16,7 +16,7 @@
 #if HWY_HAVE_CONSTEXPR_LANES
 HWY_BEFORE_NAMESPACE();
 
-namespace research_scann {
+namespace yb {
 namespace highway {
 namespace HWY_NAMESPACE {
 
@@ -330,12 +330,12 @@ SCANN_HIGHWAY_INLINE void HorizontalSum4X(D d, hn::Vec<D>& accums0,
 
 SCANN_HIGHWAY_INLINE double StaticallyInvokeOneToOneDenseDotProduct(
     const DatapointPtr<float>& qq, const DatapointPtr<int8_t>& db) {
-  return ::research_scann::dp_internal::DenseDotProductHighway(db, qq);
+  return ::yb::dp_internal::DenseDotProductHighway(db, qq);
 }
 
 SCANN_HIGHWAY_INLINE double StaticallyInvokeOneToOneDenseDotProduct(
     const DatapointPtr<float>& qq, const DatapointPtr<int16_t>& db) {
-  return ::research_scann::dp_internal::DenseDotProductHighway(db, qq);
+  return ::yb::dp_internal::DenseDotProductHighway(db, qq);
 }
 
 template <bool kIsSquaredL2>
@@ -680,12 +680,12 @@ SCANN_HIGHWAY_INLINE void InvokeCallbackHighway(const CallbackT& callback,
 }
 }  // namespace HWY_NAMESPACE
 }  // namespace highway
-}  // namespace research_scann
+}  // namespace yb
 HWY_AFTER_NAMESPACE();
 
 #if HWY_ONCE
 
-namespace research_scann {
+namespace yb {
 namespace highway {
 
 #if SCANN_HIGHWAY_ONE_TO_MANY_DYNAMIC_DISPATCH
@@ -989,6 +989,6 @@ SCANN_HIGHWAY_OUTLINE void OneToManyUint4Int8Impl(
 }
 
 }  // namespace highway
-}  // namespace research_scann
+}  // namespace yb
 #endif
 #endif

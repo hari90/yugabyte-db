@@ -42,7 +42,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 class TreeAHHybridResidual final : public SingleMachineSearcherBase<float> {
  public:
@@ -326,6 +326,6 @@ class TreeAHHybridResidual final : public SingleMachineSearcherBase<float> {
   FRIEND_TEST(TreeAHHybridResidualTest, GlobalTopNManyUpdates);
 };
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

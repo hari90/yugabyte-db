@@ -22,7 +22,7 @@
 #include "scann/oss_wrappers/scann_bits.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename StorageT, typename PositionT = uint32_t>
 class BitIterator {
@@ -98,6 +98,6 @@ void BitIterator<StorageT, PositionT>::NextNonzeroWord() {
   }
 }
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

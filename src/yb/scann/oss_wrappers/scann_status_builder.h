@@ -25,7 +25,7 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 
-namespace research_scann {
+namespace yb {
 
 class ABSL_MUST_USE_RESULT StatusBuilder {
  public:
@@ -96,6 +96,6 @@ StatusBuilder UnavailableErrorBuilder();
 StatusBuilder UnimplementedErrorBuilder();
 StatusBuilder UnknownErrorBuilder();
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

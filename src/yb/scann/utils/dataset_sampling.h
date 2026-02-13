@@ -26,7 +26,7 @@
 #include "scann/utils/sampled_index_list.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 enum class SubsamplingStrategy { kWithReplacement, kWithoutReplacement };
 
@@ -171,6 +171,6 @@ StatusOr<shared_ptr<TypedDataset<T>>> SubsampleDataset(
   return SubsampleDataset(dataset, seed, fraction, 0, dataset.size());
 }
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

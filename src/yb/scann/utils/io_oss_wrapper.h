@@ -21,7 +21,7 @@
 #include "google/protobuf/message.h"
 #include "scann/utils/common.h"
 
-namespace research_scann {
+namespace yb {
 
 class OpenSourceableFileWriter {
  public:
@@ -48,6 +48,6 @@ Status ReadProtobufFromFile(absl::string_view filename,
                             google::protobuf::Message* message);
 absl::StatusOr<std::string> GetContents(absl::string_view filename);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

@@ -42,7 +42,7 @@ ABSL_RETIRED_FLAG(bool, ignore_avx, false, "Ignore AVX1.");
 
 ABSL_RETIRED_FLAG(bool, ignore_sse4, false, "Ignore SSE4");
 
-namespace research_scann {
+namespace yb {
 namespace flags_internal {
 
 bool should_use_avx2 = port::TestCPUFeature(port::AVX2);
@@ -155,4 +155,4 @@ ScopedPlatformOverride TestHookOverridePlatform(PlatformGeneration generation) {
   return ScopedPlatformOverride(generation);
 }
 
-}  // namespace research_scann
+}  // namespace yb

@@ -24,7 +24,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 namespace {
 
@@ -268,4 +268,4 @@ bool SingleMachineSearcherBase<T>::Mutator::LookupDatapointIndex(
 
 SCANN_INSTANTIATE_TYPED_CLASS(, SingleMachineSearcherBase);
 
-}  // namespace research_scann
+}  // namespace yb

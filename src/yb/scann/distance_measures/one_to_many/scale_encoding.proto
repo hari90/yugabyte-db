@@ -14,7 +14,7 @@
 
 syntax = "proto2";
 
-package research_scann;
+package yb;
 
 enum ScaleEncoding {
   UNSPECIFIED_SCALE_ENCODING = 0;

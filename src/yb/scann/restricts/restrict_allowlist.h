@@ -37,7 +37,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 class RestrictTokenMap;
 class RestrictAllowlistConstView;
@@ -368,6 +368,6 @@ inline vector<size_t> MaybeRecycleAllowlist(
   return recycler->MaybeRemoveFromFreelist();
 }
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

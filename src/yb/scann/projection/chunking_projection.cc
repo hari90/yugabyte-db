@@ -28,7 +28,7 @@
 #include "scann/utils/datapoint_utils.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 StatusOr<unique_ptr<ChunkingProjection<T>>> BuildFromConfigImpl(
@@ -248,4 +248,4 @@ Status ChunkingProjection<T>::ProjectInput(
 
 SCANN_INSTANTIATE_TYPED_CLASS(, ChunkingProjection);
 
-}  // namespace research_scann
+}  // namespace yb

@@ -29,7 +29,7 @@
 #include <emmintrin.h>
 #include <x86intrin.h>
 
-namespace research_scann {
+namespace yb {
 namespace sse4 {
 
 static constexpr PlatformGeneration kPlatformGeneration = kBaselineSse4;
@@ -1014,11 +1014,11 @@ using Zeros = Sse4Zeros;
 using Uninitialized = Sse4Uninitialized;
 
 }  // namespace sse4
-}  // namespace research_scann
+}  // namespace yb
 
 #else
 
-namespace research_scann {
+namespace yb {
 
 template <typename T, size_t... kTensorNumRegisters>
 struct Sse4;

@@ -35,7 +35,7 @@
 
 using std::shared_ptr;
 
-namespace research_scann {
+namespace yb {
 namespace asymmetric_hashing2 {
 
 namespace {
@@ -323,4 +323,4 @@ template Datapoint<uint8_t> GetLUT16Hash<PackedDatasetMutableView>(
 SCANN_INSTANTIATE_TYPED_CLASS(, AsymmetricQueryer);
 
 }  // namespace asymmetric_hashing2
-}  // namespace research_scann
+}  // namespace yb

@@ -24,7 +24,7 @@
 #include "scann/utils/top_n_amortized_constant.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 namespace asymmetric_hashing_internal {
 
 using TopFixedPointNeighbors = TopNeighbors<int32_t>;
@@ -102,6 +102,6 @@ void WriteDistancesToTopN(const RestrictAllowlist* whitelist_or_null,
 #endif
 
 }  // namespace asymmetric_hashing_internal
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

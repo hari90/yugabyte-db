@@ -27,7 +27,7 @@
 #include "scann/utils/gmm_utils.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 struct KMeansTreeTrainingOptions {
   KMeansTreeTrainingOptions();
@@ -72,6 +72,6 @@ struct KMeansTreeTrainingOptions {
   std::optional<int> first_n_centroids;
 };
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

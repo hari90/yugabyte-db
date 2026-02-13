@@ -28,7 +28,7 @@
 #include "scann/utils/types.h"
 #include "scann/utils/util_functions.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 class ReorderingInterface {
@@ -122,6 +122,6 @@ class ReorderingHelper : public ReorderingInterface<T> {
 
 SCANN_INSTANTIATE_TYPED_CLASS(extern, ReorderingHelper);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

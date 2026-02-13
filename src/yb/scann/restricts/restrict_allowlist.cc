@@ -25,7 +25,7 @@
 #include "scann/utils/bits.h"
 #include "scann/utils/common.h"
 
-namespace research_scann {
+namespace yb {
 namespace {
 
 void ClearRemainderBits(MutableSpan<size_t> allowlist_array,
@@ -35,8 +35,8 @@ void ClearRemainderBits(MutableSpan<size_t> allowlist_array,
 
   if (num_used_bits_in_last_word == 0) return;
   DCHECK(!allowlist_array.empty());
-  allowlist_array[allowlist_array.size() - 1] = research_scann::GetLowBits(
-      allowlist_array[allowlist_array.size() - 1], num_used_bits_in_last_word);
+  allowlist_array[allowlist_array.size() - 1] =
+      yb::GetLowBits(allowlist_array[allowlist_array.size() - 1], num_used_bits_in_last_word);
 }
 
 void SetRemainderBits(MutableSpan<size_t> allowlist_array, size_t num_points) {
@@ -137,4 +137,4 @@ RestrictAllowlist CreateAllowlist(RestrictAllowlistRecycler* recycler,
   result.set_allowlist_recycling_fn(recycler->AddToFreelistFunctor());
   return result;
 }
-}  // namespace research_scann
+}  // namespace yb

@@ -29,7 +29,7 @@
 #include "scann/trees/kmeans_tree/kmeans_tree.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 class KMeansTreeLikePartitioner : public Partitioner<T> {
@@ -88,6 +88,6 @@ class KMeansTreeLikePartitioner : public Partitioner<T> {
   }
 };
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

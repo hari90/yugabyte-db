@@ -21,7 +21,7 @@
 #include "scann/proto/scann.pb.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 StatusOr<ScannConfig> Autopilot(const ScannConfig& config,
                                 shared_ptr<const Dataset> dataset,

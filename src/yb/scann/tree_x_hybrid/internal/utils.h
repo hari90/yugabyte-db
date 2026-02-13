@@ -37,7 +37,7 @@
 #include "scann/utils/types.h"
 #include "scann/utils/zip_sort.h"
 
-namespace research_scann {
+namespace yb {
 
 #ifdef __x86_64__
 SCANN_AVX2_OUTLINE size_t Avx2GatherCreateLeafLocalAllowlist(
@@ -156,6 +156,6 @@ inline int32_t SafeIntFloatMul(int32_t x, float f) {
   }
 }
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

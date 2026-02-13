@@ -21,7 +21,7 @@
 #include "scann/utils/datapoint_utils.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 T Square(T x) {
@@ -121,6 +121,6 @@ DatapointPtr<QuantizedT> ScalarQuantizeFloatDatapointWithNoiseShapingImpl(
   return MakeDatapointPtr(quantized.data(), quantized.size());
 }
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

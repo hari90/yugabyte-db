@@ -31,7 +31,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 namespace {
 
 constexpr int kNumDatasetPoints = 10000;
@@ -520,4 +520,4 @@ TEST_F(ScannOpsTest, ReorderingShapes) {
 }
 
 }  // namespace
-}  // namespace research_scann
+}  // namespace yb

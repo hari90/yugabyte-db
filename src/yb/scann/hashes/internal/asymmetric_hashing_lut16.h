@@ -28,7 +28,7 @@
 #include "scann/utils/top_n_amortized_constant.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 namespace asymmetric_hashing_internal {
 
 using TopFixedPointNeighbors = TopNeighbors<int32_t>;
@@ -194,6 +194,6 @@ void GetNeighborsViaAsymmetricDistanceLUT16WithInt32AccumulatorBatched2(
 }
 
 }  // namespace asymmetric_hashing_internal
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

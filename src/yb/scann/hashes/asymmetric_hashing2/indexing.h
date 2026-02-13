@@ -32,7 +32,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 namespace asymmetric_hashing2 {
 
 template <typename T>
@@ -127,6 +127,6 @@ class Indexer {
 SCANN_INSTANTIATE_TYPED_CLASS(extern, Indexer);
 
 }  // namespace asymmetric_hashing2
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

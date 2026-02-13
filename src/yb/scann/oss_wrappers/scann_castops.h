@@ -17,7 +17,7 @@
 
 #include <limits>
 
-namespace research_scann {
+namespace yb {
 namespace cast_ops {
 
 inline float DoubleToFloat(double value) {
@@ -39,6 +39,6 @@ inline float DoubleToFiniteFloat(double value) {
 }
 
 }  // namespace cast_ops
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

@@ -38,7 +38,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 class TreeBruteForceSecondLevelWrapper final
@@ -148,6 +148,6 @@ class TreeBruteForceSecondLevelWrapper final
 
 SCANN_INSTANTIATE_TYPED_CLASS(extern, TreeBruteForceSecondLevelWrapper);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

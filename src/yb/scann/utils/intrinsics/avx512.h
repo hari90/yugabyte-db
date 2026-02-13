@@ -29,7 +29,7 @@
 
 #include <x86intrin.h>
 
-namespace research_scann {
+namespace yb {
 namespace avx512 {
 
 static constexpr PlatformGeneration kPlatformGeneration = kSkylakeAvx512;
@@ -1065,11 +1065,11 @@ using Zeros = Avx512Zeros;
 using Uninitialized = Avx512Uninitialized;
 
 }  // namespace avx512
-}  // namespace research_scann
+}  // namespace yb
 
 #else
 
-namespace research_scann {
+namespace yb {
 
 template <typename T, size_t... kTensorNumRegisters>
 struct Avx512;

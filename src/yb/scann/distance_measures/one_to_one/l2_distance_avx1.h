@@ -19,14 +19,14 @@
 #include "scann/data_format/datapoint.h"
 #include "scann/utils/intrinsics/attributes.h"
 
-namespace research_scann {
+namespace yb {
 namespace l2_internal {
 
 SCANN_AVX1_OUTLINE double DenseSquaredL2DistanceAvx1(
     const DatapointPtr<double>& a, const DatapointPtr<double>& b);
 
 }
-}  // namespace research_scann
+}  // namespace yb
 
 #endif
 #endif

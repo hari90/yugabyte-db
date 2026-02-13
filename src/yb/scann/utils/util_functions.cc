@@ -31,7 +31,7 @@
 #include "scann/proto/exact_reordering.pb.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 float MaxAbsValue(ConstSpan<float> arr) {
   namespace hn = hwy::HWY_NAMESPACE;
@@ -353,4 +353,4 @@ void UnpackNibblesDatapoint(ConstSpan<uint8_t> packed,
   }
 }
 
-}  // namespace research_scann
+}  // namespace yb

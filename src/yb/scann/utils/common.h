@@ -50,7 +50,7 @@
 #include "scann/oss_wrappers/scann_serialize.h"
 #include "scann/oss_wrappers/scann_status.h"
 
-namespace research_scann {
+namespace yb {
 
 using ::std::array;
 using ::std::make_shared;
@@ -618,6 +618,6 @@ T ABSL_ATTRIBUTE_NO_SANITIZE_MEMORY UnalignedLoad(const void* p) {
   return t;
 }
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

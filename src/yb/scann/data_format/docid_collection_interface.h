@@ -23,7 +23,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 class DocidCollectionInterface {
  public:
@@ -106,6 +106,6 @@ class DocidLookupMap : public DocidLookup {
 absl::StatusOr<std::unique_ptr<DocidLookupMap>> CreateDocidLookupMap(
     DocidCollectionInterface* docids);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

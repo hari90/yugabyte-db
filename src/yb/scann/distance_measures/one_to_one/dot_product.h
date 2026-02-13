@@ -33,7 +33,7 @@
 #include "scann/utils/reduction.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T, typename U>
 double SparseDotProduct(const DatapointPtr<T>& a, const DatapointPtr<U>& b);
@@ -363,6 +363,6 @@ inline DimensionIndex HybridBinaryDotProduct(const DatapointPtr<uint8_t>& a,
   LOG(FATAL) << "Hybrid binary dot product not yet implemented.";
 }
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

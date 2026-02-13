@@ -20,7 +20,7 @@
 
 #ifdef __x86_64__
 
-namespace research_scann {
+namespace yb {
 namespace avx512_vnni {
 
 static constexpr PlatformGeneration kPlatformGeneration =
@@ -39,7 +39,7 @@ using Zeros = Avx512Zeros;
 using Uninitialized = Avx512Uninitialized;
 
 }  // namespace avx512_vnni
-}  // namespace research_scann
+}  // namespace yb
 
 #endif
 #endif

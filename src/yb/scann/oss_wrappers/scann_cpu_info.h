@@ -24,7 +24,7 @@
 #include <intrin.h>
 #endif
 
-namespace research_scann {
+namespace yb {
 namespace port {
 
 int NumSchedulableCPUs();
@@ -134,6 +134,6 @@ double NominalCPUFrequency();
 int CPUIDNumSMT();
 
 }  // namespace port
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

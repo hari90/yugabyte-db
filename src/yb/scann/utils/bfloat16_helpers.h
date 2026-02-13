@@ -25,7 +25,7 @@
 #include "scann/oss_wrappers/scann_threadpool.h"
 #include "scann/utils/common.h"
 
-namespace research_scann {
+namespace yb {
 
 SCANN_INLINE int16_t Bfloat16Quantize(float value) {
   uint32_t value_bits = absl::bit_cast<uint32_t>(value);
@@ -76,6 +76,6 @@ DenseDataset<int16_t> Bfloat16QuantizeFloatDatasetWithNoiseShaping(
     const DenseDataset<float>& dataset, float noise_shaping_threshold,
     ThreadPool* pool = nullptr);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

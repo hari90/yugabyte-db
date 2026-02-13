@@ -25,7 +25,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 class CosineDistance final : public DistanceMeasure {
  public:
@@ -69,6 +69,6 @@ class BinaryCosineDistance final : public BinaryDistanceMeasureBase {
                            const DatapointPtr<uint8_t>& b) const final;
 };
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

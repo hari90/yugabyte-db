@@ -20,7 +20,7 @@
 #include "scann/proto/centers.pb.h"
 #include "scann/proto/hash.pb.h"
 
-namespace research_scann {
+namespace yb {
 namespace asymmetric_hashing2 {
 
 template <typename T>
@@ -40,6 +40,6 @@ CentersForAllSubspaces DatasetSpanToCentersProto(
 }
 
 }  // namespace asymmetric_hashing2
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

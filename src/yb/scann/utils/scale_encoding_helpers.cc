@@ -33,7 +33,7 @@
 #include "scann/utils/scalar_quantization_helpers.h"
 #include "scann/utils/util_functions.h"
 
-namespace research_scann {
+namespace yb {
 
 namespace {
 
@@ -224,4 +224,4 @@ absl::Status ReconstructScaledDatapoint(
   return OkStatus();
 }
 
-}  // namespace research_scann
+}  // namespace yb

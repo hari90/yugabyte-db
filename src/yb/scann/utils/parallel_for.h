@@ -34,7 +34,7 @@
 #include "scann/utils/threads.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 enum : size_t {
   kDynamicBatchSize = numeric_limits<size_t>::max(),
@@ -185,6 +185,6 @@ SCANN_INLINE void ParallelFor(SeqT seq, ThreadPoolInterface pool, Function func,
   closure->RunParallel(pool, desired_threads);
 }
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

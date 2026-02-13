@@ -17,7 +17,7 @@
 
 #include "Eigen/Dense"
 
-namespace research_scann {
+namespace yb {
 
 using EMatrixXf = Eigen::MatrixXf;
 using EMatrixXd = Eigen::MatrixXd;
@@ -33,6 +33,6 @@ using EMatrixXdMap =
 using EVectorXfMap = Eigen::Map<const Eigen::Vector<float, Eigen::Dynamic>>;
 using EVectorXdMap = Eigen::Map<const Eigen::Vector<double, Eigen::Dynamic>>;
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

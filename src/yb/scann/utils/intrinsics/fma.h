@@ -19,7 +19,7 @@
 #include "scann/utils/intrinsics/highway.h"
 #include "scann/utils/intrinsics/simd.h"
 
-namespace research_scann {
+namespace yb {
 
 #ifdef __x86_64__
 
@@ -66,6 +66,6 @@ namespace highway {
 HWY_AFTER_NAMESPACE();
 #endif
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

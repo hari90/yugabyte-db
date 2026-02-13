@@ -50,8 +50,7 @@ void GetTensorRequireOk(OpKernelContext* context, const absl::string_view name,
 
 class ScannResource : public ResourceBase {
  public:
-  explicit ScannResource()
-      : scann_(std::make_unique<research_scann::ScannInterface>()) {}
+  explicit ScannResource() : scann_(std::make_unique<yb::ScannInterface>()) {}
 
   string DebugString() const override { return "I am the one who knocks."; }
 
@@ -59,7 +58,7 @@ class ScannResource : public ResourceBase {
 
   void Initialize() { initialized_ = true; }
 
-  std::unique_ptr<research_scann::ScannInterface> scann_;
+  std::unique_ptr<yb::ScannInterface> scann_;
 
  private:
   bool initialized_ = false;
@@ -136,9 +135,9 @@ class ScannSearchOp : public OpKernel {
     int pre_reorder_nn = reorder_nn_tensor->scalar<int>()();
 
     auto query_span = TensorToConstSpan<float>(query_tensor);
-    research_scann::DatapointPtr<float> query_ptr(
+    yb::DatapointPtr<float> query_ptr(
         nullptr, query_span.data(), query_span.size(), query_span.size());
-    research_scann::NNResultsVector res;
+    yb::NNResultsVector res;
     OP_REQUIRES_OK(context,
                    ConvertStatus(scann_resource->scann_->Search(
                        query_ptr, &res, final_nn, pre_reorder_nn, leaves)));
@@ -186,11 +185,11 @@ class ScannSearchBatchedOp : public OpKernel {
     int final_nn = final_nn_tensor->scalar<int>()();
     int pre_reorder_nn = reorder_nn_tensor->scalar<int>()();
 
-    research_scann::DenseDataset<float> queries;
+    yb::DenseDataset<float> queries;
     OP_REQUIRES_OK(context, scann_ops::PopulateDenseDatasetFromTensor(
                                 *query_tensor, &queries));
-    std::vector<research_scann::NNResultsVector> res(queries.size());
-    auto res_span = research_scann::MakeMutableSpan(res);
+    std::vector<yb::NNResultsVector> res(queries.size());
+    auto res_span = yb::MakeMutableSpan(res);
     if (parallel_tensor->scalar<bool>()())
       OP_REQUIRES_OK(
           context, ConvertStatus(scann_resource->scann_->SearchBatchedParallel(
@@ -225,7 +224,7 @@ class ScannToTensorsOp : public OpKernel {
       : OpKernel(context) {}
 
   void Compute(OpKernelContext* context) override {
-    using research_scann::ConstSpan;
+    using yb::ConstSpan;
 
     ScannResource* scann_resource;
     OP_REQUIRES_OK(context, LookupResource(context, HandleFromInput(context, 0),
@@ -260,7 +259,7 @@ class ScannToTensorsOp : public OpKernel {
     TensorFromDenseDatasetRequireOk(context, "hashed_dataset",
                                     opts.hashed_dataset.get());
 
-    research_scann::DenseDataset<int8_t>* int8_dataset = nullptr;
+    yb::DenseDataset<int8_t>* int8_dataset = nullptr;
     ConstSpan<float> int8_mults, dp_norms;
     auto int8_struct = opts.pre_quantized_fixed_point;
     if (int8_struct != nullptr) {
@@ -305,9 +304,8 @@ void CreateSearcherFromSerialized(OpKernelContext* context,
   GetTensorRequireOk(context, "int8_multipliers", &int8_multipliers);
   GetTensorRequireOk(context, "dp_norms", &dp_norms);
 
-  research_scann::DatapointIndex n_points =
-      research_scann::kInvalidDatapointIndex;
-  research_scann::ConstSpan<float> dataset;
+  yb::DatapointIndex n_points = yb::kInvalidDatapointIndex;
+  yb::ConstSpan<float> dataset;
   if (db_tensor->dims() != 0) {
     OP_REQUIRES(context, db_tensor->dims() == 2,
                 errors::InvalidArgument("Dataset must be two-dimensional"));
@@ -316,26 +314,24 @@ void CreateSearcherFromSerialized(OpKernelContext* context,
   }
 
   const tstring& config_tstr = config_tensor->scalar<tstring>()();
-  research_scann::ScannConfig config;
+  yb::ScannConfig config;
   config.ParseFromArray(config_tstr.data(), config_tstr.size());
 
-  research_scann::SingleMachineFactoryOptions opts;
+  yb::SingleMachineFactoryOptions opts;
   if (serialized_partitioner->dims() != 0) {
-    opts.serialized_partitioner =
-        std::make_shared<research_scann::SerializedPartitioner>();
+    opts.serialized_partitioner = std::make_shared<yb::SerializedPartitioner>();
     const tstring& partitioner_tstr =
         serialized_partitioner->scalar<tstring>()();
     opts.serialized_partitioner->ParseFromArray(partitioner_tstr.data(),
                                                 partitioner_tstr.size());
   }
   if (ah_codebook->dims() != 0) {
-    opts.ah_codebook =
-        std::make_shared<research_scann::CentersForAllSubspaces>();
+    opts.ah_codebook = std::make_shared<yb::CentersForAllSubspaces>();
     const tstring& codebook_str = ah_codebook->scalar<tstring>()();
     opts.ah_codebook->ParseFromArray(codebook_str.data(), codebook_str.size());
   }
-  research_scann::ConstSpan<int32_t> tokenization;
-  research_scann::ConstSpan<uint8_t> hashed_span;
+  yb::ConstSpan<int32_t> tokenization;
+  yb::ConstSpan<uint8_t> hashed_span;
   if (dp_to_token->dims() != 0) {
     n_points = dp_to_token->dim_size(0);
     tokenization = scann_ops::TensorToConstSpan<int32_t>(dp_to_token);
@@ -345,8 +341,8 @@ void CreateSearcherFromSerialized(OpKernelContext* context,
     hashed_span = scann_ops::TensorToConstSpan<uint8_t>(hashed_dataset);
   }
 
-  research_scann::ConstSpan<int8_t> int8_span;
-  research_scann::ConstSpan<float> int8_multiplier_span, norm_span;
+  yb::ConstSpan<int8_t> int8_span;
+  yb::ConstSpan<float> int8_multiplier_span, norm_span;
   if (int8_dataset->dims() != 0) {
     n_points = int8_dataset->dim_size(0);
     int8_span = scann_ops::TensorToConstSpan<int8_t>(int8_dataset);

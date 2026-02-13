@@ -37,7 +37,7 @@
 #include "scann/utils/types.h"
 #include "scann/utils/util_functions.h"
 
-namespace research_scann {
+namespace yb {
 
 class FixedPointFloatDenseCosineReorderingHelper;
 
@@ -356,6 +356,6 @@ extern template class Bfloat16ReorderingHelper<false>;
 
 SCANN_INSTANTIATE_TYPED_CLASS(extern, ExactReorderingHelper);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

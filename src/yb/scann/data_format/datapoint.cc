@@ -29,7 +29,7 @@
 #include "scann/utils/types.h"
 #include "scann/utils/zip_sort.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 bool DatapointPtr<T>::HasNonzero(DimensionIndex dimension_index) const {
@@ -211,4 +211,4 @@ void Datapoint<T>::RemoveExplicitZeroesFromSparseVector() {
 SCANN_INSTANTIATE_TYPED_CLASS(, DatapointPtr);
 SCANN_INSTANTIATE_TYPED_CLASS(, Datapoint);
 
-}  // namespace research_scann
+}  // namespace yb

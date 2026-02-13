@@ -20,7 +20,7 @@
 
 #ifdef __x86_64__
 
-namespace research_scann {
+namespace yb {
 namespace amx {
 
 static constexpr PlatformGeneration kPlatformGeneration = kSapphireRapidsAmx;
@@ -38,7 +38,7 @@ using Zeros = Avx512Zeros;
 using Uninitialized = Avx512Uninitialized;
 
 }  // namespace amx
-}  // namespace research_scann
+}  // namespace yb
 
 #endif
 #endif

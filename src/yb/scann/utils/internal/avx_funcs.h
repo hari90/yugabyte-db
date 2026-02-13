@@ -19,7 +19,7 @@
 #include "scann/utils/intrinsics/avx1.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 class AvxFunctionsAvx {
  public:
@@ -67,7 +67,7 @@ class AvxFunctionsAvx {
   }
 };
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif
 #endif

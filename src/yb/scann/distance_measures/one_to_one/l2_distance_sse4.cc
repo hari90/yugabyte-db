@@ -23,7 +23,7 @@
 
 #include "scann/utils/common.h"
 
-namespace research_scann {
+namespace yb {
 namespace l2_internal {
 
 template <typename Byte, typename SseFuncs>
@@ -269,6 +269,6 @@ SCANN_SSE4_OUTLINE double DenseSquaredL2DistanceSse4(
 }
 
 }  // namespace l2_internal
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

@@ -16,9 +16,9 @@
 
 #include "scann/distance_measures/one_to_one/common.h"
 
-namespace research_scann {
+namespace yb {
 
 SCANN_DEFINE_DISTANCE_MEASURE_VIRTUAL_METHODS(L1Distance, 32);
 SCANN_REGISTER_DISTANCE_MEASURE(L1Distance);
 
-}  // namespace research_scann
+}  // namespace yb

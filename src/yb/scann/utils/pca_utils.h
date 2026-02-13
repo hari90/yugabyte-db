@@ -25,7 +25,7 @@
 #include "scann/data_format/datapoint.h"
 #include "scann/data_format/dataset.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 void ComputePcaDense(DefaultDenseDatasetView<T> data, int32_t num_eigenvectors,
@@ -121,6 +121,6 @@ void ComputePcaDense(const DefaultDenseDatasetView<T> data,
   }
 }
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

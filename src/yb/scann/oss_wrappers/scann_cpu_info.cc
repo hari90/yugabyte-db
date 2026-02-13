@@ -50,7 +50,7 @@
 #endif
 #endif
 
-namespace research_scann {
+namespace yb {
 namespace port {
 namespace {
 
@@ -569,4 +569,4 @@ int CPUIDNumSMT() {
 }
 
 }  // namespace port
-}  // namespace research_scann
+}  // namespace yb

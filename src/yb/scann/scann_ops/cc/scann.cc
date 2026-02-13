@@ -46,7 +46,7 @@
 #include "scann/utils/threads.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 namespace {
 
 constexpr const int32_t kSoarEmptyToken = -1;
@@ -250,7 +250,7 @@ ScannInterface::CreateSearcher(ScannArtifacts artifacts) {
   if (dataset && config.has_partitioning() &&
       config.partitioning().partitioning_type() ==
           PartitioningConfig::SPHERICAL)
-    dataset->set_normalization_tag(research_scann::UNITL2NORM);
+    dataset->set_normalization_tag(yb::UNITL2NORM);
 
   SCANN_ASSIGN_OR_RETURN(auto searcher, SingleMachineFactoryScann<float>(
                                             config, dataset, std::move(opts)));
@@ -387,7 +387,7 @@ vector<SearchParameters> ScannInterface::GetSearchParametersBatched(
   } else {
     pre_reorder_nn = final_nn;
   }
-  std::shared_ptr<research_scann::TreeXOptionalParameters> tree_params;
+  std::shared_ptr<yb::TreeXOptionalParameters> tree_params;
   if (leaves > 0) {
     tree_params = std::make_shared<TreeXOptionalParameters>();
     tree_params->set_num_partitions_to_search_override(leaves);
@@ -581,4 +581,4 @@ StatusOr<SingleMachineFactoryOptions> ScannInterface::ExtractOptions() {
   return scann_->ExtractSingleMachineFactoryOptions();
 }
 
-}  // namespace research_scann
+}  // namespace yb

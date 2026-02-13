@@ -29,7 +29,7 @@
 
 #include <x86intrin.h>
 
-namespace research_scann {
+namespace yb {
 namespace avx1 {
 
 static constexpr PlatformGeneration kPlatformGeneration = kSandyBridgeAvx1;
@@ -1009,11 +1009,11 @@ using Zeros = Avx1Zeros;
 using Uninitialized = Avx1Uninitialized;
 
 }  // namespace avx1
-}  // namespace research_scann
+}  // namespace yb
 
 #else
 
-namespace research_scann {
+namespace yb {
 
 template <typename T, size_t... kTensorNumRegisters>
 struct Avx1;

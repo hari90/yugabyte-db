@@ -23,7 +23,7 @@ ABSL_RETIRED_FLAG(
     "RETIRED!  Previously:  If true, uses FastTopNeighbors in "
     "traditional ScaNN server.  FastTopNeighbors is always used in DR server.");
 
-namespace research_scann {
+namespace yb {
 
 Status DisabledTypeError(TypeTag type_tag) {
   return FailedPreconditionError(
@@ -108,4 +108,4 @@ string_view TypeNameFromTag(TypeTag type_tag) {
   }
 }
 
-}  // namespace research_scann
+}  // namespace yb

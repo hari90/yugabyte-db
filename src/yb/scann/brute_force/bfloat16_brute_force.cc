@@ -32,7 +32,7 @@
 #include "scann/utils/fast_top_neighbors.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 Bfloat16BruteForceSearcher::Bfloat16BruteForceSearcher(
     shared_ptr<const DistanceMeasure> distance,
@@ -173,4 +173,4 @@ Bfloat16BruteForceSearcher::ExtractSingleMachineFactoryOptions() {
   return opts;
 }
 
-}  // namespace research_scann
+}  // namespace yb

@@ -13,7 +13,7 @@
 #include "scann/utils/bits.h"
 #include "scann/utils/intrinsics/avx512.h"
 
-namespace research_scann {
+namespace yb {
 namespace avx512 {
 namespace lut16 {
 
@@ -808,6 +808,6 @@ void LUT16Avx512<kNumQueries, kPrefetch>::GetTopFloatDistances(
 }
 
 }  // namespace asymmetric_hashing_internal
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

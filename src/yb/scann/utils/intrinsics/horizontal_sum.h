@@ -19,7 +19,7 @@
 #include "scann/utils/intrinsics/highway.h"
 #include "scann/utils/intrinsics/simd.h"
 
-namespace research_scann {
+namespace yb {
 namespace fallback {
 
 SCANN_INLINE float HorizontalSum(Simd<float> a) { return a.Unwrap(); }
@@ -226,10 +226,10 @@ SCANN_AVX1_INLINE void HorizontalSum4X(Avx1<double> a, Avx1<double> b,
 
 namespace avx2 {
 
-using ::research_scann::avx1::HorizontalSum;
-using ::research_scann::avx1::HorizontalSum2X;
-using ::research_scann::avx1::HorizontalSum3X;
-using ::research_scann::avx1::HorizontalSum4X;
+using ::yb::avx1::HorizontalSum;
+using ::yb::avx1::HorizontalSum2X;
+using ::yb::avx1::HorizontalSum3X;
+using ::yb::avx1::HorizontalSum4X;
 
 }  // namespace avx2
 
@@ -287,6 +287,6 @@ SCANN_AVX512_INLINE void HorizontalSum4X(Avx512<double> a, Avx512<double> b,
 
 #endif
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

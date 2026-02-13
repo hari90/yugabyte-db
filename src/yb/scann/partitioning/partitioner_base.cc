@@ -25,7 +25,7 @@
 #include "scann/utils/types.h"
 #include "scann/utils/zip_sort.h"
 
-namespace research_scann {
+namespace yb {
 
 UntypedPartitioner::~UntypedPartitioner() {}
 
@@ -115,4 +115,4 @@ StatusOr<vector<std::vector<DatapointIndex>>> Partitioner<T>::TokenizeDatabase(
 
 SCANN_INSTANTIATE_TYPED_CLASS(, Partitioner);
 
-}  // namespace research_scann
+}  // namespace yb

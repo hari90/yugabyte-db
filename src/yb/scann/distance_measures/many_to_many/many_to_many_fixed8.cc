@@ -18,7 +18,7 @@
 #include "scann/distance_measures/many_to_many/many_to_many.h"
 #include "scann/distance_measures/many_to_many/many_to_many_templates.h"
 
-namespace research_scann {
+namespace yb {
 namespace mm_internal {
 
 template Status DenseDistanceManyToManyFP8PretransposedImpl(
@@ -37,4 +37,4 @@ template Status DenseDistanceManyToManyFP8PretransposedImpl(
     EpsilonFilteringCallback<float> callback);
 
 }  // namespace mm_internal
-}  // namespace research_scann
+}  // namespace yb

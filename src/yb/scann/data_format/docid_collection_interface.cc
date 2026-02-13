@@ -25,7 +25,7 @@
 #include "scann/utils/multi_stage_batch_pipeline.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 class HetergenousDocidLookupMap : public DocidLookupMap {
  public:
@@ -168,4 +168,4 @@ absl::StatusOr<std::unique_ptr<DocidLookupMap>> CreateDocidLookupMap(
   return map;
 }
 
-}  // namespace research_scann
+}  // namespace yb

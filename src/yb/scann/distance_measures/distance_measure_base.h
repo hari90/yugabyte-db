@@ -21,7 +21,7 @@
 #include "scann/proto/distance_measure.pb.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 class DistanceMeasure : public VirtualDestructor {
  public:
@@ -110,6 +110,6 @@ class DistanceMeasure : public VirtualDestructor {
   virtual void UnusedKeyMethod();
 };
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

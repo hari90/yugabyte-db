@@ -16,10 +16,10 @@
 
 #include "scann/hashes/internal/asymmetric_hashing_impl.h"
 
-namespace research_scann {
+namespace yb {
 namespace asymmetric_hashing_internal {
 
 SCANN_INSTANTIATE_AH_FUNCTION();
 
 }
-}  // namespace research_scann
+}  // namespace yb

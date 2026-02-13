@@ -18,7 +18,7 @@
 
 #include "absl/strings/str_cat.h"
 
-namespace research_scann {
+namespace yb {
 
 using absl::StrCat;
 
@@ -88,4 +88,4 @@ void SearchParameters::SetUnspecifiedParametersFrom(
   }
 }
 
-}  // namespace research_scann
+}  // namespace yb

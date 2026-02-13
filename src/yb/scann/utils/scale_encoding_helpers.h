@@ -23,7 +23,7 @@
 #include "scann/distance_measures/one_to_many/scale_encoding.pb.h"
 #include "scann/utils/common.h"
 
-namespace research_scann {
+namespace yb {
 
 absl::Status AppendQuantizeScaledFloatDatapointWithNoiseShaping(
     int bits, DatapointPtr<float> dptr, ConstSpan<float> fixed8_multipliers,
@@ -48,6 +48,6 @@ absl::Status ReconstructScaledDatapoint(
     ScaleEncoding scale_encoding, absl::string_view encoded,
     MutableSpan<float>& dp);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

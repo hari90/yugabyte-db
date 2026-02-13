@@ -25,7 +25,7 @@
 #include "scann/data_format/datapoint.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 static const double bytes_in_mb = 1024.0 * 1024.0;
 
@@ -66,6 +66,6 @@ inline void LogTcMalloc(int verbosity_level = 0) {
   VLOG(verbosity_level) << GetTcMallocLogString();
 }
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

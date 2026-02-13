@@ -22,7 +22,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/time/time.h"
 
-namespace research_scann {
+namespace yb {
 
 unique_ptr<ThreadPool> StartThreadPool(absl::string_view pool_name,
                                        ssize_t num_threads) {
@@ -34,4 +34,4 @@ unique_ptr<ThreadPool> StartThreadPool(absl::string_view pool_name,
   return pool;
 }
 
-}  // namespace research_scann
+}  // namespace yb

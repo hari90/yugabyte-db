@@ -45,7 +45,7 @@
 #include "scann/utils/scalar_quantization_helpers.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 void DenseDotProductDistanceOneToManyInt8Float(
     const DatapointPtr<float>& query, DefaultDenseDatasetView<int8_t> database,
@@ -154,8 +154,7 @@ SCANN_OUTLINE void OneToManyBf16FloatImpl(const float* __restrict__ query,
       callback.invoke(
           j, DenseSquaredL2Distance(query_dptr, MakeDatapointPtr(db_fp32)));
     } else {
-      callback.invoke(j, -::research_scann::dp_internal::DenseDotProductHighway(
-                             db_dptr, query_dptr));
+      callback.invoke(j, -::yb::dp_internal::DenseDotProductHighway(db_dptr, query_dptr));
     }
   }
 }
@@ -511,6 +510,6 @@ void DenseDotProductDistanceOneToManyScaledUint4Float(
     const uint8_t* dataset, ConstSpan<DatapointIndex> indices,
     MutableSpan<float> result);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

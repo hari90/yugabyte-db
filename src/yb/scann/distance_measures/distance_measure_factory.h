@@ -21,12 +21,12 @@
 #include "scann/proto/distance_measure.pb.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 StatusOr<shared_ptr<DistanceMeasure>> GetDistanceMeasure(string_view name);
 StatusOr<shared_ptr<DistanceMeasure>> GetDistanceMeasure(
     const DistanceMeasureConfig& config);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

@@ -25,7 +25,7 @@
 #include "scann/projection/projection_base.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 class RandomOrthogonalProjection : public Projection<T> {
@@ -61,6 +61,6 @@ class RandomOrthogonalProjection : public Projection<T> {
 
 SCANN_INSTANTIATE_TYPED_CLASS(extern, RandomOrthogonalProjection);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

@@ -44,7 +44,7 @@
 #include "scann/utils/types.h"
 #include "scann/utils/weak_ptr_cache.h"
 
-namespace research_scann {
+namespace yb {
 
 namespace {
 template <typename T>
@@ -99,8 +99,7 @@ PartitionerFromKMeansTreeNoProjection(shared_ptr<const KMeansTree> kmeans_tree,
              PartitioningConfig::ASYMMETRIC) {
     SCANN_RETURN_IF_ERROR(
         km->CreateAsymmetricHashingSearcherForQueryTokenization());
-    km->SetQueryTokenizationType(
-        research_scann::KMeansTreePartitioner<T>::ASYMMETRIC_HASHING);
+    km->SetQueryTokenizationType(yb::KMeansTreePartitioner<T>::ASYMMETRIC_HASHING);
   }
 
   if (config.database_tokenization_type() == PartitioningConfig::FLOAT) {
@@ -112,8 +111,7 @@ PartitionerFromKMeansTreeNoProjection(shared_ptr<const KMeansTree> kmeans_tree,
              PartitioningConfig::ASYMMETRIC) {
     SCANN_RETURN_IF_ERROR(
         km->CreateAsymmetricHashingSearcherForDatabaseTokenization());
-    km->SetDatabaseTokenizationType(
-        research_scann::KMeansTreePartitioner<T>::ASYMMETRIC_HASHING);
+    km->SetDatabaseTokenizationType(yb::KMeansTreePartitioner<T>::ASYMMETRIC_HASHING);
   }
   km->SetNumTokenizedBranch(config.num_tokenized_branch());
   return km;
@@ -233,4 +231,4 @@ SCANN_INSTANTIATE_SERIALIZED_PARTITIONER_FACTORY(, int64_t);
 SCANN_INSTANTIATE_SERIALIZED_PARTITIONER_FACTORY(, float);
 SCANN_INSTANTIATE_SERIALIZED_PARTITIONER_FACTORY(, double);
 
-}  // namespace research_scann
+}  // namespace yb

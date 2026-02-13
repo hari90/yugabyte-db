@@ -29,7 +29,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 Status CanonicalizeScannConfigForRetrieval(ScannConfig* config);
 
@@ -62,6 +62,6 @@ std::string GetPossiblyPartitionedWildcard(const ScannConfig& config);
 int GetNumPartitionedShards(const std::string& partitioner_prefix,
                             int32_t n_epochs);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

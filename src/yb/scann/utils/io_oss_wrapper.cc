@@ -21,7 +21,7 @@
 #include "google/protobuf/message.h"
 #include "scann/utils/common.h"
 
-namespace research_scann {
+namespace yb {
 
 OpenSourceableFileWriter::OpenSourceableFileWriter(absl::string_view filename)
     : fout_(std::string(filename), std::ofstream::binary) {}
@@ -87,4 +87,4 @@ absl::StatusOr<std::string> GetContents(absl::string_view filename) {
   return content.str();
 }
 
-}  // namespace research_scann
+}  // namespace yb

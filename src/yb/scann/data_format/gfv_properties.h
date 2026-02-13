@@ -23,7 +23,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 inline int GfvFeatureType() {
@@ -73,6 +73,6 @@ bool IsGfvSparseOrDie(const GenericFeatureVector& gfv);
 
 bool IsGfvDenseOrDie(const GenericFeatureVector& gfv);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

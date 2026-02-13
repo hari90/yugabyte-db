@@ -26,7 +26,7 @@
 #include "scann/oss_wrappers/scann_threadpool.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 unique_ptr<ThreadPool> StartThreadPool(absl::string_view pool_name,
                                        ssize_t num_threads);
@@ -72,6 +72,6 @@ class ThreadPoolInterface {
   ThreadPool* executor_ = nullptr;
 };
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

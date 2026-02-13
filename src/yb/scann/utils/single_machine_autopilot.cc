@@ -30,7 +30,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 StatusOr<ScannConfig> AutopilotTreeAh(const ScannConfig& config,
                                       shared_ptr<const Dataset> dataset,
@@ -220,4 +220,4 @@ StatusOr<ScannConfig> Autopilot(const ScannConfig& config,
   }
 }
 
-}  // namespace research_scann
+}  // namespace yb

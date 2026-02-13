@@ -31,7 +31,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 class VariableLengthDocidCollection final : public DocidCollectionInterface {
  public:
@@ -234,6 +234,6 @@ class FixedLengthDocidCollection final : public DocidCollectionInterface {
   mutable unique_ptr<FixedLengthDocidCollection::Mutator> mutator_ = nullptr;
 };
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

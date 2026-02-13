@@ -23,7 +23,7 @@
 #include "scann/data_format/dataset.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 class FP8SimdBlockTransposedDatabase {
  public:
@@ -84,6 +84,6 @@ class FP8SimdBlockTransposedDatabase {
   uint8_t simd_block_size_ : 5;
 };
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

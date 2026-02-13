@@ -27,7 +27,7 @@
 #include "scann/proto/projection.pb.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 class EigenvalueOpqProjection : public Projection<T> {
@@ -66,6 +66,6 @@ class EigenvalueOpqProjection : public Projection<T> {
 
 SCANN_INSTANTIATE_TYPED_CLASS(extern, EigenvalueOpqProjection);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

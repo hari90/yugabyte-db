@@ -34,7 +34,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 class ScalarQuantizedBruteForceSearcher final
     : public SingleMachineSearcherBase<float> {
@@ -239,6 +239,6 @@ class TreeScalarQuantizationPreprocessedQueryCreator final
   const vector<float> inverse_multipliers_;
 };
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

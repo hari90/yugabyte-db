@@ -28,7 +28,7 @@
 #include "scann/utils/scale_encoding_helpers.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 namespace {
 
 template <Int8TileSide kSide>
@@ -133,4 +133,4 @@ Datapoint<int8_t> SFP8SimdBlockTransposedDatabase::ReconstructDatapoint(
   return codec_->ReconstructDatapoint(idx, payload());
 }
 
-}  // namespace research_scann
+}  // namespace yb

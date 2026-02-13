@@ -22,7 +22,7 @@
 #include "absl/types/variant.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 namespace internal {
 
 template <typename Index>
@@ -91,6 +91,6 @@ void SampledIndexList<Index>::RestartIndex() {
 }
 
 }  // namespace internal
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

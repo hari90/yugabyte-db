@@ -21,7 +21,7 @@
 #include "absl/strings/string_view.h"
 #include "scann/oss_wrappers/scann_status_builder.h"
 
-namespace research_scann {
+namespace yb {
 
 absl::Status AnnotateStatus(const absl::Status& s, absl::string_view msg) {
   if (s.ok() || msg.empty()) return s;
@@ -39,4 +39,4 @@ StatusBuilder RetCheckFail(absl::string_view msg) {
   return InternalErrorBuilder() << msg;
 }
 
-}  // namespace research_scann
+}  // namespace yb

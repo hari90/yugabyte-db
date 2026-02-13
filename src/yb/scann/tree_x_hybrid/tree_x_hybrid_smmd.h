@@ -42,7 +42,7 @@
 #include "scann/utils/top_n_amortized_constant.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename U>
 class DisjointRestrictTokenSearcher;
@@ -334,6 +334,6 @@ class TreeXHybridSMMD : public SingleMachineSearcherBase<T> {
 
 SCANN_INSTANTIATE_TREE_X_HYBRID_SMMD(extern);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

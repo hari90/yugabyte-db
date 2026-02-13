@@ -27,7 +27,7 @@
 #include "scann/proto/distance_measure.pb.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 namespace internal {
 namespace {
 
@@ -203,4 +203,4 @@ SCANN_INSTANTIATE_TYPED_CLASS(, TrainedAsymmetricHashingResults);
 SCANN_INSTANTIATE_TYPED_CLASS(, HashLeafHelpers);
 
 }  // namespace internal
-}  // namespace research_scann
+}  // namespace yb

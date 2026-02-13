@@ -46,7 +46,7 @@
 #include "scann/utils/intrinsics/simd.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 #ifdef __SSE3__
 
@@ -1877,6 +1877,6 @@ void DenseDistanceOneToManyBlockTransposed(
 SCANN_INSTANTIATE_COMMON_FLOAT_ONE_TO_MANY(extern)
 SCANN_INSTANTIATE_COMMON_DOUBLE_ONE_TO_MANY(extern)
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

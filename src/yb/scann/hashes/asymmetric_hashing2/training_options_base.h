@@ -30,7 +30,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 namespace asymmetric_hashing2 {
 
 class TrainingOptionsBase {
@@ -95,6 +95,6 @@ class TrainingOptionsTyped : public TrainingOptionsBase {
 SCANN_INSTANTIATE_TYPED_CLASS(extern, TrainingOptionsTyped);
 
 }  // namespace asymmetric_hashing2
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

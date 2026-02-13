@@ -19,7 +19,7 @@
 #include "scann/proto/partitioning.pb.h"
 #include "scann/proto/projection.pb.h"
 
-namespace research_scann {
+namespace yb {
 
 StatusOr<DatapointIndex> ComputeConsistentNumPointsFromIndex(
     const Dataset* dataset, const DenseDataset<uint8_t>* hashed_dataset,
@@ -156,4 +156,4 @@ StatusOr<DimensionIndex> ComputeConsistentDimensionalityFromIndex(
   return dims;
 }
 
-}  // namespace research_scann
+}  // namespace yb

@@ -24,7 +24,7 @@
 #include "scann/utils/intrinsics/attributes.h"
 
 HWY_BEFORE_NAMESPACE();
-namespace research_scann {
+namespace yb {
 namespace dp_internal {
 namespace HWY_NAMESPACE {
 
@@ -130,10 +130,10 @@ SCANN_HIGHWAY_INLINE double DenseDotProductInt16FloatHighwayImpl(
 
 }  // namespace HWY_NAMESPACE
 }  // namespace dp_internal
-}  // namespace research_scann
+}  // namespace yb
 HWY_AFTER_NAMESPACE();
 
-namespace research_scann {
+namespace yb {
 namespace dp_internal {
 
 SCANN_HIGHWAY_OUTLINE double DenseDotProductHighway(
@@ -155,4 +155,4 @@ SCANN_HIGHWAY_OUTLINE double DenseDotProductHighway(
 }
 
 }  // namespace dp_internal
-}  // namespace research_scann
+}  // namespace yb

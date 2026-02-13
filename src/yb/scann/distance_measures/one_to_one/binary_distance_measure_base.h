@@ -25,7 +25,7 @@
 #include "scann/oss_wrappers/scann_aligned_malloc.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 class BinaryDistanceMeasureBase : public DistanceMeasure {
  public:
@@ -85,6 +85,6 @@ inline DimensionIndex DenseBinaryMergeAndPopcnt(const DatapointPtr<uint8_t>& v1,
   return result;
 }
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

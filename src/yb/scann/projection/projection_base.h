@@ -25,7 +25,7 @@
 #include "scann/proto/projection.pb.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 class UntypedProjection : public VirtualDestructor {
  public:
@@ -61,6 +61,6 @@ class Projection : public UntypedProjection {
 
 SCANN_INSTANTIATE_TYPED_CLASS(extern, Projection);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

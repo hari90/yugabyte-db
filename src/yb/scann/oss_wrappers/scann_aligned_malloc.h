@@ -17,11 +17,11 @@
 
 #include <cstdlib>
 
-namespace research_scann {
+namespace yb {
 
 void *aligned_malloc(size_t size, size_t minimum_alignment);
 void aligned_free(void *aligned_memory);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

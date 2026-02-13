@@ -34,7 +34,7 @@
 #include "scann/utils/fast_top_neighbors.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 class BruteForceSearcher final : public SingleMachineSearcherBase<T> {
@@ -167,6 +167,6 @@ class BruteForceSearcher final : public SingleMachineSearcherBase<T> {
 
 SCANN_INSTANTIATE_TYPED_CLASS(extern, BruteForceSearcher);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

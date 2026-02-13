@@ -24,7 +24,7 @@
 #include "scann/proto/scann.pb.h"
 #include "scann/utils/common.h"
 
-namespace research_scann {
+namespace yb {
 
 Status GenericSearchParameters::PopulateValuesFromScannConfig(
     const ScannConfig& config) {
@@ -98,4 +98,4 @@ Status GenericSearchParameters::PopulateValuesFromScannConfig(
   return OkStatus();
 }
 
-}  // namespace research_scann
+}  // namespace yb

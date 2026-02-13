@@ -27,7 +27,7 @@
 #include "hwy/highway.h"
 #include "scann/utils/common.h"
 
-namespace research_scann {
+namespace yb {
 
 constexpr size_t kNumLanes = 8;
 
@@ -68,5 +68,5 @@ SCANN_OUTLINE HWY_ATTR size_t HwyCompact(uint32_t* indices, float* values,
   return write_idx;
 }
 
-}  // namespace research_scann
+}  // namespace yb
 #endif

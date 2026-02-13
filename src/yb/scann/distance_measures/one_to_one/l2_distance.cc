@@ -16,7 +16,7 @@
 
 #include "scann/distance_measures/one_to_one/common.h"
 
-namespace research_scann {
+namespace yb {
 
 SCANN_DEFINE_DISTANCE_MEASURE_VIRTUAL_METHODS(SquaredL2Distance,
                                               kEarlyStoppingNotSupported);
@@ -29,4 +29,4 @@ SCANN_DEFINE_DISTANCE_MEASURE_VIRTUAL_METHODS(NegatedSquaredL2Distance,
                                               kEarlyStoppingNotSupported);
 SCANN_REGISTER_DISTANCE_MEASURE(NegatedSquaredL2Distance);
 
-}  // namespace research_scann
+}  // namespace yb

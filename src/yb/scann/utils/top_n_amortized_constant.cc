@@ -19,7 +19,7 @@
 
 ABSL_RETIRED_FLAG(bool, use_branch_optimized_top_n, , );
 
-namespace research_scann {
+namespace yb {
 
 template <typename Distance>
 void TopNeighbors<Distance>::PartitionElements(vector<Neighbor>* elements,
@@ -32,4 +32,4 @@ void TopNeighbors<Distance>::PartitionElements(vector<Neighbor>* elements,
 SCANN_INSTANTIATE_TYPED_CLASS(, TopNeighbors);
 template class TopNeighbors<DimensionIndex>;
 
-}  // namespace research_scann
+}  // namespace yb

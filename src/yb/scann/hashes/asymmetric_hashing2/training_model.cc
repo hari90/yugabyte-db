@@ -31,7 +31,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 namespace asymmetric_hashing2 {
 
 using QuantizationScheme = AsymmetricHasherConfig::QuantizationScheme;
@@ -211,4 +211,4 @@ bool Model<T>::CentersEqual(const Model& rhs) const {
 SCANN_INSTANTIATE_TYPED_CLASS(, Model);
 
 }  // namespace asymmetric_hashing2
-}  // namespace research_scann
+}  // namespace yb

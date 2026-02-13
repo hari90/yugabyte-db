@@ -16,7 +16,7 @@
 
 syntax = "proto2";
 
-package research_scann;
+package yb;
 
 message Crowding {
   optional bool enabled = 1 [default = false];

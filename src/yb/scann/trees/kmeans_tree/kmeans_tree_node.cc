@@ -44,7 +44,7 @@
 #include "scann/utils/types.h"
 #include "scann/utils/util_functions.h"
 
-namespace research_scann {
+namespace yb {
 
 KMeansTreeNode::KMeansTreeNode() = default;
 
@@ -358,4 +358,4 @@ void KMeansTreeNode::UnionIndicesImpl(
 
 void KMeansTreeNode::MaybeInitializeThreadSharding() {}
 
-}  // namespace research_scann
+}  // namespace yb

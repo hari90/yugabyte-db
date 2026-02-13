@@ -19,7 +19,7 @@
 
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename CollectionT>
 class RandomAccessIterator {
@@ -116,6 +116,6 @@ class RandomAccessIterator {
   size_t offset_ = 0;
 };
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

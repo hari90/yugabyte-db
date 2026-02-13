@@ -207,16 +207,16 @@ SCANN_SIMD_INLINE double StaticallyInvokeOneToOneDenseDotProduct(
     const DatapointPtr<float>& qq, const DatapointPtr<int8_t>& db) {
   using T = Simd<float>;
   if constexpr (IsSame<T, Avx512<float>>()) {
-    return ::research_scann::dp_internal::DenseDotProductAvx2(db, qq);
+    return ::yb::dp_internal::DenseDotProductAvx2(db, qq);
   }
   if constexpr (IsSame<T, Avx2<float>>()) {
-    return ::research_scann::dp_internal::DenseDotProductAvx2(db, qq);
+    return ::yb::dp_internal::DenseDotProductAvx2(db, qq);
   }
   if constexpr (IsSame<T, Avx1<float>>()) {
-    return ::research_scann::dp_internal::DenseDotProductAvx1(db, qq);
+    return ::yb::dp_internal::DenseDotProductAvx1(db, qq);
   }
   if constexpr (IsSame<T, Sse4<float>>()) {
-    return ::research_scann::dp_internal::DenseDotProductSse4(db, qq);
+    return ::yb::dp_internal::DenseDotProductSse4(db, qq);
   }
   LOG(FATAL) << "Unhandled: " << SimdName();
 }
@@ -560,7 +560,7 @@ SCANN_SIMD_INLINE void OneToManyAsymmetricTemplate(
 
   auto get_db_ptr = [indices, &dataset_view, result, callback](size_t i)
                         SCANN_INLINE_LAMBDA -> const DataT* {
-    using ::research_scann::one_to_many_low_level::GetDatapointIndex;
+    using ::yb::one_to_many_low_level::GetDatapointIndex;
     const size_t idx = kHasIndices ? indices[i] : GetDatapointIndex(result, i);
     callback.prefetch(idx);
     return dataset_view.GetPtr(idx);

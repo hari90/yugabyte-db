@@ -19,7 +19,7 @@
 #include "scann/hashes/internal/lut16_args.h"
 #include "scann/utils/intrinsics/attributes.h"
 
-namespace research_scann {
+namespace yb {
 namespace asymmetric_hashing_internal {
 
 template <size_t kNumQueries, PrefetchStrategy kPrefetch>
@@ -40,6 +40,6 @@ class LUT16Highway {
 SCANN_INSTANTIATE_CLASS_FOR_LUT16_BATCH_SIZES(extern, LUT16Highway);
 
 }  // namespace asymmetric_hashing_internal
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

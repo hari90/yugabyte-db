@@ -42,7 +42,7 @@
 #include "scann/utils/types.h"
 #include "scann/utils/util_functions.h"
 
-namespace research_scann {
+namespace yb {
 namespace asymmetric_hashing2 {
 namespace {
 
@@ -104,9 +104,7 @@ SearcherBase<T>::SearcherBase(
   DCHECK(hashed_dataset);
 
   if (lut16_) {
-    packed_dataset_ =
-        ::research_scann::asymmetric_hashing2::CreatePackedDataset(
-            *this->hashed_dataset());
+    packed_dataset_ = ::yb::asymmetric_hashing2::CreatePackedDataset(*this->hashed_dataset());
 
     const size_t l2_cache_bytes = 256 * 1024;
     if (packed_dataset_.bit_packed_data.size() <= l2_cache_bytes / 2) {
@@ -496,4 +494,4 @@ SCANN_INSTANTIATE_TYPED_CLASS(, Searcher);
 SCANN_INSTANTIATE_TYPED_CLASS(, PrecomputedAsymmetricLookupTableCreator);
 
 }  // namespace asymmetric_hashing2
-}  // namespace research_scann
+}  // namespace yb

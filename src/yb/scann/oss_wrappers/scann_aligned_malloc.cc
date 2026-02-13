@@ -14,7 +14,7 @@
 
 #include "scann/oss_wrappers/scann_aligned_malloc.h"
 
-namespace research_scann {
+namespace yb {
 
 #if (defined(__STD_C_VERSION__) && (__STD_C_VERSION__ >= 201112L)) || \
     (__cplusplus >= 201703L) || defined(_ISOC11_SOURCE)
@@ -37,4 +37,4 @@ void aligned_free(void *aligned_memory) { _aligned_free(aligned_memory); }
 #else
 #endif
 
-}  // namespace research_scann
+}  // namespace yb

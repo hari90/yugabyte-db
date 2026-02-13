@@ -30,7 +30,7 @@
 #include "scann/utils/datapoint_utils.h"
 #include "scann/utils/pca_utils.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 PcaProjection<T>::PcaProjection(const int32_t input_dims,
@@ -248,4 +248,4 @@ std::optional<SerializedProjection> PcaProjection<T>::SerializeToProto() const {
 DEFINE_PROJECT_INPUT_OVERRIDES(PcaProjection);
 SCANN_INSTANTIATE_TYPED_CLASS(, PcaProjection);
 
-}  // namespace research_scann
+}  // namespace yb

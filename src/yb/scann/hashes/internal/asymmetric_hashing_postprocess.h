@@ -21,7 +21,7 @@
 #include "scann/oss_wrappers/scann_aligned_malloc.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 namespace asymmetric_hashing_internal {
 
@@ -92,6 +92,6 @@ class ConvertToFloatAndPostprocess {
 };
 
 }  // namespace asymmetric_hashing_internal
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

@@ -19,7 +19,7 @@
 
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename IndexT, typename ValueT>
 struct SparseLowLevelDatapoint {
@@ -144,6 +144,6 @@ class SparseDatasetLowLevel {
   std::vector<StartOffsetT> start_offsets_ = {0};
 };
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

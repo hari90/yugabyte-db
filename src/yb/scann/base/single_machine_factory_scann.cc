@@ -56,7 +56,7 @@
 
 using std::dynamic_pointer_cast;
 
-namespace research_scann {
+namespace yb {
 namespace {
 
 template <typename T>
@@ -266,4 +266,4 @@ StatusOrSearcherUntyped SingleMachineFactoryLeafSearcherScann(
 
 SCANN_INSTANTIATE_SINGLE_MACHINE_FACTORY_SCANN();
 
-}  // namespace research_scann
+}  // namespace yb

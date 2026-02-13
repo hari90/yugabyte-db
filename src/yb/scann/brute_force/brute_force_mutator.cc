@@ -22,7 +22,7 @@
 #include "scann/utils/single_machine_autopilot.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 StatusOr<unique_ptr<typename BruteForceSearcher<T>::Mutator>>
@@ -123,4 +123,4 @@ BruteForceSearcher<T>::Mutator::IncrementalMaintenance() {
 
 SCANN_INSTANTIATE_TYPED_CLASS(, BruteForceSearcher);
 
-}  // namespace research_scann
+}  // namespace yb

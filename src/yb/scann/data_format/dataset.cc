@@ -41,7 +41,7 @@
 #include "scann/utils/types.h"
 #include "scann/utils/util_functions.h"
 
-namespace research_scann {
+namespace yb {
 
 shared_ptr<DocidCollectionInterface> Dataset::ReleaseDocids() {
   auto result = std::move(docids_);
@@ -789,4 +789,4 @@ SCANN_INSTANTIATE_TYPED_CLASS(, TypedDataset);
 SCANN_INSTANTIATE_TYPED_CLASS(, SparseDataset);
 SCANN_INSTANTIATE_TYPED_CLASS(, DenseDataset);
 
-}  // namespace research_scann
+}  // namespace yb

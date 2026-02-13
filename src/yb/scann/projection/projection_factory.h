@@ -28,7 +28,7 @@
 #include "scann/proto/projection.pb.h"
 #include "scann/utils/common.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 using MaybeDatasetOrSerializedProjection =
@@ -108,6 +108,6 @@ StatusOr<unique_ptr<ChunkingProjection<T>>> ChunkingProjectionFactory(
 
 SCANN_INSTANTIATE_TYPED_CLASS(extern, ProjectionFactoryImpl);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

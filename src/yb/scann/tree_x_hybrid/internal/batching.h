@@ -24,7 +24,7 @@
 #include "scann/utils/fast_top_neighbors.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 namespace tree_x_internal {
 
 template <typename T>
@@ -125,6 +125,6 @@ size_t RecursiveSize(const T& vec) {
 }
 
 }  // namespace tree_x_internal
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

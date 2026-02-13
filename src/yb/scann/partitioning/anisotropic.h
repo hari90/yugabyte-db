@@ -22,7 +22,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/linear_algebra/types.h"
 
-namespace research_scann {
+namespace yb {
 
 class AvqAccumulator {
  public:
@@ -53,6 +53,6 @@ inline EVectorXf ComputeAVQPartition(ConstSpan<float> partition,
 std::pair<double, double> ComputeRescaleFraction(
     ConstSpan<float> partition_center, ConstSpan<float> partition_data);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

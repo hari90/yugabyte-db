@@ -25,7 +25,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/intrinsics/simd.h"
 
-namespace research_scann {
+namespace yb {
 
 enum class Int8TileSide {
   kQuery,
@@ -285,6 +285,6 @@ class Int32AccumulatorTile {
 #undef SCANN_SIMD_ATTRIBUTE
 }  // namespace fallback
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

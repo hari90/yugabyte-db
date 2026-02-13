@@ -26,7 +26,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/datapoint_utils.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 TreeBruteForceSecondLevelWrapper<T>::TreeBruteForceSecondLevelWrapper(
@@ -353,4 +353,4 @@ TreeBruteForceSecondLevelWrapper<T>::CreateTopLevel(
 
 SCANN_INSTANTIATE_TYPED_CLASS(, TreeBruteForceSecondLevelWrapper);
 
-}  // namespace research_scann
+}  // namespace yb

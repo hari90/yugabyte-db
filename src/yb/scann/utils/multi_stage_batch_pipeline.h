@@ -21,7 +21,7 @@
 
 #include "scann/utils/common.h"
 
-namespace research_scann {
+namespace yb {
 
 template <int kBatchSize, typename... StageCallbacks>
 void RunMultiStageBatchPipeline(size_t task_count,
@@ -62,6 +62,6 @@ void RunMultiStageBatchPipeline(size_t task_count,
   }
 }
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

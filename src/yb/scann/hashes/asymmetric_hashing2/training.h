@@ -28,7 +28,7 @@
 #include "scann/oss_wrappers/scann_threadpool.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 namespace asymmetric_hashing2 {
 
 template <typename T>
@@ -44,8 +44,7 @@ StatusOr<unique_ptr<Model<T>>> TrainSingleMachine(
     const auto& dense = down_cast<const DenseDataset<T>&>(dataset);
     SCANN_ASSIGN_OR_RETURN(
         auto centers,
-        ::research_scann::asymmetric_hashing_internal::StackedQuantizers<
-            T>::Train(dense, params, pool));
+        ::yb::asymmetric_hashing_internal::StackedQuantizers<T>::Train(dense, params, pool));
     SCANN_ASSIGN_OR_RETURN(
         result, Model<T>::FromCenters(std::move(centers),
                                       params.config().quantization_scheme()));
@@ -62,8 +61,7 @@ StatusOr<unique_ptr<Model<T>>> TrainSingleMachine(
 
     SCANN_ASSIGN_OR_RETURN(
         auto centers,
-        ::research_scann::asymmetric_hashing_internal::TrainAsymmetricHashing(
-            dataset_no_bias, params, pool));
+        ::yb::asymmetric_hashing_internal::TrainAsymmetricHashing(dataset_no_bias, params, pool));
     auto converted = asymmetric_hashing_internal::ConvertCentersIfNecessary<T>(
         std::move(centers));
     SCANN_ASSIGN_OR_RETURN(
@@ -72,8 +70,7 @@ StatusOr<unique_ptr<Model<T>>> TrainSingleMachine(
   } else {
     SCANN_ASSIGN_OR_RETURN(
         auto centers,
-        ::research_scann::asymmetric_hashing_internal::TrainAsymmetricHashing(
-            dataset, params, pool));
+        ::yb::asymmetric_hashing_internal::TrainAsymmetricHashing(dataset, params, pool));
     auto converted = asymmetric_hashing_internal::ConvertCentersIfNecessary<T>(
         std::move(centers));
     SCANN_ASSIGN_OR_RETURN(
@@ -85,6 +82,6 @@ StatusOr<unique_ptr<Model<T>>> TrainSingleMachine(
 }
 
 }  // namespace asymmetric_hashing2
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

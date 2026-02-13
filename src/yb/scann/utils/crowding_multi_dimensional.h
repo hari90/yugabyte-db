@@ -25,7 +25,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 class CrowdingMultiDimensional {
  public:
@@ -83,6 +83,6 @@ class CrowdingAttributesGuard {
   State state_ = State::kEmpty;
 };
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

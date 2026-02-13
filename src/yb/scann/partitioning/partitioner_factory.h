@@ -31,7 +31,7 @@
 #include "scann/utils/types.h"
 #include "scann/utils/util_functions.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 StatusOr<unique_ptr<Partitioner<T>>> PartitionerFromSerialized(
@@ -113,6 +113,6 @@ SCANN_INSTANTIATE_SERIALIZED_PARTITIONER_FACTORY(extern, int64_t);
 SCANN_INSTANTIATE_SERIALIZED_PARTITIONER_FACTORY(extern, float);
 SCANN_INSTANTIATE_SERIALIZED_PARTITIONER_FACTORY(extern, double);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

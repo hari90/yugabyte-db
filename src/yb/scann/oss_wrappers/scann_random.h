@@ -17,12 +17,12 @@
 
 #include <random>
 
-namespace research_scann {
+namespace yb {
 
 using MTRandom = std::mt19937;
 using ACMRandom = std::minstd_rand0;
 const int kDeterministicSeed = 301;
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

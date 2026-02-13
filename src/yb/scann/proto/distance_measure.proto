@@ -14,7 +14,7 @@
 
 syntax = "proto2";
 
-package research_scann;
+package yb;
 
 message DistanceMeasureConfig {
   optional string distance_measure = 1 [default = "SquaredL2Distance"];

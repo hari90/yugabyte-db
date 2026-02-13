@@ -21,7 +21,7 @@
 #include "scann/oss_wrappers/scann_threadpool.h"
 #include "scann/utils/common.h"
 
-namespace research_scann {
+namespace yb {
 
 StatusOrSearcherUntyped RetrainAndReindexSearcher(
     UntypedSingleMachineSearcherBase* searcher,

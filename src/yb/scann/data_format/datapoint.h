@@ -30,7 +30,7 @@
 #include "scann/utils/infinite_one_array.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 class DatapointPtr;
@@ -441,6 +441,6 @@ inline void DatapointPtr<double>::ToGfv(GenericFeatureVector& result) const {
 SCANN_INSTANTIATE_TYPED_CLASS(extern, DatapointPtr);
 SCANN_INSTANTIATE_TYPED_CLASS(extern, Datapoint);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

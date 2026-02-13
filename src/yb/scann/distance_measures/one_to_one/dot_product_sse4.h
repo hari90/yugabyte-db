@@ -20,7 +20,7 @@
 #include "scann/data_format/datapoint.h"
 #include "scann/utils/intrinsics/attributes.h"
 
-namespace research_scann {
+namespace yb {
 namespace dp_internal {
 
 SCANN_SSE4_OUTLINE double DenseDotProductSse4(const DatapointPtr<uint8_t>& a,
@@ -42,7 +42,7 @@ SCANN_SSE4_OUTLINE double DenseDotProductSse4(const DatapointPtr<int8_t>& a,
                                               const DatapointPtr<int8_t>& b,
                                               const DatapointPtr<float>& c);
 }  // namespace dp_internal
-}  // namespace research_scann
+}  // namespace yb
 
 #endif
 #endif

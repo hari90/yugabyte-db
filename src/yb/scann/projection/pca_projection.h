@@ -25,7 +25,7 @@
 #include "scann/proto/projection.pb.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 class PcaProjection : public Projection<T> {
@@ -77,6 +77,6 @@ class PcaProjection : public Projection<T> {
 
 SCANN_INSTANTIATE_TYPED_CLASS(extern, PcaProjection);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

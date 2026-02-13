@@ -35,7 +35,7 @@
 #include "scann/utils/top_n_amortized_constant.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 namespace asymmetric_hashing_internal {
 
 template <typename T>
@@ -746,4 +746,4 @@ template class PopulateDistancesIterator<6, LimitedInnerFunctor>;
 SCANN_INSTANTIATE_TYPED_CLASS(, AhImpl);
 
 }  // namespace asymmetric_hashing_internal
-}  // namespace research_scann
+}  // namespace yb

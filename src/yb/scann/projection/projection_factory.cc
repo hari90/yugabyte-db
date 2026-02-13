@@ -28,7 +28,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 Status FixRemainderDims(const DimensionIndex input_dim,
                         const ProjectionConfig& config,
@@ -205,4 +205,4 @@ StatusOr<unique_ptr<Projection<T>>> ProjectionFactoryImpl<T>::Create(
 
 SCANN_INSTANTIATE_TYPED_CLASS(, ProjectionFactoryImpl);
 
-}  // namespace research_scann
+}  // namespace yb

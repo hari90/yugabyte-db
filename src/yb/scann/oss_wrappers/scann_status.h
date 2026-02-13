@@ -83,12 +83,12 @@
 #define SCANN_MACROS_CONCAT_NAME(x, y) SCANN_MACROS_CONCAT_IMPL(x, y)
 #define SCANN_MACROS_CONCAT_IMPL(x, y) x##y
 
-namespace research_scann {
+namespace yb {
 
 absl::Status AnnotateStatus(const absl::Status& s, absl::string_view msg);
 
 StatusBuilder RetCheckFail(absl::string_view msg);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

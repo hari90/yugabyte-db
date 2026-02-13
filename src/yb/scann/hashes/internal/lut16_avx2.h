@@ -22,7 +22,7 @@
 #include "scann/utils/intrinsics/attributes.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 namespace asymmetric_hashing_internal {
 
 template <size_t kNumQueries, PrefetchStrategy kPrefetch>
@@ -43,7 +43,7 @@ class LUT16Avx2 {
 SCANN_INSTANTIATE_CLASS_FOR_LUT16_BATCH_SIZES(extern, LUT16Avx2);
 
 }  // namespace asymmetric_hashing_internal
-}  // namespace research_scann
+}  // namespace yb
 
 #endif
 #endif

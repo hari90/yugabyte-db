@@ -27,7 +27,7 @@
 #include "scann/oss_wrappers/scann_malloc_extension.h"
 #include "scann/utils/common.h"
 
-namespace research_scann {
+namespace yb {
 
 class ShortStringOptimizedString {
  public:
@@ -146,6 +146,6 @@ class ShortStringOptimizedString {
 
 static_assert(sizeof(ShortStringOptimizedString) == sizeof(string_view), "");
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

@@ -49,7 +49,7 @@
 #include "scann/utils/scalar_quantization_helpers.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 namespace one_to_many_low_level {
 
 using NeighborResult = std::pair<DatapointIndex, float>;
@@ -811,4 +811,4 @@ ReorderingHelper<T>::CreateBruteForceSearcher(int32_t num_neighbors,
 
 SCANN_INSTANTIATE_TYPED_CLASS(, ReorderingHelper);
 
-}  // namespace research_scann
+}  // namespace yb

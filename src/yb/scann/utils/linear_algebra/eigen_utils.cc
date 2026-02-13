@@ -25,7 +25,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/linear_algebra/types.h"
 
-namespace research_scann {
+namespace yb {
 
 using Eigen::ColMajor;
 using Eigen::Dynamic;
@@ -168,4 +168,4 @@ absl::Status FillSpanFromEigenVector(const EVectorXd& vec,
   return FillSpanFromEigenVectorHelper(vec, dp);
 }
 
-}  // namespace research_scann
+}  // namespace yb

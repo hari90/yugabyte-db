@@ -27,7 +27,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 namespace asymmetric_hashing2 {
 
 template <typename T>
@@ -109,4 +109,4 @@ Status TrainingOptions<T>::Validate() const {
 SCANN_INSTANTIATE_TYPED_CLASS(, TrainingOptions);
 
 }  // namespace asymmetric_hashing2
-}  // namespace research_scann
+}  // namespace yb

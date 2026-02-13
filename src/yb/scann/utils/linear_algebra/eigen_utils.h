@@ -25,7 +25,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/linear_algebra/types.h"
 
-namespace research_scann {
+namespace yb {
 
 EMatrixXf ToEigenMatrix(const DenseDataset<float>& dataset);
 EVectorXf ToEigenVector(const DatapointPtr<float>& dptr);
@@ -54,6 +54,6 @@ absl::Status FillSpanFromEigenVector(const EVectorXf& vec,
 absl::Status FillSpanFromEigenVector(const EVectorXd& vec,
                                      absl::Span<double> dp);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

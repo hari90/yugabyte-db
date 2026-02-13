@@ -16,10 +16,10 @@
 
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 namespace asymmetric_hashing2 {
 
 SCANN_INSTANTIATE_TYPED_CLASS(, TrainingOptionsTyped);
 
 }
-}  // namespace research_scann
+}  // namespace yb

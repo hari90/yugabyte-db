@@ -20,7 +20,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
-namespace research_scann {
+namespace yb {
 namespace tcmalloc {
 
 class MallocExtension {
@@ -36,6 +36,6 @@ class MallocExtension {
 };
 
 }  // namespace tcmalloc
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

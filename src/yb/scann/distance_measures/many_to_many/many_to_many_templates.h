@@ -83,7 +83,7 @@
       DLOG(FATAL) << "Invalid Batch Size:  " << batch_size;               \
   }
 
-namespace research_scann {
+namespace yb {
 
 #if defined(__x86_64__) && !defined(SCANN_FORCE_SSE4)
 #define SCANN_MANY_TO_MANY_DYNAMIC_DISPATCH_X64
@@ -401,6 +401,6 @@ Status DenseDistanceManyToManyFP8PretransposedImpl(
 #undef SCANN_CALL_FUNCTION_BY_MM_BATCH_SIZE
 
 }  // namespace mm_internal
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

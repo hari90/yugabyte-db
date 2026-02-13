@@ -32,7 +32,7 @@
 #include "scann/scann_ops/cc/scann.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 using np_row_major_arr =
@@ -78,6 +78,6 @@ class ScannNumpy {
   ScannInterface scann_;
 };
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

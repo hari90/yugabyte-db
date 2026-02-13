@@ -23,7 +23,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 TreeXOptionalParameters::TreeXOptionalParameters() {}
 TreeXOptionalParameters::~TreeXOptionalParameters() {}
@@ -74,4 +74,4 @@ Status TreeXOptionalParameters::EnablePreTokenizationWithDistances(
   return OkStatus();
 }
 
-}  // namespace research_scann
+}  // namespace yb

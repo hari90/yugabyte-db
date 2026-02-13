@@ -24,7 +24,7 @@
 #include "scann/data_format/datapoint.h"
 #include "scann/utils/internal/avx_funcs.h"
 
-namespace research_scann {
+namespace yb {
 namespace dp_internal {
 
 #define SCANN_SIMD_ATTRIBUTE SCANN_AVX1
@@ -65,6 +65,6 @@ SCANN_AVX1_OUTLINE double DenseDotProductAvx1(const DatapointPtr<int8_t>& a,
 }
 
 }  // namespace dp_internal
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

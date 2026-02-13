@@ -42,7 +42,7 @@
 #include "scann/utils/types.h"
 #include "scann/utils/zip_sort.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 KMeansTreePartitioner<T>::KMeansTreePartitioner(
@@ -998,4 +998,4 @@ Status KMeansTreePartitioner<T>::OrthogonalityAmplifiedTokenForDatapointBatched(
 
 SCANN_INSTANTIATE_TYPED_CLASS(, KMeansTreePartitioner);
 
-}  // namespace research_scann
+}  // namespace yb

@@ -35,7 +35,7 @@
 #include "scann/utils/types.h"
 #include "scann/utils/util_functions.h"
 
-namespace research_scann {
+namespace yb {
 
 std::vector<float> ComputeMaxQuantizationMultipliers(
     const DenseDataset<float>& dataset) {
@@ -417,4 +417,4 @@ uint32_t DecodeBottomBitsDataFromInt8(ConstSpan<int8_t> quantized) {
   return result;
 }
 
-}  // namespace research_scann
+}  // namespace yb

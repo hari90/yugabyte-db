@@ -37,11 +37,11 @@ Status ConvertStatus(const Status& status);
 
 template <typename DstType, typename SrcType = DstType>
 absl::Status PopulateDenseDatasetFromTensor(
-    const Tensor& tensor, research_scann::DenseDataset<DstType>* dataset);
+    const Tensor& tensor, yb::DenseDataset<DstType>* dataset);
 
 template <typename DstType, typename SrcType>
 absl::Status PopulateDenseDatasetFromTensor(
-    const Tensor& tensor, research_scann::DenseDataset<DstType>* dataset) {
+    const Tensor& tensor, yb::DenseDataset<DstType>* dataset) {
   if (tensor.dims() != 2) {
     return errors::InvalidArgument("Dataset must be 2-dimensional",
                                    tensor.DebugString());
@@ -57,9 +57,8 @@ absl::Status PopulateDenseDatasetFromTensor(
   dataset->Reserve(num_datapoint);
 
   for (int i = 0; i < num_datapoint; ++i) {
-    const research_scann::DatapointPtr<DstType> dptr(
-        nullptr, reinterpret_cast<const DstType*>(&tensor_t(i, 0)), num_dim,
-        num_dim);
+    const yb::DatapointPtr<DstType> dptr(
+        nullptr, reinterpret_cast<const DstType*>(&tensor_t(i, 0)), num_dim, num_dim);
     TF_RETURN_IF_ERROR(ConvertStatus(dataset->Append(dptr, "")));
   }
   return OkStatus();
@@ -67,8 +66,7 @@ absl::Status PopulateDenseDatasetFromTensor(
 
 template <typename T>
 absl::Status TensorFromDenseDataset(
-    OpKernelContext* context, absl::string_view name,
-    const research_scann::DenseDataset<T>* dataset) {
+    OpKernelContext* context, absl::string_view name, const yb::DenseDataset<T>* dataset) {
   if (dataset == nullptr) return EmptyTensor(context, name);
   Tensor* tensor;
   TF_RETURN_IF_ERROR(context->allocate_output(
@@ -83,14 +81,13 @@ absl::Status TensorFromDenseDataset(
 
 template <typename T>
 void TensorFromDenseDatasetRequireOk(
-    OpKernelContext* context, absl::string_view name,
-    const research_scann::DenseDataset<T>* dataset) {
+    OpKernelContext* context, absl::string_view name, const yb::DenseDataset<T>* dataset) {
   OP_REQUIRES_OK(context, TensorFromDenseDataset(context, name, dataset));
 }
 
 template <typename T>
-absl::Status TensorFromSpan(OpKernelContext* context, absl::string_view name,
-                            research_scann::ConstSpan<T> span) {
+absl::Status TensorFromSpan(
+    OpKernelContext* context, absl::string_view name, yb::ConstSpan<T> span) {
   if (span.empty()) return EmptyTensor(context, name);
   Tensor* tensor;
   TF_RETURN_IF_ERROR(context->allocate_output(
@@ -101,13 +98,13 @@ absl::Status TensorFromSpan(OpKernelContext* context, absl::string_view name,
 }
 
 template <typename T>
-void TensorFromSpanRequireOk(OpKernelContext* context, absl::string_view name,
-                             research_scann::ConstSpan<T> span) {
+void TensorFromSpanRequireOk(
+    OpKernelContext* context, absl::string_view name, yb::ConstSpan<T> span) {
   OP_REQUIRES_OK(context, TensorFromSpan(context, name, span));
 }
 
 template <typename T>
-research_scann::ConstSpan<T> TensorToConstSpan(const Tensor* t) {
+yb::ConstSpan<T> TensorToConstSpan(const Tensor* t) {
   return absl::MakeConstSpan(t->flat<T>().data(), t->NumElements());
 }
 

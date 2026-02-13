@@ -25,7 +25,7 @@
 #include "scann/utils/scalar_quantization_helpers.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 namespace one_to_many_low_level {
 
 template <typename ValueT>
@@ -277,6 +277,6 @@ class SetTop1Functor {
 };
 
 }  // namespace one_to_many_low_level
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

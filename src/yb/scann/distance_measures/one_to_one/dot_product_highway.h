@@ -19,7 +19,7 @@
 #include "scann/data_format/datapoint.h"
 #include "scann/utils/intrinsics/attributes.h"
 
-namespace research_scann {
+namespace yb {
 namespace dp_internal {
 
 SCANN_HIGHWAY_OUTLINE double DenseDotProductHighway(
@@ -29,6 +29,6 @@ SCANN_HIGHWAY_OUTLINE double DenseDotProductHighway(
     const DatapointPtr<int16_t>& a, const DatapointPtr<float>& b);
 
 }  // namespace dp_internal
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

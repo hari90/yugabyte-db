@@ -14,9 +14,9 @@
 
 #include "scann/distance_measures/one_to_many/one_to_many_symmetric.h"
 
-namespace research_scann {
+namespace yb {
 
 SCANN_INSTANTIATE_COMMON_FLOAT_ONE_TO_MANY()
 SCANN_INSTANTIATE_COMMON_DOUBLE_ONE_TO_MANY()
 
-}  // namespace research_scann
+}  // namespace yb

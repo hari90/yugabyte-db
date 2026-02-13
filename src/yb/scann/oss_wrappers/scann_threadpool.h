@@ -20,7 +20,7 @@
 
 #include "absl/strings/string_view.h"
 
-namespace research_scann {
+namespace yb {
 
 class ThreadPool {
  public:
@@ -34,6 +34,6 @@ class ThreadPool {
   std::unique_ptr<Impl> impl_;
 };
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

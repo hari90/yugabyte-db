@@ -34,7 +34,7 @@
 #include "scann/hashes/internal/lut16_highway.h"
 #endif
 
-namespace research_scann {
+namespace yb {
 namespace asymmetric_hashing_internal {
 
 class LUT16Interface {
@@ -318,6 +318,6 @@ void LUT16Interface::GetTopFloatDistances(LUT16ArgsTopN<float, TopN> args) {
 #endif
 
 }  // namespace asymmetric_hashing_internal
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

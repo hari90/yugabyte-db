@@ -20,7 +20,7 @@
 #include "scann/partitioning/partitioner_base.h"
 #include "scann/partitioning/tree_brute_force_second_level_wrapper.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 StatusOr<unique_ptr<Partitioner<T>>>
@@ -105,6 +105,6 @@ KMeansTreePartitionerFactoryPreSampledAndProjected(
   return StatusOr<unique_ptr<Partitioner<T>>>(std::move(result));
 }
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

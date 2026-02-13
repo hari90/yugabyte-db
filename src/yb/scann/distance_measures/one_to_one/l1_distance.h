@@ -24,7 +24,7 @@
 #include "scann/utils/reduction.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T, typename U>
 double SparseL1Norm(const DatapointPtr<T>& a, const DatapointPtr<U>& b);
@@ -131,6 +131,6 @@ double HybridL1Norm(const DatapointPtr<T>& a, const DatapointPtr<U>& b) {
   return HybridPairAccumulate(a, b, L1ReduceTwo(), L1ReduceOne());
 }
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

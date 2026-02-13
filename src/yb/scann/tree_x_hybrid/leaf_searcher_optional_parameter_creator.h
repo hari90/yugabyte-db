@@ -21,7 +21,7 @@
 #include "scann/data_format/datapoint.h"
 #include "scann/utils/common.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 class LeafSearcherOptionalParameterCreator {
@@ -32,6 +32,6 @@ class LeafSearcherOptionalParameterCreator {
   CreateLeafSearcherOptionalParameters(const DatapointPtr<T>& query) const = 0;
 };
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

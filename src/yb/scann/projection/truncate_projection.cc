@@ -16,7 +16,7 @@
 
 #include "scann/utils/datapoint_utils.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 Status TruncateProjection<T>::ProjectInput(const DatapointPtr<T>& input,
@@ -44,4 +44,4 @@ Status TruncateProjection<T>::ProjectInput(const DatapointPtr<T>& input,
 
 SCANN_INSTANTIATE_TYPED_CLASS(, TruncateProjection);
 
-}  // namespace research_scann
+}  // namespace yb

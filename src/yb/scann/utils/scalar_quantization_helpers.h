@@ -27,7 +27,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 struct ScalarQuantizationResults {
   DenseDataset<int8_t> quantized_dataset;
@@ -162,6 +162,6 @@ uint32_t DecodeBottomBitsDataFromPackedInt4(ConstSpan<uint8_t> packed);
 
 uint32_t DecodeBottomBitsDataFromInt8(ConstSpan<int8_t> quantized);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

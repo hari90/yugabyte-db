@@ -14,7 +14,7 @@
 
 syntax = "proto2";
 
-package research_scann;
+package yb;
 
 message AutopilotTreeAH {
   optional int64 l1_size = 1 [default = 32768];

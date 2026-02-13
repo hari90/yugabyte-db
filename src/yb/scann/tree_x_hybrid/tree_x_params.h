@@ -24,7 +24,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 class TreeXOptionalParameters final
     : public SearcherSpecificOptionalParameters {
@@ -87,6 +87,6 @@ class TreeXOptionalParameters final
       all_leaf_optional_params_;
 };
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

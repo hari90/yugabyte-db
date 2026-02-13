@@ -19,7 +19,7 @@
 #include "scann/data_format/datapoint.h"
 #include "scann/distance_measures/one_to_one/common.h"
 
-namespace research_scann {
+namespace yb {
 
 SCANN_DEFINE_DISTANCE_MEASURE_VIRTUAL_METHODS(DotProductDistance,
                                               kEarlyStoppingNotSupported);
@@ -41,4 +41,4 @@ double BinaryDotProductDistance::GetDistanceSparse(
 
 SCANN_REGISTER_DISTANCE_MEASURE(BinaryDotProductDistance);
 
-}  // namespace research_scann
+}  // namespace yb

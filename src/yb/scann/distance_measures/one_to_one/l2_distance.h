@@ -29,7 +29,7 @@
 #include "scann/utils/reduction.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T, typename U>
 double DenseSquaredL2Distance(const DatapointPtr<T>& a,
@@ -288,6 +288,6 @@ inline double DenseSquaredL2Distance<double, double>(
 
 #endif
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

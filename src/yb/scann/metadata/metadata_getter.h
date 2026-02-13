@@ -26,7 +26,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 class MetadataGetter;
@@ -42,7 +42,7 @@ class UntypedMetadataGetter {
 
   virtual bool needs_dataset() const;
 
-  virtual research_scann::TypeTag TypeTag() const = 0;
+  virtual yb::TypeTag TypeTag() const = 0;
 
   virtual ~UntypedMetadataGetter();
 };
@@ -55,7 +55,7 @@ class MetadataGetter : public UntypedMetadataGetter {
   MetadataGetter(const MetadataGetter&) = delete;
   MetadataGetter& operator=(const MetadataGetter&) = delete;
 
-  research_scann::TypeTag TypeTag() const final { return TagForType<T>(); }
+  yb::TypeTag TypeTag() const final { return TagForType<T>(); }
 
   virtual std::optional<size_t> fixed_len_size(
       const TypedDataset<T>* dataset, const DatapointPtr<T>& query) const {
@@ -101,6 +101,6 @@ class MetadataGetter : public UntypedMetadataGetter {
   }
 };
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

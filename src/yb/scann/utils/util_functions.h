@@ -40,7 +40,7 @@
 #include <pmmintrin.h>
 #endif
 
-namespace research_scann {
+namespace yb {
 
 using std::shared_ptr;
 
@@ -472,6 +472,6 @@ void UnpackNibblesDatapoint(ConstSpan<uint8_t> packed,
                             MutableSpan<uint8_t> hash,
                             DimensionIndex hash_size);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

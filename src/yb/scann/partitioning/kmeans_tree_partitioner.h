@@ -45,7 +45,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 class KMeansTreePartitioner final : public KMeansTreeLikePartitioner<T> {
@@ -323,6 +323,6 @@ KMeansTreePartitioner<float>::TokenizeDatabaseImplFastPath(
 
 SCANN_INSTANTIATE_TYPED_CLASS(extern, KMeansTreePartitioner);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

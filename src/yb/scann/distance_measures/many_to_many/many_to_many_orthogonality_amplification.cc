@@ -18,7 +18,7 @@
 #include "scann/distance_measures/many_to_many/many_to_many_common.h"
 #include "scann/distance_measures/many_to_many/many_to_many_templates.h"
 
-namespace research_scann {
+namespace yb {
 namespace mm_internal {
 
 template void DenseManyToManyOrthogonalityAmplifiedImpl(
@@ -40,4 +40,4 @@ template void DenseManyToManyOrthogonalityAmplifiedImpl(
     EpsilonFilteringCallback<float> callback);
 
 }  // namespace mm_internal
-}  // namespace research_scann
+}  // namespace yb

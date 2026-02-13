@@ -20,7 +20,7 @@
 
 #include "absl/numeric/bits.h"
 
-namespace research_scann {
+namespace yb {
 namespace bits {
 
 #if (defined(__i386__) || defined(__x86_64__)) && defined(__GNUC__)
@@ -60,6 +60,6 @@ int Log2Ceiling(uint32_t n);
 int Log2Ceiling64(uint64_t n);
 
 }  // namespace bits
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

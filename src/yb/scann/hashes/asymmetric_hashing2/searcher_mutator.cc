@@ -28,7 +28,7 @@
 #include "scann/utils/common.h"
 #include "scann/utils/util_functions.h"
 
-namespace research_scann {
+namespace yb {
 namespace asymmetric_hashing2 {
 
 class AHPrecomputedMutationArtifacts
@@ -49,7 +49,7 @@ Searcher<T>::Mutator::Create(Searcher<T>* searcher) {
   const Indexer<T>* indexer = searcher->opts_.indexer_.get();
   if (!indexer) {
     return FailedPreconditionError(
-        "research_scann::asymmetric_hashing2::Searcher has not been "
+        "yb::asymmetric_hashing2::Searcher has not been "
         "initialized "
         "with an indexer.");
   }
@@ -252,4 +252,4 @@ Status Searcher<T>::Mutator::Hash(const DatapointPtr<T>& maybe_residual,
 SCANN_INSTANTIATE_TYPED_CLASS(, Searcher);
 
 }  // namespace asymmetric_hashing2
-}  // namespace research_scann
+}  // namespace yb

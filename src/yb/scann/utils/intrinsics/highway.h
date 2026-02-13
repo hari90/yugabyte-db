@@ -28,7 +28,7 @@
 
 #include "scann/utils/intrinsics/fallback.h"
 
-namespace research_scann {
+namespace yb {
 
 namespace highway = fallback;
 
@@ -48,7 +48,7 @@ namespace highway = fallback;
 #include "scann/utils/intrinsics/flags.h"
 
 HWY_BEFORE_NAMESPACE();
-namespace research_scann {
+namespace yb {
 
 namespace hn = hwy::HWY_NAMESPACE;
 
@@ -741,7 +741,7 @@ using Zeros = HwyZeros;
 using Uninitialized = HwyUninitialized;
 
 }  // namespace highway
-}  // namespace research_scann
+}  // namespace yb
 
 HWY_AFTER_NAMESPACE();
 

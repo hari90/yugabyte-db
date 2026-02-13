@@ -20,7 +20,7 @@
 #include "scann/utils/datapoint_utils.h"
 #include "scann/utils/pca_utils.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 EigenvalueOpqProjection<T>::EigenvalueOpqProjection(const int32_t input_dims)
@@ -163,4 +163,4 @@ EigenvalueOpqProjection<T>::GetDirections() const {
 DEFINE_PROJECT_INPUT_OVERRIDES(EigenvalueOpqProjection);
 SCANN_INSTANTIATE_TYPED_CLASS(, EigenvalueOpqProjection);
 
-}  // namespace research_scann
+}  // namespace yb

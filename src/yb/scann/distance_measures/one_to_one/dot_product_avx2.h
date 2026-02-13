@@ -20,7 +20,7 @@
 #include "scann/data_format/datapoint.h"
 #include "scann/utils/intrinsics/attributes.h"
 
-namespace research_scann {
+namespace yb {
 namespace dp_internal {
 
 SCANN_AVX2_OUTLINE double DenseDotProductAvx2(const DatapointPtr<int8_t>& a,
@@ -35,7 +35,7 @@ SCANN_AVX2_OUTLINE double DenseDotProductAvx2(const DatapointPtr<int8_t>& a,
                                               const DatapointPtr<float>& c);
 
 }  // namespace dp_internal
-}  // namespace research_scann
+}  // namespace yb
 
 #endif
 #endif

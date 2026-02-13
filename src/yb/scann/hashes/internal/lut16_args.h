@@ -22,7 +22,7 @@
 #include "scann/utils/fast_top_neighbors.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 namespace asymmetric_hashing_internal {
 
 inline constexpr size_t kPrefetchBytesAhead = 768;
@@ -142,6 +142,6 @@ struct LUT16ArgsTopN<float, TopN> : public LUT16ArgsTopNBase<float, TopN> {
   EXTERN_KEYWORD template class ClassName<9, PrefetchStrategy::kOff>;
 
 }  // namespace asymmetric_hashing_internal
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

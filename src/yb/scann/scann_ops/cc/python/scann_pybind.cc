@@ -22,24 +22,21 @@
 
 PYBIND11_MODULE(scann_pybind, py_module) {
   py_module.doc() = "pybind11 wrapper for ScaNN";
-  pybind11::class_<research_scann::ScannNumpy>(py_module, "ScannNumpy")
+  pybind11::class_<yb::ScannNumpy>(py_module, "ScannNumpy")
       .def(pybind11::init<const std::string&, const std::string&>())
-      .def(pybind11::init<const research_scann::np_row_major_arr<float>&,
-                          const std::string&, int>())
-      .def("search", &research_scann::ScannNumpy::Search)
-      .def("search_batched", &research_scann::ScannNumpy::SearchBatched)
+      .def(pybind11::init<const yb::np_row_major_arr<float>&, const std::string&, int>())
+      .def("search", &yb::ScannNumpy::Search)
+      .def("search_batched", &yb::ScannNumpy::SearchBatched)
 
-      .def("upsert", &research_scann::ScannNumpy::Upsert)
-      .def("delete", &research_scann::ScannNumpy::Delete)
-      .def("rebalance", &research_scann::ScannNumpy::Rebalance)
-      .def_static("suggest_autopilot",
-                  &research_scann::ScannNumpy::SuggestAutopilot)
-      .def("size", &research_scann::ScannNumpy::Size)
-      .def("reserve", &research_scann::ScannNumpy::Reserve)
-      .def("set_num_threads", &research_scann::ScannNumpy::SetNumThreads)
-      .def("config", &research_scann::ScannNumpy::Config)
-      .def("serialize", &research_scann::ScannNumpy::Serialize)
-      .def("get_health_stats", &research_scann::ScannNumpy::GetHealthStats)
-      .def("initialize_health_stats",
-           &research_scann::ScannNumpy::InitializeHealthStats);
+      .def("upsert", &yb::ScannNumpy::Upsert)
+      .def("delete", &yb::ScannNumpy::Delete)
+      .def("rebalance", &yb::ScannNumpy::Rebalance)
+      .def_static("suggest_autopilot", &yb::ScannNumpy::SuggestAutopilot)
+      .def("size", &yb::ScannNumpy::Size)
+      .def("reserve", &yb::ScannNumpy::Reserve)
+      .def("set_num_threads", &yb::ScannNumpy::SetNumThreads)
+      .def("config", &yb::ScannNumpy::Config)
+      .def("serialize", &yb::ScannNumpy::Serialize)
+      .def("get_health_stats", &yb::ScannNumpy::GetHealthStats)
+      .def("initialize_health_stats", &yb::ScannNumpy::InitializeHealthStats);
 }

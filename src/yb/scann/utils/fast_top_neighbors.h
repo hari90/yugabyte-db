@@ -36,7 +36,7 @@
 #include "scann/utils/types.h"
 #include "scann/utils/util_functions.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename DistT, typename DatapointIndexT = DatapointIndex,
           size_t FixedCapacity = 0>
@@ -602,6 +602,6 @@ SCANN_INSTANTIATE_FAST_TOP_NEIGHBORS(extern, float,
 static_assert(std::is_same_v<uint32_t, DatapointIndex> ||
               std::is_same_v<uint64_t, DatapointIndex>);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

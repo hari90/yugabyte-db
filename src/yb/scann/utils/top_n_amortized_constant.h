@@ -25,7 +25,7 @@
 #include "scann/utils/types.h"
 #include "scann/utils/util_functions.h"
 
-namespace research_scann {
+namespace yb {
 
 template <class T, class Cmp = std::greater<T>>
 class TopNAmortizedConstant {
@@ -204,6 +204,6 @@ SCANN_INSTANTIATE_TYPED_CLASS(extern, TopNeighbors);
 
 extern template class TopNeighbors<DimensionIndex>;
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

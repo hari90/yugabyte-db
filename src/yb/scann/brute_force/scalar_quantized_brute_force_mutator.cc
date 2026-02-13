@@ -23,7 +23,7 @@
 #include "scann/utils/scalar_quantization_helpers.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 StatusOr<unique_ptr<ScalarQuantizedBruteForceSearcher::Mutator>>
 ScalarQuantizedBruteForceSearcher::Mutator::Create(
@@ -156,4 +156,4 @@ ScalarQuantizedBruteForceSearcher::Mutator::LookupDatapointIndexOrError(
   return index;
 }
 
-}  // namespace research_scann
+}  // namespace yb

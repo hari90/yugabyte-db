@@ -47,7 +47,7 @@
 #include "scann/utils/types.h"
 #include "scann/utils/util_functions.h"
 
-namespace research_scann {
+namespace yb {
 
 class UntypedSingleMachineSearcherBase;
 using StatusOrSearcherUntyped =
@@ -70,7 +70,7 @@ class UntypedSingleMachineSearcherBase {
 
   virtual ~UntypedSingleMachineSearcherBase();
 
-  virtual research_scann::TypeTag TypeTag() const = 0;
+  virtual yb::TypeTag TypeTag() const = 0;
 
   virtual const Dataset* dataset() const = 0;
 
@@ -392,7 +392,7 @@ class SingleMachineSearcherBase : public UntypedSingleMachineSearcherBase {
     return GetNeighborProtoNoMetadata(neighbor, result);
   }
 
-  research_scann::TypeTag TypeTag() const final { return TagForType<T>(); }
+  yb::TypeTag TypeTag() const final { return TagForType<T>(); }
 
   const TypedDataset<T>* dataset() const final { return dataset_.get(); }
 
@@ -670,6 +670,6 @@ void RetrainAndReindexFixup(UntypedSingleMachineSearcherBase* result,
 
 SCANN_INSTANTIATE_TYPED_CLASS(extern, SingleMachineSearcherBase);
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

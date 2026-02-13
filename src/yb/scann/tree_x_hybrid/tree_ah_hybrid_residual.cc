@@ -56,7 +56,7 @@
 #include "scann/utils/fast_top_neighbors.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 using asymmetric_hashing2::AsymmetricHashingOptionalParameters;
 
@@ -1145,7 +1145,7 @@ TreeAHHybridResidual::GetHealthStats() const {
 }
 
 vector<uint32_t> TreeAHHybridResidual::SizeByPartition() const {
-  return ::research_scann::SizeByPartition(datapoints_by_token_);
+  return ::yb::SizeByPartition(datapoints_by_token_);
 }
 
-}  // namespace research_scann
+}  // namespace yb

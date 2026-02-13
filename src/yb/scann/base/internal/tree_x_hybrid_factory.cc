@@ -63,7 +63,7 @@
 #include "scann/utils/scalar_quantization_helpers.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 template <typename T>
 using StatusOrSearcher = StatusOr<unique_ptr<SingleMachineSearcherBase<T>>>;
@@ -733,4 +733,4 @@ StatusOrSearcherUntyped TreeXHybridFactory(
 
 SCANN_INSTANTIATE_TREE_X_HYBRID_FACTORY();
 
-}  // namespace research_scann
+}  // namespace yb

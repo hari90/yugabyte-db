@@ -24,7 +24,7 @@
 #include "scann/utils/intrinsics/highway.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 namespace {
 uint8_t SimdBlockSize() {
@@ -118,4 +118,4 @@ Datapoint<int8_t> FP8SimdBlockTransposedDatabase::ReconstructDatapoint(
   return Datapoint<int8_t>({}, std::move(data), dimensionality_);
 }
 
-}  // namespace research_scann
+}  // namespace yb

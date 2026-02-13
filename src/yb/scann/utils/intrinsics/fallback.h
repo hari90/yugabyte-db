@@ -23,7 +23,7 @@
 #include "scann/utils/intrinsics/flags.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 namespace fallback {
 
 static constexpr PlatformGeneration kPlatformGeneration = kFallbackForNonX86;
@@ -582,6 +582,6 @@ SCANN_INLINE uint64_t GetComparisonMask(array<bool, 64> cmp) {
   return ret;
 }
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

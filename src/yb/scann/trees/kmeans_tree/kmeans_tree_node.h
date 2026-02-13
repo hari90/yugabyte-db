@@ -44,7 +44,7 @@
 #include "scann/utils/types.h"
 #include "scann/utils/zip_sort.h"
 
-namespace research_scann {
+namespace yb {
 
 class KMeansTreeNode {
  public:
@@ -358,6 +358,6 @@ Status KMeansTreeNode::ApplyAvq(
   return OkStatus();
 }
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

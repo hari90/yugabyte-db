@@ -14,7 +14,7 @@
 
 syntax = "proto2";
 
-package research_scann;
+package yb;
 
 message SerializedLinearProjectionTree {
   message Node {

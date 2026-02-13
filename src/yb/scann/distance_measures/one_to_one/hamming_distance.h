@@ -27,7 +27,7 @@
 #include "scann/utils/reduction.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 inline DimensionIndex DenseBinaryHammingDistance(
     const DatapointPtr<uint8_t>& a, const DatapointPtr<uint8_t>& b);
@@ -192,6 +192,6 @@ inline DimensionIndex DenseBinaryHammingDistance(
   return DenseBinaryMergeAndPopcnt(a, b, DenseBinaryHammingXor());
 }
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

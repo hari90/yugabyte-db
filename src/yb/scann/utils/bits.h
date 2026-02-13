@@ -23,7 +23,7 @@
 #include "absl/numeric/bits.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 inline uint32_t NextPowerOfTwo32(uint32_t x) {
   return (x & (x - 1)) ? 1UL << (32 - absl::countl_zero(x)) : x;
@@ -55,6 +55,6 @@ SCANN_INLINE T GetLowBits(T src, int nbits) {
                     : src & (all_ones >> (sizeof(T) * CHAR_BIT - nbits));
 }
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

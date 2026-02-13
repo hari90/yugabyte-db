@@ -23,7 +23,7 @@
 #include "scann/data_format/dataset.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 
 struct PreQuantizedFixedPoint {
   shared_ptr<DenseDataset<int8_t>> fixed_point_dataset = nullptr;
@@ -48,6 +48,6 @@ inline PreQuantizedFixedPoint CreatePreQuantizedFixedPoint(
   return res;
 }
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif

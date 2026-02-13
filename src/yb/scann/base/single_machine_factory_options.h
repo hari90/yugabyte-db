@@ -30,7 +30,7 @@
 #include "scann/utils/fixed_point/pre_quantized_fixed_point.h"
 #include "scann/utils/types.h"
 
-namespace research_scann {
+namespace yb {
 template <typename T>
 class DenseDataset;
 template <typename T>
@@ -72,6 +72,6 @@ struct SingleMachineFactoryOptions {
   shared_ptr<ThreadPool> parallelization_pool;
 };
 
-}  // namespace research_scann
+}  // namespace yb
 
 #endif
