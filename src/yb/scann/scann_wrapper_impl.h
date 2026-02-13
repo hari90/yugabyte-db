@@ -58,6 +58,16 @@ using ScannImplPtr = std::unique_ptr<ScannImplOpaque, ScannImplDeleter>;
 // Factory.
 ScannImplPtr CreateScannImpl();
 
+// Opaque handle to a ScannConfig proto.  Hides the protobuf type from
+// translation units that cannot include ScaNN/absl headers.
+struct ScannConfigOpaque;
+
+struct ScannConfigDeleter {
+  void operator()(ScannConfigOpaque* p) const;
+};
+
+using ScannConfigPtr = std::unique_ptr<ScannConfigOpaque, ScannConfigDeleter>;
+
 // ---------------------------------------------------------------------------
 // Functions that mirror the ScannWrapper public API but return ImplStatus.
 // ---------------------------------------------------------------------------
@@ -65,7 +75,8 @@ ScannImplPtr CreateScannImpl();
 ImplStatus ImplInitialize(ScannImplOpaque* impl,
                           const float* dataset, size_t dataset_size,
                           uint32_t n_points,
-                          const std::string& config, int training_threads);
+                          const ScannConfigOpaque& config,
+                          int training_threads);
 
 ImplStatus ImplLoadFromDisk(ScannImplOpaque* impl,
                             const std::string& artifacts_dir,
@@ -102,6 +113,21 @@ ImplStatus ImplSerialize(ScannImplOpaque* impl, const std::string& path);
 void ImplSetNumThreads(ScannImplOpaque* impl, int num_threads);
 size_t ImplNPoints(const ScannImplOpaque* impl);
 size_t ImplDimensionality(const ScannImplOpaque* impl);
+
+// ---------------------------------------------------------------------------
+// Config builders — return an opaque ScannConfigPtr ready to pass directly
+// to the proto-based ImplInitialize overload.
+// ---------------------------------------------------------------------------
+
+ScannConfigPtr ImplAhConfig(int num_neighbors, int dim);
+ScannConfigPtr ImplTreeAhConfig(int num_neighbors, int dim);
+ScannConfigPtr ImplTreeBruteForceConfig(int num_neighbors, int dim);
+ScannConfigPtr ImplBruteForceConfig(int num_neighbors, int dim, bool fixed_point);
+ScannConfigPtr ImplReorderConfig(int num_neighbors, int dim);
+
+// Serialize an opaque config to its text-format representation (useful for
+// logging / debugging).
+std::string ImplConfigToString(const ScannConfigOpaque& config);
 
 }  // namespace scann_internal
 }  // namespace yb

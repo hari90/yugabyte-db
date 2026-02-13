@@ -17,13 +17,16 @@
 
 #include "scann/scann_wrapper_impl.h"
 
+#include <algorithm>
 #include <fstream>
 
+#include "absl/base/internal/sysinfo.h"
 #include "google/protobuf/text_format.h"
 #include "scann/data_format/datapoint.h"
 #include "scann/data_format/dataset.h"
 #include "scann/scann_ops/cc/scann.h"
 #include "scann/utils/common.h"
+#include "scann/utils/threads.h"
 #include "scann/utils/types.h"
 
 namespace yb {
@@ -33,6 +36,8 @@ namespace yb {
 // ---------------------------------------------------------------------------
 
 namespace {
+
+int GetNumCPUs() { return std::max(absl::base_internal::NumCPUs(), 1); }
 
 // Convert an absl::Status to our lightweight ImplStatus POD.
 scann_internal::ImplStatus ToImplStatus(const absl::Status& s) {
@@ -64,9 +69,14 @@ struct ScannImplOpaque {
   ScannInterface scann;
 };
 
-// Deleter & factory --------------------------------------------------------
+struct ScannConfigOpaque {
+  ScannConfig config;
+};
+
+// Deleters & factories ------------------------------------------------------
 
 void ScannImplDeleter::operator()(ScannImplOpaque* p) const { delete p; }
+void ScannConfigDeleter::operator()(ScannConfigOpaque* p) const { delete p; }
 
 ScannImplPtr CreateScannImpl() {
   return ScannImplPtr(new ScannImplOpaque());
@@ -79,10 +89,40 @@ ScannImplPtr CreateScannImpl() {
 ImplStatus ImplInitialize(ScannImplOpaque* impl,
                           const float* dataset, size_t dataset_size,
                           uint32_t n_points,
-                          const std::string& config, int training_threads) {
+                          const ScannConfigOpaque& config,
+                          int training_threads) {
+  if (training_threads < 0) {
+    return {3, "training_threads must be non-negative"};  // kInvalidArgument
+  }
+  if (training_threads == 0) {
+    training_threads = GetNumCPUs();
+  }
+
+  SingleMachineFactoryOptions opts;
+  opts.parallelization_pool =
+      StartThreadPool("scann_threadpool", training_threads - 1);
+
+  // Replicate the dataset construction that the string-based Initialize does.
+  DimensionIndex n_dim = kInvalidDimension;
+  if (config.config.input_output().pure_dynamic_config().has_dimensionality()) {
+    n_dim = config.config.input_output().pure_dynamic_config().dimensionality();
+  }
+
+  ConstSpan<float> ds_span(dataset, dataset_size);
+  std::shared_ptr<DenseDataset<float>> ds_ptr;
+  if (!ds_span.empty() || n_dim != kInvalidDimension) {
+    std::vector<float> ds_vec(ds_span.data(), ds_span.data() + ds_span.size());
+    auto ds = std::make_unique<DenseDataset<float>>(
+        std::move(ds_vec), static_cast<DatapointIndex>(n_points));
+    if (n_dim != kInvalidDimension) {
+      ds->set_dimensionality(n_dim);
+    }
+    ds_ptr = std::move(ds);
+  }
+
   return ToImplStatus(impl->scann.Initialize(
-      ConstSpan<float>(dataset, dataset_size),
-      static_cast<DatapointIndex>(n_points), config, training_threads));
+      ScannInterface::ScannArtifacts{config.config, std::move(ds_ptr),
+                                     std::move(opts)}));
 }
 
 ImplStatus ImplLoadFromDisk(ScannImplOpaque* impl,
@@ -221,6 +261,161 @@ size_t ImplNPoints(const ScannImplOpaque* impl) {
 
 size_t ImplDimensionality(const ScannImplOpaque* impl) {
   return static_cast<size_t>(impl->scann.dimensionality());
+}
+
+// ---------------------------------------------------------------------------
+// Config builders (proto → text format)
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// Shared helper: configures the AsymmetricHasherConfig block that is common to
+// AH, TreeAH, and Reorder configs.
+void SetupAh(AsymmetricHasherConfig* ah, int dim, bool use_residual) {
+  ah->set_lookup_type(AsymmetricHasherConfig::INT8_LUT16);
+  ah->set_use_residual_quantization(use_residual);
+  ah->set_use_global_topn(true);
+  ah->mutable_quantization_distance()->set_distance_measure("SquaredL2Distance");
+  ah->set_num_clusters_per_block(16);
+
+  auto* proj = ah->mutable_projection();
+  proj->set_input_dim(dim);
+  proj->set_projection_type(ProjectionConfig::CHUNK);
+  proj->set_num_blocks(dim / 2);
+  proj->set_num_dims_per_block(2);
+
+  ah->mutable_fixed_point_lut_conversion_options()
+      ->set_float_to_int_conversion_method(
+          AsymmetricHasherConfig::FixedPointLUTConversionOptions::ROUND);
+  ah->set_expected_sample_size(100000);
+  ah->set_max_clustering_iterations(10);
+}
+
+// Serialize a ScannConfig proto to its text-format representation.
+std::string ConfigToString(const ScannConfig& config) {
+  std::string result;
+  google::protobuf::TextFormat::PrintToString(config, &result);
+  return result;
+}
+
+}  // namespace
+
+ScannConfigPtr ImplAhConfig(int num_neighbors, int dim) {
+  auto cfg = ScannConfigPtr(new ScannConfigOpaque());
+  auto& config = cfg->config;
+  config.set_num_neighbors(num_neighbors);
+  config.mutable_distance_measure()->set_distance_measure("DotProductDistance");
+
+  SetupAh(config.mutable_hash()->mutable_asymmetric_hash(), dim,
+           /*use_residual=*/false);
+
+  config.mutable_input_output()->mutable_pure_dynamic_config()
+      ->set_dimensionality(dim);
+
+  return cfg;
+}
+
+ScannConfigPtr ImplTreeAhConfig(int num_neighbors, int dim) {
+  auto cfg = ScannConfigPtr(new ScannConfigOpaque());
+  auto& config = cfg->config;
+  config.set_num_neighbors(num_neighbors);
+  config.mutable_distance_measure()->set_distance_measure("DotProductDistance");
+
+  auto* part = config.mutable_partitioning();
+  part->set_num_children(100);
+  part->set_min_cluster_size(20);
+  part->set_max_clustering_iterations(12);
+  part->set_single_machine_center_initialization(
+      PartitioningConfig::RANDOM_INITIALIZATION);
+  part->mutable_partitioning_distance()->set_distance_measure("SquaredL2Distance");
+  auto* spill = part->mutable_query_spilling();
+  spill->set_spilling_type(QuerySpillingConfig::FIXED_NUMBER_OF_CENTERS);
+  spill->set_max_spill_centers(20);
+  part->set_expected_sample_size(100000);
+  part->mutable_query_tokenization_distance_override()
+      ->set_distance_measure("DotProductDistance");
+  part->set_partitioning_type(PartitioningConfig::GENERIC);
+  part->set_query_tokenization_type(PartitioningConfig::FLOAT);
+
+  SetupAh(config.mutable_hash()->mutable_asymmetric_hash(), dim,
+           /*use_residual=*/true);
+
+  config.mutable_input_output()->mutable_pure_dynamic_config()
+      ->set_dimensionality(dim);
+
+  return cfg;
+}
+
+ScannConfigPtr ImplTreeBruteForceConfig(int num_neighbors, int dim) {
+  auto cfg = ScannConfigPtr(new ScannConfigOpaque());
+  auto& config = cfg->config;
+  config.set_num_neighbors(num_neighbors);
+  config.mutable_distance_measure()->set_distance_measure("DotProductDistance");
+
+  auto* part = config.mutable_partitioning();
+  part->set_num_children(100);
+  part->set_min_cluster_size(10);
+  part->set_max_clustering_iterations(12);
+  part->set_single_machine_center_initialization(
+      PartitioningConfig::RANDOM_INITIALIZATION);
+  part->mutable_partitioning_distance()->set_distance_measure("SquaredL2Distance");
+  auto* spill = part->mutable_query_spilling();
+  spill->set_spilling_type(QuerySpillingConfig::FIXED_NUMBER_OF_CENTERS);
+  spill->set_max_spill_centers(10);
+  part->set_expected_sample_size(100000);
+  part->mutable_query_tokenization_distance_override()
+      ->set_distance_measure("DotProductDistance");
+  part->set_partitioning_type(PartitioningConfig::GENERIC);
+  part->set_query_tokenization_type(PartitioningConfig::FLOAT);
+
+  config.mutable_brute_force()->mutable_fixed_point()->set_enabled(true);
+
+  config.mutable_input_output()->mutable_pure_dynamic_config()
+      ->set_dimensionality(dim);
+
+  return cfg;
+}
+
+ScannConfigPtr ImplBruteForceConfig(int num_neighbors, int dim,
+                                    bool fixed_point) {
+  auto cfg = ScannConfigPtr(new ScannConfigOpaque());
+  auto& config = cfg->config;
+  config.set_num_neighbors(num_neighbors);
+  config.mutable_distance_measure()->set_distance_measure("DotProductDistance");
+
+  if (fixed_point) {
+    config.mutable_brute_force()->mutable_fixed_point()->set_enabled(true);
+  } else {
+    config.mutable_brute_force();
+  }
+
+  config.mutable_input_output()->mutable_pure_dynamic_config()
+      ->set_dimensionality(dim);
+
+  return cfg;
+}
+
+ScannConfigPtr ImplReorderConfig(int num_neighbors, int dim) {
+  auto cfg = ScannConfigPtr(new ScannConfigOpaque());
+  auto& config = cfg->config;
+  config.set_num_neighbors(num_neighbors);
+  config.mutable_distance_measure()->set_distance_measure("DotProductDistance");
+
+  SetupAh(config.mutable_hash()->mutable_asymmetric_hash(), dim,
+           /*use_residual=*/false);
+
+  auto* reorder = config.mutable_exact_reordering();
+  reorder->set_approx_num_neighbors(40);
+  reorder->mutable_fixed_point()->set_enabled(false);
+
+  config.mutable_input_output()->mutable_pure_dynamic_config()
+      ->set_dimensionality(dim);
+
+  return cfg;
+}
+
+std::string ImplConfigToString(const ScannConfigOpaque& config) {
+  return ConfigToString(config.config);
 }
 
 }  // namespace scann_internal

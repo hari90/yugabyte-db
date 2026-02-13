@@ -87,7 +87,7 @@ class ScannOpsTest : public YBTest {
     queries_ = RandomDataset(kNumQueries, kDimension, kSeed + 1);
   }
 
-  void SerializationTester(const std::string& config) {
+  void SerializationTester(const scann_internal::ScannConfigPtr& config) {
     ScannWrapper scann1;
     ASSERT_OK(scann1.Initialize(dataset_, kNumDatasetPoints, config, 4));
 
@@ -142,8 +142,8 @@ TEST_F(ScannOpsTest, ReorderingSerialization) {
 
 TEST_F(ScannOpsTest, BruteForceMatchesReference) {
   ScannWrapper scann;
-  ASSERT_TRUE(
-      scann.Initialize(dataset_, kNumDatasetPoints, ScannBruteForceConfig(10, kDimension), 4).ok());
+  ASSERT_OK(
+      scann.Initialize(dataset_, kNumDatasetPoints, ScannBruteForceConfig(10, kDimension), 4));
 
   auto results = ASSERT_RESULT(scann.SearchBatched(queries_, kNumQueries, 10, 10, 0));
 
@@ -171,8 +171,8 @@ TEST_F(ScannOpsTest, BruteForceMatchesReference) {
 
 TEST_F(ScannOpsTest, BruteForceFinalNumNeighbors) {
   ScannWrapper scann;
-  ASSERT_TRUE(
-      scann.Initialize(dataset_, kNumDatasetPoints, ScannBruteForceConfig(10, kDimension), 4).ok());
+  ASSERT_OK(
+      scann.Initialize(dataset_, kNumDatasetPoints, ScannBruteForceConfig(10, kDimension), 4));
 
   auto results20 = ASSERT_RESULT(scann.SearchBatched(queries_, kNumQueries, 20, 20, 0));
 
@@ -201,8 +201,8 @@ TEST_F(ScannOpsTest, BruteForceFinalNumNeighbors) {
 
 TEST_F(ScannOpsTest, SingleQuerySearch) {
   ScannWrapper scann;
-  ASSERT_TRUE(
-      scann.Initialize(dataset_, kNumDatasetPoints, ScannBruteForceConfig(10, kDimension), 4).ok());
+  ASSERT_OK(
+      scann.Initialize(dataset_, kNumDatasetPoints, ScannBruteForceConfig(10, kDimension), 4));
 
   std::vector<int32_t> ref_indices;
   std::vector<float> ref_distances;
@@ -230,7 +230,7 @@ TEST_F(ScannOpsTest, ParallelMatchesSequential) {
   std::vector<float> queries = RandomDataset(1000, 32, 519);
 
   ScannWrapper scann;
-  ASSERT_TRUE(scann.Initialize(dataset, 10000, ScannTreeAhConfig(10, 32), 4).ok());
+  ASSERT_OK(scann.Initialize(dataset, 10000, ScannTreeAhConfig(10, 32), 4));
 
   scann.SetNumThreads(4);
 
@@ -250,35 +250,31 @@ TEST_F(ScannOpsTest, ParallelMatchesSequential) {
 
 TEST_F(ScannOpsTest, ReorderingShapes) {
   ScannWrapper scann;
-  ASSERT_TRUE(scann.Initialize(dataset_, kNumDatasetPoints, ScannReorderConfig(5, kDimension), 4).ok());
+  ASSERT_OK(scann.Initialize(dataset_, kNumDatasetPoints, ScannReorderConfig(5, kDimension), 4));
 
   // -- Batched searches -------------------------------------------------------
   {
-    auto r = scann.SearchBatched(queries_, kNumQueries, 5, 5, 0);
-    ASSERT_TRUE(r.ok()) << r.status().ToString();
+    auto r = ASSERT_RESULT(scann.SearchBatched(queries_, kNumQueries, 5, 5, 0));
     for (int q = 0; q < kNumQueries; ++q) {
-      EXPECT_EQ((*r)[q].size(), 5u) << "query " << q;
+      EXPECT_EQ(r[q].size(), 5u) << "query " << q;
     }
   }
   {
-    auto r = scann.SearchBatched(queries_, kNumQueries, 8, 8, 0);
-    ASSERT_TRUE(r.ok()) << r.status().ToString();
+    auto r = ASSERT_RESULT(scann.SearchBatched(queries_, kNumQueries, 8, 8, 0));
     for (int q = 0; q < kNumQueries; ++q) {
-      EXPECT_EQ((*r)[q].size(), 8u) << "query " << q;
+      EXPECT_EQ(r[q].size(), 8u) << "query " << q;
     }
   }
   {
-    auto r = scann.SearchBatched(queries_, kNumQueries, 5, 8, 0);
-    ASSERT_TRUE(r.ok()) << r.status().ToString();
+    auto r = ASSERT_RESULT(scann.SearchBatched(queries_, kNumQueries, 5, 8, 0));
     for (int q = 0; q < kNumQueries; ++q) {
-      EXPECT_EQ((*r)[q].size(), 5u) << "query " << q;
+      EXPECT_EQ(r[q].size(), 5u) << "query " << q;
     }
   }
   {
-    auto r = scann.SearchBatched(queries_, kNumQueries, 6, 8, 0);
-    ASSERT_TRUE(r.ok()) << r.status().ToString();
+    auto r = ASSERT_RESULT(scann.SearchBatched(queries_, kNumQueries, 6, 8, 0));
     for (int q = 0; q < kNumQueries; ++q) {
-      EXPECT_EQ((*r)[q].size(), 6u) << "query " << q;
+      EXPECT_EQ(r[q].size(), 6u) << "query " << q;
     }
   }
 
@@ -286,31 +282,27 @@ TEST_F(ScannOpsTest, ReorderingShapes) {
   std::vector<float> first_query(queries_.begin(), queries_.begin() + kDimension);
 
   {
-    auto r = scann.Search(first_query, 5, 5, 0);
-    ASSERT_TRUE(r.ok()) << r.status().ToString();
-    EXPECT_EQ(r->size(), 5u);
+    auto r = ASSERT_RESULT(scann.Search(first_query, 5, 5, 0));
+    EXPECT_EQ(r.size(), 5u);
   }
   {
-    auto r = scann.Search(first_query, 8, 8, 0);
-    ASSERT_TRUE(r.ok()) << r.status().ToString();
-    EXPECT_EQ(r->size(), 8u);
+    auto r = ASSERT_RESULT(scann.Search(first_query, 8, 8, 0));
+    EXPECT_EQ(r.size(), 8u);
   }
   {
-    auto r = scann.Search(first_query, 5, 8, 0);
-    ASSERT_TRUE(r.ok()) << r.status().ToString();
-    EXPECT_EQ(r->size(), 5u);
+    auto r = ASSERT_RESULT(scann.Search(first_query, 5, 8, 0));
+    EXPECT_EQ(r.size(), 5u);
   }
   {
-    auto r = scann.Search(first_query, 6, 8, 0);
-    ASSERT_TRUE(r.ok()) << r.status().ToString();
-    EXPECT_EQ(r->size(), 6u);
+    auto r = ASSERT_RESULT(scann.Search(first_query, 6, 8, 0));
+    EXPECT_EQ(r.size(), 6u);
   }
 }
 
 TEST_F(ScannOpsTest, NPointsAndDimensionality) {
   ScannWrapper scann;
-  ASSERT_TRUE(
-      scann.Initialize(dataset_, kNumDatasetPoints, ScannBruteForceConfig(10, kDimension), 4).ok());
+  ASSERT_OK(
+      scann.Initialize(dataset_, kNumDatasetPoints, ScannBruteForceConfig(10, kDimension), 4));
 
   EXPECT_EQ(scann.n_points(), kNumDatasetPoints);
   EXPECT_EQ(scann.dimensionality(), kDimension);
@@ -318,9 +310,8 @@ TEST_F(ScannOpsTest, NPointsAndDimensionality) {
 
 TEST_F(ScannOpsTest, MoveConstructor) {
   ScannWrapper scann1;
-  ASSERT_TRUE(
-      scann1.Initialize(dataset_, kNumDatasetPoints, ScannBruteForceConfig(10, kDimension), 4)
-          .ok());
+  ASSERT_OK(
+      scann1.Initialize(dataset_, kNumDatasetPoints, ScannBruteForceConfig(10, kDimension), 4));
 
   // Search before move.
   std::vector<float> query(queries_.begin(), queries_.begin() + kDimension);
@@ -343,9 +334,8 @@ TEST_F(ScannOpsTest, MoveConstructor) {
 
 TEST_F(ScannOpsTest, MoveAssignment) {
   ScannWrapper scann1;
-  ASSERT_TRUE(
-      scann1.Initialize(dataset_, kNumDatasetPoints, ScannBruteForceConfig(10, kDimension), 4)
-          .ok());
+  ASSERT_OK(
+      scann1.Initialize(dataset_, kNumDatasetPoints, ScannBruteForceConfig(10, kDimension), 4));
 
   std::vector<float> query(queries_.begin(), queries_.begin() + kDimension);
   auto before = ASSERT_RESULT(scann1.Search(query, 5, 5, 0));
@@ -365,8 +355,8 @@ TEST_F(ScannOpsTest, MoveAssignment) {
 
 TEST_F(ScannOpsTest, InsertIncreasesNPoints) {
   ScannWrapper scann;
-  ASSERT_TRUE(
-      scann.Initialize(dataset_, kNumDatasetPoints, ScannBruteForceConfig(10, kDimension), 4).ok());
+  ASSERT_OK(
+      scann.Initialize(dataset_, kNumDatasetPoints, ScannBruteForceConfig(10, kDimension), 4));
 
   ASSERT_EQ(scann.n_points(), kNumDatasetPoints);
 
@@ -393,15 +383,9 @@ TEST_F(ScannOpsTest, InsertedPointIsSearchable) {
   // Plain brute force WITHOUT fixed_point quantization.  The fixed_point path
   // pre-quantizes the dataset at build time and dynamically inserted points
   // are not included in that representation, making them invisible to search.
-  const std::string config = R"(
-    num_neighbors: 5
-    distance_measure { distance_measure: "DotProductDistance" }
-    brute_force { }
-    input_output { pure_dynamic_config { dimensionality: 8 } }
-  )";
-
   ScannWrapper scann;
-  ASSERT_TRUE(scann.Initialize(small_dataset, kSmallN, config, 1).ok());
+  ASSERT_OK(scann.Initialize(
+      small_dataset, kSmallN, ScannBruteForceConfig(5, kDim, /*fixed_point=*/false), 1));
 
   // Create a distinctive point: all ones.  Its dot product with an all-ones
   // query will be kDim (= 8), which is larger than a random [0,1) vector's
@@ -428,15 +412,9 @@ TEST_F(ScannOpsTest, InsertMultipleThenBatchSearch) {
   // Plain brute force WITHOUT fixed_point quantization.  The fixed_point path
   // pre-quantizes the dataset at build time and dynamically inserted points
   // are not included in that representation, making them invisible to search.
-  const std::string config = R"(
-    num_neighbors: 5
-    distance_measure { distance_measure: "DotProductDistance" }
-    brute_force { }
-    input_output { pure_dynamic_config { dimensionality: 8 } }
-  )";
-
   ScannWrapper scann;
-  ASSERT_TRUE(scann.Initialize(small_dataset, kSmallN, config, 1).ok());
+  ASSERT_OK(scann.Initialize(
+      small_dataset, kSmallN, ScannBruteForceConfig(5, kDim, /*fixed_point=*/false), 1));
 
   // Insert kDim one-hot basis vectors.  Point i has a large value only in
   // dimension i, so each point is orthogonal to the others and the dot
@@ -480,7 +458,7 @@ TEST_F(ScannOpsTest, DeleteByDocidDecreasesNPoints) {
   auto small_dataset = RandomDataset(kSmallN, kDim, 99);
 
   ScannWrapper scann;
-  ASSERT_TRUE(scann.Initialize(small_dataset, kSmallN, ScannBruteForceConfig(5, kDim), 1).ok());
+  ASSERT_OK(scann.Initialize(small_dataset, kSmallN, ScannBruteForceConfig(5, kDim), 1));
 
   // Insert a point so we have a known docid.
   std::vector<float> pt(kDim, 1.0f);
@@ -488,8 +466,7 @@ TEST_F(ScannOpsTest, DeleteByDocidDecreasesNPoints) {
   ASSERT_EQ(scann.n_points(), kSmallN + 1);
 
   // Delete by docid.
-  auto s = scann.Delete(std::string("to_delete"));
-  ASSERT_TRUE(s.ok()) << s.ToString();
+  ASSERT_OK(scann.Delete(std::string("to_delete")));
   EXPECT_EQ(scann.n_points(), kSmallN);
 }
 
@@ -499,15 +476,14 @@ TEST_F(ScannOpsTest, DeleteByIndexDecreasesNPoints) {
   auto small_dataset = RandomDataset(kSmallN, kDim, 100);
 
   ScannWrapper scann;
-  ASSERT_TRUE(scann.Initialize(small_dataset, kSmallN, ScannBruteForceConfig(5, kDim), 1).ok());
+  ASSERT_OK(scann.Initialize(small_dataset, kSmallN, ScannBruteForceConfig(5, kDim), 1));
 
   // Insert a point and delete it by its numeric index.
   std::vector<float> pt(kDim, 1.0f);
   auto idx = ASSERT_RESULT(scann.Insert(pt, "by_index"));
   ASSERT_EQ(scann.n_points(), kSmallN + 1);
 
-  auto s = scann.Delete(idx);
-  ASSERT_TRUE(s.ok()) << s.ToString();
+  ASSERT_OK(scann.Delete(idx));
   EXPECT_EQ(scann.n_points(), kSmallN);
 }
 
@@ -517,15 +493,9 @@ TEST_F(ScannOpsTest, DeletedPointNotReturnedBySearch) {
   auto small_dataset = RandomDataset(kSmallN, kDim, 101);
 
   // Plain brute force without fixed_point so inserted points are searchable.
-  const std::string config = R"(
-    num_neighbors: 5
-    distance_measure { distance_measure: "DotProductDistance" }
-    brute_force { }
-    input_output { pure_dynamic_config { dimensionality: 8 } }
-  )";
-
   ScannWrapper scann;
-  ASSERT_TRUE(scann.Initialize(small_dataset, kSmallN, config, 1).ok());
+  ASSERT_OK(scann.Initialize(
+      small_dataset, kSmallN, ScannBruteForceConfig(5, kDim, /*fixed_point=*/false), 1));
 
   // Insert a distinctive all-ones point.
   std::vector<float> pt(kDim, 1.0f);
@@ -534,20 +504,17 @@ TEST_F(ScannOpsTest, DeletedPointNotReturnedBySearch) {
   // Confirm it is the top-1 result for an all-ones query.
   std::vector<float> query(kDim, 1.0f);
   {
-    auto r = scann.Search(query, 1, 1, 0);
-    ASSERT_TRUE(r.ok()) << r.status().ToString();
-    ASSERT_EQ(r->size(), 1u);
-    EXPECT_EQ((*r)[0].index, idx);
+    auto r = ASSERT_RESULT(scann.Search(query, 1, 1, 0));
+    ASSERT_EQ(r.size(), 1u);
+    EXPECT_EQ(r[0].index, idx);
   }
 
   // Delete it and search again — it should no longer appear.
-  auto s = scann.Delete(std::string("delete_me"));
-  ASSERT_TRUE(s.ok()) << s.ToString();
+  ASSERT_OK(scann.Delete(std::string("delete_me")));
 
   {
-    auto r = scann.Search(query, 5, 5, 0);
-    ASSERT_TRUE(r.ok()) << r.status().ToString();
-    for (const auto& result : *r) {
+    auto r = ASSERT_RESULT(scann.Search(query, 5, 5, 0));
+    for (const auto& result : r) {
       EXPECT_NE(result.index, idx)
           << "Deleted point (index " << idx << ") should not appear in results";
     }

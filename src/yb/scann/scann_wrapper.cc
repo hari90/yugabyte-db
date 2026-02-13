@@ -72,11 +72,11 @@ ScannWrapper& ScannWrapper::operator=(ScannWrapper&&) noexcept = default;
 
 Status ScannWrapper::Initialize(const std::vector<float>& dataset,
                                 uint32_t n_points,
-                                const std::string& config,
+                                const scann_internal::ScannConfigPtr& config,
                                 int training_threads) {
   return ImplToYbStatus(
       scann_internal::ImplInitialize(impl_.get(), dataset.data(), dataset.size(),
-                                     n_points, config, training_threads));
+                                     n_points, *config, training_threads));
 }
 
 Status ScannWrapper::LoadFromDisk(const std::string& artifacts_dir,
@@ -170,174 +170,33 @@ size_t ScannWrapper::dimensionality() const {
 }
 
 // ---------------------------------------------------------------------------
-// ScaNN configuration builders
+// ScaNN configuration builders – delegate to proto-based implementations
+// in scann_wrapper_impl.cc (the only TU that can include proto headers).
 // ---------------------------------------------------------------------------
 
-std::string ScannConfigWithDimensionality(const std::string& base_config, int dim) {
-  return base_config + R"(
-    input_output {
-      pure_dynamic_config {
-        dimensionality: )" +
-         std::to_string(dim) + R"(
-      }
-    }
-  )";
+scann_internal::ScannConfigPtr ScannAhConfig(int num_neighbors, int dim) {
+  return scann_internal::ImplAhConfig(num_neighbors, dim);
 }
 
-std::string ScannAhConfig(int num_neighbors, int dim) {
-  return ScannConfigWithDimensionality(
-      R"(
-        num_neighbors: )" +
-          std::to_string(num_neighbors) + R"(
-        distance_measure { distance_measure: "DotProductDistance" }
-        hash {
-          asymmetric_hash {
-            lookup_type: INT8_LUT16
-            use_residual_quantization: false
-            use_global_topn: true
-            quantization_distance { distance_measure: "SquaredL2Distance" }
-            num_clusters_per_block: 16
-            projection {
-              input_dim: )" +
-          std::to_string(dim) + R"(
-              projection_type: CHUNK
-              num_blocks: )" +
-          std::to_string(dim / 2) + R"(
-              num_dims_per_block: 2
-            }
-            fixed_point_lut_conversion_options {
-              float_to_int_conversion_method: ROUND
-            }
-            expected_sample_size: 100000
-            max_clustering_iterations: 10
-          }
-        }
-      )",
-      dim);
+scann_internal::ScannConfigPtr ScannTreeAhConfig(int num_neighbors, int dim) {
+  return scann_internal::ImplTreeAhConfig(num_neighbors, dim);
 }
 
-std::string ScannTreeAhConfig(int num_neighbors, int dim) {
-  return ScannConfigWithDimensionality(
-      R"(
-        num_neighbors: )" +
-          std::to_string(num_neighbors) + R"(
-        distance_measure { distance_measure: "DotProductDistance" }
-        partitioning {
-          num_children: 100
-          min_cluster_size: 20
-          max_clustering_iterations: 12
-          single_machine_center_initialization: RANDOM_INITIALIZATION
-          partitioning_distance { distance_measure: "SquaredL2Distance" }
-          query_spilling {
-            spilling_type: FIXED_NUMBER_OF_CENTERS
-            max_spill_centers: 20
-          }
-          expected_sample_size: 100000
-          query_tokenization_distance_override { distance_measure: "DotProductDistance" }
-          partitioning_type: GENERIC
-          query_tokenization_type: FLOAT
-        }
-        hash {
-          asymmetric_hash {
-            lookup_type: INT8_LUT16
-            use_residual_quantization: true
-            use_global_topn: true
-            quantization_distance { distance_measure: "SquaredL2Distance" }
-            num_clusters_per_block: 16
-            projection {
-              input_dim: )" +
-          std::to_string(dim) + R"(
-              projection_type: CHUNK
-              num_blocks: )" +
-          std::to_string(dim / 2) + R"(
-              num_dims_per_block: 2
-            }
-            fixed_point_lut_conversion_options {
-              float_to_int_conversion_method: ROUND
-            }
-            expected_sample_size: 100000
-            max_clustering_iterations: 10
-          }
-        }
-      )",
-      dim);
+scann_internal::ScannConfigPtr ScannTreeBruteForceConfig(int num_neighbors, int dim) {
+  return scann_internal::ImplTreeBruteForceConfig(num_neighbors, dim);
 }
 
-std::string ScannTreeBruteForceConfig(int num_neighbors, int dim) {
-  return ScannConfigWithDimensionality(
-      R"(
-        num_neighbors: )" +
-          std::to_string(num_neighbors) + R"(
-        distance_measure { distance_measure: "DotProductDistance" }
-        partitioning {
-          num_children: 100
-          min_cluster_size: 10
-          max_clustering_iterations: 12
-          single_machine_center_initialization: RANDOM_INITIALIZATION
-          partitioning_distance { distance_measure: "SquaredL2Distance" }
-          query_spilling {
-            spilling_type: FIXED_NUMBER_OF_CENTERS
-            max_spill_centers: 10
-          }
-          expected_sample_size: 100000
-          query_tokenization_distance_override { distance_measure: "DotProductDistance" }
-          partitioning_type: GENERIC
-          query_tokenization_type: FLOAT
-        }
-        brute_force {
-          fixed_point { enabled: true }
-        }
-      )",
-      dim);
+scann_internal::ScannConfigPtr ScannBruteForceConfig(
+    int num_neighbors, int dim, bool fixed_point) {
+  return scann_internal::ImplBruteForceConfig(num_neighbors, dim, fixed_point);
 }
 
-std::string ScannBruteForceConfig(int num_neighbors, int dim) {
-  return ScannConfigWithDimensionality(
-      R"(
-        num_neighbors: )" +
-          std::to_string(num_neighbors) + R"(
-        distance_measure { distance_measure: "DotProductDistance" }
-        brute_force {
-          fixed_point { enabled: true }
-        }
-      )",
-      dim);
+scann_internal::ScannConfigPtr ScannReorderConfig(int num_neighbors, int dim) {
+  return scann_internal::ImplReorderConfig(num_neighbors, dim);
 }
 
-std::string ScannReorderConfig(int num_neighbors, int dim) {
-  return ScannConfigWithDimensionality(
-      R"(
-        num_neighbors: )" +
-          std::to_string(num_neighbors) + R"(
-        distance_measure { distance_measure: "DotProductDistance" }
-        hash {
-          asymmetric_hash {
-            lookup_type: INT8_LUT16
-            use_residual_quantization: false
-            use_global_topn: true
-            quantization_distance { distance_measure: "SquaredL2Distance" }
-            num_clusters_per_block: 16
-            projection {
-              input_dim: )" +
-          std::to_string(dim) + R"(
-              projection_type: CHUNK
-              num_blocks: )" +
-          std::to_string(dim / 2) + R"(
-              num_dims_per_block: 2
-            }
-            fixed_point_lut_conversion_options {
-              float_to_int_conversion_method: ROUND
-            }
-            expected_sample_size: 100000
-            max_clustering_iterations: 10
-          }
-        }
-        exact_reordering {
-          approx_num_neighbors: 40
-          fixed_point { enabled: false }
-        }
-      )",
-      dim);
+std::string ScannConfigToString(const scann_internal::ScannConfigPtr& config) {
+  return scann_internal::ImplConfigToString(*config);
 }
 
 }  // namespace yb

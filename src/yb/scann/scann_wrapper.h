@@ -50,15 +50,17 @@ class ScannWrapper {
   // Index construction
   // ---------------------------------------------------------------------------
 
-  // Build an index from a flat row-major float dataset and a text-format
-  // ScannConfig proto.
+  // Build an index from a flat row-major float dataset and a ScannConfig proto
+  // (returned by the ScannXxxConfig builder functions below).
   //
   //   dataset          – row-major float vector of size (n_points * dim).
   //   n_points         – number of vectors in the dataset.
-  //   config           – text-format ScannConfig proto string.
+  //   config           – opaque ScannConfig proto built via the Scann*Config
+  //                      helpers.
   //   training_threads – number of threads for training/indexing.
   Status Initialize(const std::vector<float>& dataset, uint32_t n_points,
-                    const std::string& config, int training_threads);
+                    const scann_internal::ScannConfigPtr& config,
+                    int training_threads);
 
   // Load a previously serialized index from disk.
   //
@@ -137,24 +139,33 @@ class ScannWrapper {
 // ---------------------------------------------------------------------------
 // ScaNN configuration builders
 //
-// Each function returns a text-format ScannConfig proto string ready to pass
-// to ScannWrapper::Initialize().  `num_neighbors` is the number of neighbors
+// Each function returns an opaque ScannConfigPtr ready to pass directly to
+// ScannWrapper::Initialize().  `num_neighbors` is the number of neighbors
 // returned by a search and `dim` is the dimensionality of the vectors.
 // ---------------------------------------------------------------------------
 
 // Asymmetric-hashing (AH) scoring.
-std::string ScannAhConfig(int num_neighbors, int dim);
+scann_internal::ScannConfigPtr ScannAhConfig(int num_neighbors, int dim);
 
 // Tree-partitioned + AH scoring.
-std::string ScannTreeAhConfig(int num_neighbors, int dim);
+scann_internal::ScannConfigPtr ScannTreeAhConfig(int num_neighbors, int dim);
 
 // Tree-partitioned + brute-force scoring.
-std::string ScannTreeBruteForceConfig(int num_neighbors, int dim);
+scann_internal::ScannConfigPtr ScannTreeBruteForceConfig(int num_neighbors, int dim);
 
 // Brute-force scoring (no partitioning).
-std::string ScannBruteForceConfig(int num_neighbors, int dim);
+//   fixed_point – when true (default), enables fixed-point quantization for
+//                 faster scoring.  Set to false when the index will be mutated
+//                 (Insert/Delete) since dynamically added points are not
+//                 included in the pre-quantized representation.
+scann_internal::ScannConfigPtr ScannBruteForceConfig(
+    int num_neighbors, int dim, bool fixed_point = true);
 
 // AH scoring + exact reordering.
-std::string ScannReorderConfig(int num_neighbors, int dim);
+scann_internal::ScannConfigPtr ScannReorderConfig(int num_neighbors, int dim);
+
+// Serialize an opaque config to its text-format representation (useful for
+// logging / debugging).
+std::string ScannConfigToString(const scann_internal::ScannConfigPtr& config);
 
 }  // namespace yb
