@@ -29,7 +29,9 @@ namespace yb::scann {
 namespace {
 
 Status ImplToYbStatus(const scann_internal::ImplStatus& s) {
-  if (s.ok()) return Status();
+  if (s.ok()) {
+    return Status();
+  }
 
   Status::Code code;
   switch (s.code) {
@@ -84,6 +86,27 @@ Status ScannWrapper::LoadFromDisk(const std::string& artifacts_dir,
                                        scann_assets_pbtxt));
 }
 
+// -- Mutation -----------------------------------------------------------------
+
+Result<int32_t> ScannWrapper::Insert(const std::vector<float>& datapoint,
+                                     const std::string& docid) {
+  int32_t assigned_index;
+  auto impl_status = scann_internal::ImplInsert(
+      impl_.get(), datapoint.data(), datapoint.size(), docid, &assigned_index);
+  if (!impl_status.ok()) {
+    return ImplToYbStatus(impl_status);
+  }
+  return assigned_index;
+}
+
+Status ScannWrapper::Delete(const std::string& docid) {
+  return ImplToYbStatus(scann_internal::ImplDelete(impl_.get(), docid));
+}
+
+Status ScannWrapper::Delete(int32_t index) {
+  return ImplToYbStatus(scann_internal::ImplDelete(impl_.get(), index));
+}
+
 // -- Search -------------------------------------------------------------------
 
 Result<std::vector<ScannSearchResult>> ScannWrapper::Search(
@@ -93,7 +116,9 @@ Result<std::vector<ScannSearchResult>> ScannWrapper::Search(
   auto impl_status = scann_internal::ImplSearch(
       impl_.get(), query.data(), query.size(),
       final_nn, pre_reorder_nn, leaves, &results);
-  if (!impl_status.ok()) return ImplToYbStatus(impl_status);
+  if (!impl_status.ok()) {
+    return ImplToYbStatus(impl_status);
+  }
   return results;
 }
 
@@ -104,7 +129,9 @@ Result<std::vector<std::vector<ScannSearchResult>>> ScannWrapper::SearchBatched(
   auto impl_status = scann_internal::ImplSearchBatched(
       impl_.get(), queries.data(), queries.size(), num_queries,
       final_nn, pre_reorder_nn, leaves, &results);
-  if (!impl_status.ok()) return ImplToYbStatus(impl_status);
+  if (!impl_status.ok()) {
+    return ImplToYbStatus(impl_status);
+  }
   return results;
 }
 
@@ -116,7 +143,9 @@ ScannWrapper::SearchBatchedParallel(
   auto impl_status = scann_internal::ImplSearchBatchedParallel(
       impl_.get(), queries.data(), queries.size(), num_queries,
       final_nn, pre_reorder_nn, leaves, batch_size, &results);
-  if (!impl_status.ok()) return ImplToYbStatus(impl_status);
+  if (!impl_status.ok()) {
+    return ImplToYbStatus(impl_status);
+  }
   return results;
 }
 

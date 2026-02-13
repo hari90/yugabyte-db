@@ -36,7 +36,9 @@ namespace {
 
 // Convert an absl::Status to our lightweight ImplStatus POD.
 scann_internal::ImplStatus ToImplStatus(const absl::Status& s) {
-  if (s.ok()) return {0, ""};
+  if (s.ok()) {
+    return {0, ""};
+  }
   return {static_cast<int>(s.code()), std::string(s.message())};
 }
 
@@ -87,7 +89,9 @@ ImplStatus ImplLoadFromDisk(ScannImplOpaque* impl,
                             const std::string& artifacts_dir,
                             const std::string& scann_assets_pbtxt) {
   auto load_or = ScannInterface::LoadArtifacts(artifacts_dir, scann_assets_pbtxt);
-  if (!load_or.ok()) return ToImplStatus(load_or.status());
+  if (!load_or.ok()) {
+    return ToImplStatus(load_or.status());
+  }
   return ToImplStatus(impl->scann.Initialize(std::move(load_or).value()));
 }
 
@@ -99,7 +103,9 @@ ImplStatus ImplSearch(const ScannImplOpaque* impl,
   auto status = impl->scann.Search(
       MakeDatapointPtr(query, static_cast<DimensionIndex>(query_size)),
       &nn_results, final_nn, pre_reorder_nn, leaves);
-  if (!status.ok()) return ToImplStatus(status);
+  if (!status.ok()) {
+    return ToImplStatus(status);
+  }
   ConvertResults(nn_results, results);
   return {0, ""};
 }
@@ -116,7 +122,9 @@ ImplStatus ImplSearchBatched(const ScannImplOpaque* impl,
   auto status = impl->scann.SearchBatched(
       query_dataset, MakeMutableSpan(nn_results), final_nn, pre_reorder_nn,
       leaves);
-  if (!status.ok()) return ToImplStatus(status);
+  if (!status.ok()) {
+    return ToImplStatus(status);
+  }
 
   results->resize(num_queries);
   for (size_t i = 0; i < num_queries; ++i) {
@@ -138,7 +146,9 @@ ImplStatus ImplSearchBatchedParallel(const ScannImplOpaque* impl,
   auto status = impl->scann.SearchBatchedParallel(
       query_dataset, MakeMutableSpan(nn_results), final_nn, pre_reorder_nn,
       leaves, batch_size);
-  if (!status.ok()) return ToImplStatus(status);
+  if (!status.ok()) {
+    return ToImplStatus(status);
+  }
 
   results->resize(num_queries);
   for (size_t i = 0; i < num_queries; ++i) {
@@ -147,9 +157,45 @@ ImplStatus ImplSearchBatchedParallel(const ScannImplOpaque* impl,
   return {0, ""};
 }
 
+ImplStatus ImplInsert(
+    ScannImplOpaque* impl, const float* datapoint, size_t datapoint_size, const std::string& docid,
+    int32_t* assigned_index) {
+  auto mutator_or = impl->scann.GetMutator();
+  if (!mutator_or.ok()) {
+    return ToImplStatus(mutator_or.status());
+  }
+  auto* mutator = mutator_or.value();
+
+  auto index_or = mutator->AddDatapoint(
+      MakeDatapointPtr(datapoint, static_cast<DimensionIndex>(datapoint_size)), docid);
+  if (!index_or.ok()) {
+    return ToImplStatus(index_or.status());
+  }
+  *assigned_index = static_cast<int32_t>(index_or.value());
+  return {0, ""};
+}
+
+ImplStatus ImplDelete(ScannImplOpaque* impl, const std::string& docid) {
+  auto mutator_or = impl->scann.GetMutator();
+  if (!mutator_or.ok()) {
+    return ToImplStatus(mutator_or.status());
+  }
+  return ToImplStatus(mutator_or.value()->RemoveDatapoint(docid));
+}
+
+ImplStatus ImplDelete(ScannImplOpaque* impl, int32_t index) {
+  auto mutator_or = impl->scann.GetMutator();
+  if (!mutator_or.ok()) {
+    return ToImplStatus(mutator_or.status());
+  }
+  return ToImplStatus(mutator_or.value()->RemoveDatapoint(static_cast<DatapointIndex>(index)));
+}
+
 ImplStatus ImplSerialize(ScannImplOpaque* impl, const std::string& path) {
   auto assets_or = impl->scann.Serialize(path, /*relative_path=*/false);
-  if (!assets_or.ok()) return ToImplStatus(assets_or.status());
+  if (!assets_or.ok()) {
+    return ToImplStatus(assets_or.status());
+  }
 
   // Write the manifest proto so that LoadFromDisk can find it.
   std::string assets_pbtxt;

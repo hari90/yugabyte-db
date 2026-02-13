@@ -89,6 +89,14 @@ ImplStatus ImplSearchBatchedParallel(const ScannImplOpaque* impl,
                                      int leaves, int batch_size,
                                      std::vector<std::vector<ScannSearchResult>>* results);
 
+ImplStatus ImplInsert(ScannImplOpaque* impl,
+                      const float* datapoint, size_t datapoint_size,
+                      const std::string& docid,
+                      int32_t* assigned_index);
+
+ImplStatus ImplDelete(ScannImplOpaque* impl, const std::string& docid);
+ImplStatus ImplDelete(ScannImplOpaque* impl, int32_t index);
+
 ImplStatus ImplSerialize(ScannImplOpaque* impl, const std::string& path);
 
 void ImplSetNumThreads(ScannImplOpaque* impl, int num_threads);

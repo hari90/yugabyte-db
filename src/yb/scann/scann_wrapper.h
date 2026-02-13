@@ -69,6 +69,25 @@ class ScannWrapper {
                       const std::string& scann_assets_pbtxt = "");
 
   // ---------------------------------------------------------------------------
+  // Mutation
+  // ---------------------------------------------------------------------------
+
+  // Insert a single datapoint into the index.
+  //
+  //   datapoint – float vector of length dimensionality().
+  //   docid     – unique string identifier for the datapoint.
+  //
+  // Returns the assigned datapoint index on success.
+  Result<int32_t> Insert(const std::vector<float>& datapoint,
+                         const std::string& docid);
+
+  // Delete a datapoint by its string docid.
+  Status Delete(const std::string& docid);
+
+  // Delete a datapoint by its numeric index.
+  Status Delete(int32_t index);
+
+  // ---------------------------------------------------------------------------
   // Search
   // ---------------------------------------------------------------------------
 
