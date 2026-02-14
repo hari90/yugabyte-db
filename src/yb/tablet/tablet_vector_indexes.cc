@@ -282,13 +282,16 @@ namespace {
 
 class VectorIndexBackfillHelper : public rocksdb::DirectWriter {
  public:
-  explicit VectorIndexBackfillHelper(HybridTime backfill_ht, OpId op_id)
-      : backfill_ht_(backfill_ht), op_id_(op_id) {}
+  VectorIndexBackfillHelper(
+      HybridTime backfill_ht, OpId op_id, bool needs_reverse_mapping)
+      : backfill_ht_(backfill_ht), op_id_(op_id),
+        needs_reverse_mapping_(needs_reverse_mapping) {}
 
   void Add(Slice ybctid, Slice value) {
     ybctids_.push_back(arena_.DupSlice(ybctid));
     entries_.emplace_back(docdb::DocVectorIndexInsertEntry {
       .value = ValueBuffer(value),
+      .ybctid = KeyBuffer(ybctid),
     });
   }
 
@@ -327,6 +330,9 @@ class VectorIndexBackfillHelper : public rocksdb::DirectWriter {
   }
 
   Status Apply(rocksdb::DirectWriteHandler& handler) override {
+    if (!needs_reverse_mapping_) {
+      return Status::OK();
+    }
     for (size_t i = 0; i != ybctids_.size(); ++i) {
       docdb::DocVectorIndex::ApplyReverseEntry(
           handler, ybctids_[i], entries_[i].value.AsSlice(), DocHybridTime(backfill_ht_, 0));
@@ -337,6 +343,7 @@ class VectorIndexBackfillHelper : public rocksdb::DirectWriter {
  private:
   const HybridTime backfill_ht_;
   const OpId op_id_;
+  const bool needs_reverse_mapping_;
   docdb::DocVectorIndexInsertEntries entries_;
   std::vector<Slice> ybctids_;
   Arena arena_;
@@ -361,7 +368,9 @@ Status TabletVectorIndexes::Backfill(
   RETURN_NOT_OK(reader.Init(backfill_ht, from_key));
 
   // Expecting one row at most.
-  VectorIndexBackfillHelper helper(backfill_ht, op_id);
+  bool needs_reverse_mapping =
+      vector_index->options().hnsw().backend() != HnswBackend::SCANN;
+  VectorIndexBackfillHelper helper(backfill_ht, op_id, needs_reverse_mapping);
   for (;;) {
     if (tablet().IsShutdownRequested()) {
       LOG_WITH_FUNC(INFO) << "Exit: " << AsString(*vector_index);
@@ -655,16 +664,24 @@ Status TabletVectorIndexes::Verify() {
         index_table->index_info->indexed_table_id()));
     IndexedTableReader reader(*vector_index);
     RETURN_NOT_OK(reader.Init(read_ht, Slice()));
-    auto reverse_mapping_reader = VERIFY_RESULT(
-        vector_index->context().CreateReverseMappingReader(ReadHybridTime::SingleTime(read_ht)));
+    bool needs_reverse_mapping =
+        vector_index->options().hnsw().backend() != HnswBackend::SCANN;
+    docdb::DocVectorIndexReverseMappingReaderPtr reverse_mapping_reader;
+    if (needs_reverse_mapping) {
+      reverse_mapping_reader = VERIFY_RESULT(
+          vector_index->context().CreateReverseMappingReader(
+              ReadHybridTime::SingleTime(read_ht)));
+    }
     while (VERIFY_RESULT(reader.FetchNext())) {
       auto value = dockv::EncodedDocVectorValue::FromSlice(reader.current_vector_slice());
       auto vector_id = VERIFY_RESULT(value.DecodeId());
-      auto ybctid = CHECK_RESULT(reverse_mapping_reader->Fetch(vector_id));
-      if (reader.current_ybctid() != ybctid) {
-        LOG_WITH_FUNC(DFATAL)
-            << "Wrong reverse record for: " << vector_id << ": " << ybctid.ToDebugHexString()
-            << ", while expected: " << reader.current_ybctid().ToDebugHexString();
+      if (reverse_mapping_reader) {
+        auto ybctid = CHECK_RESULT(reverse_mapping_reader->Fetch(vector_id));
+        if (reader.current_ybctid() != ybctid) {
+          LOG_WITH_FUNC(DFATAL)
+              << "Wrong reverse record for: " << vector_id << ": " << ybctid.ToDebugHexString()
+              << ", while expected: " << reader.current_ybctid().ToDebugHexString();
+        }
       }
       if (!VERIFY_RESULT(vector_index->HasVectorId(vector_id))) {
         LOG_WITH_FUNC(DFATAL) << "Missing vector id in index: " << vector_id;
