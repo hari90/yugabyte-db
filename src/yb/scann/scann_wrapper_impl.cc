@@ -39,10 +39,12 @@ namespace {
 
 int GetNumCPUs() { return std::max(absl::base_internal::NumCPUs(), 1); }
 
+static const scann_internal::ImplStatus StatusOK = {0, ""};
+
 // Convert an absl::Status to our lightweight ImplStatus POD.
 scann_internal::ImplStatus ToImplStatus(const absl::Status& s) {
   if (s.ok()) {
-    return {0, ""};
+    return StatusOK;
   }
   return {static_cast<int>(s.code()), std::string(s.message())};
 }
@@ -55,6 +57,13 @@ void ConvertResults(const NNResultsVector& nn_results,
     (*out)[i].index = static_cast<int32_t>(nn_results[i].first);
     (*out)[i].distance = nn_results[i].second;
   }
+}
+
+// Serialize a ScannConfig proto to its text-format representation.
+std::string ConfigToString(const ScannConfig& config) {
+  std::string result;
+  google::protobuf::TextFormat::PrintToString(config, &result);
+  return result;
 }
 
 }  // namespace
@@ -147,7 +156,7 @@ ImplStatus ImplSearch(const ScannImplOpaque* impl,
     return ToImplStatus(status);
   }
   ConvertResults(nn_results, results);
-  return {0, ""};
+  return StatusOK;
 }
 
 ImplStatus ImplSearchBatched(const ScannImplOpaque* impl,
@@ -170,7 +179,7 @@ ImplStatus ImplSearchBatched(const ScannImplOpaque* impl,
   for (size_t i = 0; i < num_queries; ++i) {
     ConvertResults(nn_results[i], &(*results)[i]);
   }
-  return {0, ""};
+  return StatusOK;
 }
 
 ImplStatus ImplSearchBatchedParallel(const ScannImplOpaque* impl,
@@ -194,7 +203,7 @@ ImplStatus ImplSearchBatchedParallel(const ScannImplOpaque* impl,
   for (size_t i = 0; i < num_queries; ++i) {
     ConvertResults(nn_results[i], &(*results)[i]);
   }
-  return {0, ""};
+  return StatusOK;
 }
 
 ImplStatus ImplInsert(
@@ -212,7 +221,7 @@ ImplStatus ImplInsert(
     return ToImplStatus(index_or.status());
   }
   *assigned_index = static_cast<int32_t>(index_or.value());
-  return {0, ""};
+  return StatusOK;
 }
 
 ImplStatus ImplDelete(ScannImplOpaque* impl, const std::string& docid) {
@@ -229,6 +238,35 @@ ImplStatus ImplDelete(ScannImplOpaque* impl, int32_t index) {
     return ToImplStatus(mutator_or.status());
   }
   return ToImplStatus(mutator_or.value()->RemoveDatapoint(static_cast<DatapointIndex>(index)));
+}
+
+ImplStatus ImplRunMaintenance(ScannImplOpaque* impl, bool* retrain_performed) {
+  auto mutator_or = impl->scann.GetMutator();
+  if (!mutator_or.ok()) {
+    return ToImplStatus(mutator_or.status());
+  }
+  auto maint_or = mutator_or.value()->IncrementalMaintenance();
+  if (!maint_or.ok()) {
+    return ToImplStatus(maint_or.status());
+  }
+  // IncrementalMaintenance returns a ScannConfig when the index has drifted
+  // enough that a full RetrainAndReindex is recommended.
+  if (maint_or.value().has_value()) {
+    *retrain_performed = true;
+    auto status_or = impl->scann.RetrainAndReindex(ConfigToString(maint_or.value().value()));
+    if (!status_or.ok()) {
+      return ToImplStatus(status_or.status());
+    }
+  }
+  return StatusOK;
+}
+
+ImplStatus ImplRetrainAndReindex(ScannImplOpaque* impl) {
+  auto status_or = impl->scann.RetrainAndReindex(/*config=*/"");
+  if (!status_or.ok()) {
+    return ToImplStatus(status_or.status());
+  }
+  return StatusOK;
 }
 
 ImplStatus ImplSerialize(ScannImplOpaque* impl, const std::string& path) {
@@ -248,7 +286,7 @@ ImplStatus ImplSerialize(ScannImplOpaque* impl, const std::string& path) {
     return {13, "Failed to open scann_assets.pbtxt for writing"};  // kInternal
   }
   out << assets_pbtxt;
-  return {0, ""};
+  return StatusOK;
 }
 
 void ImplSetNumThreads(ScannImplOpaque* impl, int num_threads) {
@@ -289,13 +327,6 @@ void SetupAh(AsymmetricHasherConfig* ah, int dim, bool use_residual) {
           AsymmetricHasherConfig::FixedPointLUTConversionOptions::ROUND);
   ah->set_expected_sample_size(100000);
   ah->set_max_clustering_iterations(10);
-}
-
-// Serialize a ScannConfig proto to its text-format representation.
-std::string ConfigToString(const ScannConfig& config) {
-  std::string result;
-  google::protobuf::TextFormat::PrintToString(config, &result);
-  return result;
 }
 
 }  // namespace

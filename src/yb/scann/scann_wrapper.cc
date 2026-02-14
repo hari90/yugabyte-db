@@ -17,6 +17,7 @@
 
 #include "scann/scann_wrapper.h"
 
+#include "yb/util/monotime.h"
 #include "yb/util/result.h"
 #include "yb/util/status.h"
 
@@ -57,6 +58,19 @@ Status ImplToYbStatus(const scann_internal::ImplStatus& s) {
   return Status(code, __FILE__, __LINE__, s.message);
 }
 
+class Timer {
+ public:
+  Timer(const std::string& label) : label_(label), start_(MonoTime::Now()) {}
+  ~Timer() {
+    auto end = MonoTime::Now();
+    LOG(INFO) << "scann: " << label_ << ": " << (end - start_).ToSeconds() * 1000 << "ms";
+  }
+
+ private:
+  std::string label_;
+  MonoTime start_;
+};
+
 }  // namespace
 
 // ---------------------------------------------------------------------------
@@ -75,11 +89,9 @@ Status ScannWrapper::Initialize(const std::vector<float>& dataset,
                                 const scann_internal::ScannConfigPtr& config,
                                 int training_threads,
                                 const std::vector<ScannVectorId>& labels) {
-  if (!labels.empty() && labels.size() != n_points) {
-    return Status(Status::kInvalidArgument, __FILE__, __LINE__,
-                  "labels size must equal n_points");
-  }
+  SCHECK_EQ(labels.size(), n_points, InvalidArgument, "labels size must equal n_points");
 
+  Timer timer("Initialize");
   auto impl_status = scann_internal::ImplInitialize(
       impl_.get(), dataset.data(), dataset.size(), n_points, *config,
       training_threads);
@@ -93,6 +105,7 @@ Status ScannWrapper::Initialize(const std::vector<float>& dataset,
 
 Status ScannWrapper::LoadFromDisk(const std::string& artifacts_dir,
                                   const std::string& scann_assets_pbtxt) {
+  Timer timer("LoadFromDisk");
   auto impl_status = scann_internal::ImplLoadFromDisk(
       impl_.get(), artifacts_dir, scann_assets_pbtxt);
   if (!impl_status.ok()) {
@@ -107,6 +120,7 @@ Status ScannWrapper::LoadFromDisk(const std::string& artifacts_dir,
 Result<int32_t> ScannWrapper::Insert(const std::vector<float>& datapoint,
                                      const std::string& docid,
                                      const ScannVectorId& label) {
+  Timer timer("Insert");
   int32_t assigned_index;
   auto impl_status = scann_internal::ImplInsert(
       impl_.get(), datapoint.data(), datapoint.size(), docid, &assigned_index);
@@ -115,6 +129,8 @@ Result<int32_t> ScannWrapper::Insert(const std::vector<float>& datapoint,
   }
 
   labels_.Put(assigned_index, label);
+
+  RETURN_NOT_OK(RunMaintenance());
   return assigned_index;
 }
 
@@ -122,15 +138,36 @@ Status ScannWrapper::Delete(const std::string& docid) {
   // NOTE: Delete-by-docid cannot efficiently clean up the label map because
   // the mapping from docid to index is internal to ScaNN.  The label entry
   // will become stale.  Use Delete(int32_t index) to ensure label cleanup.
-  return ImplToYbStatus(scann_internal::ImplDelete(impl_.get(), docid));
+  Timer timer("Delete(const std::string&)");
+  RETURN_NOT_OK(ImplToYbStatus(scann_internal::ImplDelete(impl_.get(), docid)));
+  return RunMaintenance();
 }
 
 Status ScannWrapper::Delete(int32_t index) {
-  auto status = ImplToYbStatus(scann_internal::ImplDelete(impl_.get(), index));
-  if (status.ok()) {
-    labels_.Erase(index);
+  Timer timer("Delete(int32_t)");
+  RETURN_NOT_OK(ImplToYbStatus(scann_internal::ImplDelete(impl_.get(), index)));
+  labels_.Erase(index);
+  return RunMaintenance();
+}
+
+Status ScannWrapper::RunMaintenance() {
+  bool retrain_performed = false;
+
+  {
+    Timer timer("RunMaintenance");
+    RETURN_NOT_OK(
+        ImplToYbStatus(scann_internal::ImplRunMaintenance(impl_.get(), &retrain_performed)));
+    if (retrain_performed) {
+      LOG(INFO) << "scann: RunMaintenance: retrain performed";
+    }
   }
-  return status;
+
+  return Status::OK();
+}
+
+Status ScannWrapper::Retrain() {
+  Timer timer("Retrain");
+  return ImplToYbStatus(scann_internal::ImplRetrainAndReindex(impl_.get()));
 }
 
 // -- Search -------------------------------------------------------------------
@@ -138,6 +175,7 @@ Status ScannWrapper::Delete(int32_t index) {
 Result<std::vector<ScannSearchResult>> ScannWrapper::Search(
     const std::vector<float>& query,
     int final_nn, int pre_reorder_nn, int leaves) const {
+  Timer timer("Search");
   // Route through the batched path (batch_size=1) because ScaNN's single-query
   // FindNeighbors crashes for some searcher types (e.g. plain AH without
   // reordering) while FindNeighborsBatched works universally.
@@ -157,6 +195,7 @@ Result<std::vector<ScannSearchResult>> ScannWrapper::Search(
 Result<std::vector<std::vector<ScannSearchResult>>> ScannWrapper::SearchBatched(
     const std::vector<float>& queries, size_t num_queries,
     int final_nn, int pre_reorder_nn, int leaves) const {
+  Timer timer("SearchBatched");
   std::vector<std::vector<scann_internal::ImplSearchResult>> impl_results;
   auto impl_status = scann_internal::ImplSearchBatched(
       impl_.get(), queries.data(), queries.size(), num_queries,
@@ -177,6 +216,7 @@ Result<std::vector<std::vector<ScannSearchResult>>>
 ScannWrapper::SearchBatchedParallel(
     const std::vector<float>& queries, size_t num_queries,
     int final_nn, int pre_reorder_nn, int leaves, int batch_size) const {
+  Timer timer("SearchBatchedParallel");
   std::vector<std::vector<scann_internal::ImplSearchResult>> impl_results;
   auto impl_status = scann_internal::ImplSearchBatchedParallel(
       impl_.get(), queries.data(), queries.size(), num_queries,
@@ -196,6 +236,7 @@ ScannWrapper::SearchBatchedParallel(
 // -- Persistence --------------------------------------------------------------
 
 Status ScannWrapper::Serialize(const std::string& path) {
+  Timer timer("Serialize");
   auto impl_status = scann_internal::ImplSerialize(impl_.get(), path);
   if (!impl_status.ok()) {
     return ImplToYbStatus(impl_status);

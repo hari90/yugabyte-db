@@ -63,12 +63,12 @@ class ScannWrapper {
   //   config           – opaque ScannConfig proto built via the Scann*Config
   //                      helpers.
   //   training_threads – number of threads for training/indexing.
-  //   labels           – optional vector of ScannVectorId labels, one per
-  //                      datapoint.  If non-empty, must have size == n_points.
+  //   labels           – vector of ScannVectorId labels, one per datapoint.
+  //                      Must have size == n_points.
   Status Initialize(const std::vector<float>& dataset, uint32_t n_points,
                     const scann_internal::ScannConfigPtr& config,
                     int training_threads,
-                    const std::vector<ScannVectorId>& labels = {});
+                    const std::vector<ScannVectorId>& labels);
 
   // Load a previously serialized index from disk.
   //
@@ -98,6 +98,19 @@ class ScannWrapper {
 
   // Delete a datapoint by its numeric index.
   Status Delete(int32_t index);
+
+  // Run incremental maintenance on the index.  Should be called after
+  // insert / delete operations to keep tree-partitioned indexes balanced
+  // (reassigns datapoints to correct partitions, may split/shrink partitions).
+  // For brute-force indexes this is a lightweight no-op check.
+  // If maintenance determines a full retrain is needed, Retrain() is called
+  // automatically.
+  Status RunMaintenance();
+
+  // Fully retrain the model (e.g. partition centers) and rebuild the index
+  // from the current dataset.  This is expensive and should only be called
+  // when incremental maintenance signals that the index has drifted too far.
+  Status Retrain();
 
   // ---------------------------------------------------------------------------
   // Search

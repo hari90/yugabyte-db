@@ -109,6 +109,10 @@ ImplStatus ImplInsert(ScannImplOpaque* impl,
 ImplStatus ImplDelete(ScannImplOpaque* impl, const std::string& docid);
 ImplStatus ImplDelete(ScannImplOpaque* impl, int32_t index);
 
+ImplStatus ImplRunMaintenance(ScannImplOpaque* impl, bool* retrain_performed);
+
+ImplStatus ImplRetrainAndReindex(ScannImplOpaque* impl);
+
 ImplStatus ImplSerialize(ScannImplOpaque* impl, const std::string& path);
 
 void ImplSetNumThreads(ScannImplOpaque* impl, int num_threads);

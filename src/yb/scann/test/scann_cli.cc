@@ -190,13 +190,16 @@ void CmdInit(CliState& s) {
   std::cout << "Generating " << n_points << " random " << dim
             << "-d vectors...\n";
   auto dataset = RandomDataset(n_points, dim, /*seed=*/42);
+  auto labels = std::vector<ScannVectorId>(n_points);
+  for (int i = 0; i < n_points; ++i) {
+    labels[i] = ScannVectorId::GenerateRandom();
+  }
 
   std::cout << "Building index...\n";
   s.scann = ScannWrapper();
 
   Timer timer;
-  auto status =
-      s.scann.Initialize(dataset, n_points, s.current_config, threads);
+  auto status = s.scann.Initialize(dataset, n_points, s.current_config, threads, labels);
   if (!status.ok()) {
     std::cout << "  ERROR: " << status.ToString() << "\n";
   } else {
