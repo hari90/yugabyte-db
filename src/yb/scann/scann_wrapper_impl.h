@@ -27,14 +27,15 @@
 #include <vector>
 
 namespace yb {
+namespace scann_internal {
 
-// Result of a nearest-neighbor search: a (datapoint_index, distance) pair.
-struct ScannSearchResult {
+// Internal bridge result type: a (datapoint_index, distance) pair.
+// The public-facing ScannSearchResult (with ScannVectorId label) lives in
+// scann_wrapper.h.
+struct ImplSearchResult {
   int32_t index;
   float distance;
 };
-
-namespace scann_internal {
 
 // Lightweight status POD that bridges absl::Status (ScaNN side) and
 // yb::Status (YB side) without requiring either header.
@@ -85,20 +86,20 @@ ImplStatus ImplLoadFromDisk(ScannImplOpaque* impl,
 ImplStatus ImplSearch(const ScannImplOpaque* impl,
                       const float* query, size_t query_size,
                       int final_nn, int pre_reorder_nn, int leaves,
-                      std::vector<ScannSearchResult>* results);
+                      std::vector<ImplSearchResult>* results);
 
 ImplStatus ImplSearchBatched(const ScannImplOpaque* impl,
                              const float* queries, size_t queries_size,
                              size_t num_queries,
                              int final_nn, int pre_reorder_nn, int leaves,
-                             std::vector<std::vector<ScannSearchResult>>* results);
+                             std::vector<std::vector<ImplSearchResult>>* results);
 
 ImplStatus ImplSearchBatchedParallel(const ScannImplOpaque* impl,
                                      const float* queries, size_t queries_size,
                                      size_t num_queries,
                                      int final_nn, int pre_reorder_nn,
                                      int leaves, int batch_size,
-                                     std::vector<std::vector<ScannSearchResult>>* results);
+                                     std::vector<std::vector<ImplSearchResult>>* results);
 
 ImplStatus ImplInsert(ScannImplOpaque* impl,
                       const float* datapoint, size_t datapoint_size,

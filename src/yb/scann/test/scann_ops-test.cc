@@ -29,6 +29,9 @@
 #include "yb/util/test_util.h"
 
 namespace yb::scann {
+
+using scann_internal::ScannConfigPtr;
+
 namespace {
 
 constexpr int kNumDatasetPoints = 10000;
@@ -362,12 +365,14 @@ TEST_F(ScannOpsTest, InsertIncreasesNPoints) {
 
   // Insert a single new datapoint.
   std::vector<float> new_point(kDimension, 0.5f);
-  auto idx = ASSERT_RESULT(scann.Insert(new_point, "new_point_0"));
+  auto idx = ASSERT_RESULT(scann.Insert(new_point, "new_point_0",
+                                        ScannVectorId::GenerateRandom()));
   EXPECT_EQ(scann.n_points(), kNumDatasetPoints + 1);
 
   // Insert another.
   std::vector<float> new_point2(kDimension, 0.7f);
-  auto idx2 = ASSERT_RESULT(scann.Insert(new_point2, "new_point_1"));
+  auto idx2 = ASSERT_RESULT(scann.Insert(new_point2, "new_point_1",
+                                         ScannVectorId::GenerateRandom()));
   EXPECT_EQ(scann.n_points(), kNumDatasetPoints + 2);
 
   // The two inserts should return distinct indices.
@@ -391,7 +396,8 @@ TEST_F(ScannOpsTest, InsertedPointIsSearchable) {
   // query will be kDim (= 8), which is larger than a random [0,1) vector's
   // expected dot product (~kDim/4).
   std::vector<float> inserted(kDim, 1.0f);
-  auto idx = ASSERT_RESULT(scann.Insert(inserted, "all_ones"));
+  auto idx = ASSERT_RESULT(scann.Insert(inserted, "all_ones",
+                                        ScannVectorId::GenerateRandom()));
 
   // Query with the same all-ones vector.  DotProductDistance = -dot, so the
   // inserted point should have the most negative (best) distance.
@@ -426,7 +432,8 @@ TEST_F(ScannOpsTest, InsertMultipleThenBatchSearch) {
   for (int i = 0; i < kInsertCount; ++i) {
     std::vector<float> pt(kDim, 0.0f);
     pt[i] = kLargeVal;
-    auto idx = ASSERT_RESULT(scann.Insert(pt, "inserted_" + std::to_string(i)));
+    auto idx = ASSERT_RESULT(scann.Insert(pt, "inserted_" + std::to_string(i),
+                                         ScannVectorId::GenerateRandom()));
     inserted_indices.push_back(idx);
   }
 
@@ -462,7 +469,7 @@ TEST_F(ScannOpsTest, DeleteByDocidDecreasesNPoints) {
 
   // Insert a point so we have a known docid.
   std::vector<float> pt(kDim, 1.0f);
-  ASSERT_OK(scann.Insert(pt, "to_delete"));
+  ASSERT_OK(scann.Insert(pt, "to_delete", ScannVectorId::GenerateRandom()));
   ASSERT_EQ(scann.n_points(), kSmallN + 1);
 
   // Delete by docid.
@@ -480,7 +487,8 @@ TEST_F(ScannOpsTest, DeleteByIndexDecreasesNPoints) {
 
   // Insert a point and delete it by its numeric index.
   std::vector<float> pt(kDim, 1.0f);
-  auto idx = ASSERT_RESULT(scann.Insert(pt, "by_index"));
+  auto idx = ASSERT_RESULT(scann.Insert(pt, "by_index",
+                                        ScannVectorId::GenerateRandom()));
   ASSERT_EQ(scann.n_points(), kSmallN + 1);
 
   ASSERT_OK(scann.Delete(idx));
@@ -499,7 +507,8 @@ TEST_F(ScannOpsTest, DeletedPointNotReturnedBySearch) {
 
   // Insert a distinctive all-ones point.
   std::vector<float> pt(kDim, 1.0f);
-  auto idx = ASSERT_RESULT(scann.Insert(pt, "delete_me"));
+  auto idx = ASSERT_RESULT(scann.Insert(pt, "delete_me",
+                                        ScannVectorId::GenerateRandom()));
 
   // Confirm it is the top-1 result for an all-ones query.
   std::vector<float> query(kDim, 1.0f);
@@ -521,5 +530,197 @@ TEST_F(ScannOpsTest, DeletedPointNotReturnedBySearch) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Label (ScannVectorId) tests
+// ---------------------------------------------------------------------------
+
+TEST_F(ScannOpsTest, InsertedLabelReturnedBySearch) {
+  constexpr int kSmallN = 100;
+  constexpr int kDim = 8;
+  auto small_dataset = RandomDataset(kSmallN, kDim, 200);
+
+  ScannWrapper scann;
+  ASSERT_OK(scann.Initialize(
+      small_dataset, kSmallN, ScannBruteForceConfig(5, kDim, /*fixed_point=*/false), 1));
+
+  // Insert a distinctive all-ones point with a known label.
+  auto expected_label = ScannVectorId::GenerateRandom();
+  std::vector<float> inserted(kDim, 1.0f);
+  auto idx = ASSERT_RESULT(scann.Insert(inserted, "labeled_point", expected_label));
+
+  // Query with an all-ones vector; the inserted point should be top-1.
+  std::vector<float> query(kDim, 1.0f);
+  auto results = ASSERT_RESULT(scann.Search(query, 5, 5, 0));
+  ASSERT_FALSE(results.empty());
+  EXPECT_EQ(results[0].index, idx);
+  EXPECT_EQ(results[0].label, expected_label);
+}
+
+TEST_F(ScannOpsTest, InitializeWithLabels) {
+  constexpr int kSmallN = 50;
+  constexpr int kDim = 8;
+  auto small_dataset = RandomDataset(kSmallN, kDim, 201);
+
+  // Generate a label for each datapoint.
+  std::vector<ScannVectorId> labels;
+  labels.reserve(kSmallN);
+  for (int i = 0; i < kSmallN; ++i) {
+    labels.push_back(ScannVectorId::GenerateRandom());
+  }
+
+  ScannWrapper scann;
+  ASSERT_OK(scann.Initialize(
+      small_dataset, kSmallN, ScannBruteForceConfig(5, kDim), 1, labels));
+
+  // Search and verify the labels in the results match what we passed in.
+  std::vector<float> query(small_dataset.begin(), small_dataset.begin() + kDim);
+  auto results = ASSERT_RESULT(scann.Search(query, 5, 5, 0));
+  ASSERT_FALSE(results.empty());
+  for (const auto& r : results) {
+    EXPECT_EQ(r.label, labels[r.index])
+        << "index " << r.index << " label mismatch";
+  }
+}
+
+TEST_F(ScannOpsTest, InitializeWithoutLabelsGivesNilLabels) {
+  constexpr int kSmallN = 50;
+  constexpr int kDim = 8;
+  auto small_dataset = RandomDataset(kSmallN, kDim, 202);
+
+  ScannWrapper scann;
+  ASSERT_OK(scann.Initialize(
+      small_dataset, kSmallN, ScannBruteForceConfig(5, kDim), 1));
+
+  std::vector<float> query(small_dataset.begin(), small_dataset.begin() + kDim);
+  auto results = ASSERT_RESULT(scann.Search(query, 5, 5, 0));
+  ASSERT_FALSE(results.empty());
+  for (const auto& r : results) {
+    EXPECT_TRUE(r.label.IsNil()) << "index " << r.index << " expected nil label";
+  }
+}
+
+TEST_F(ScannOpsTest, InitializeWithWrongLabelCountFails) {
+  constexpr int kSmallN = 50;
+  constexpr int kDim = 8;
+  auto small_dataset = RandomDataset(kSmallN, kDim, 203);
+
+  // Provide the wrong number of labels.
+  std::vector<ScannVectorId> bad_labels(kSmallN + 5);
+  for (auto& l : bad_labels) l = ScannVectorId::GenerateRandom();
+
+  ScannWrapper scann;
+  auto status = scann.Initialize(
+      small_dataset, kSmallN, ScannBruteForceConfig(5, kDim), 1, bad_labels);
+  EXPECT_NOK(status);
+}
+
+TEST_F(ScannOpsTest, LabelsSerializeAndLoad) {
+  constexpr int kSmallN = 100;
+  constexpr int kDim = 8;
+  auto small_dataset = RandomDataset(kSmallN, kDim, 204);
+
+  // Initialize with labels for every datapoint.
+  std::vector<ScannVectorId> labels;
+  labels.reserve(kSmallN);
+  for (int i = 0; i < kSmallN; ++i) {
+    labels.push_back(ScannVectorId::GenerateRandom());
+  }
+
+  ScannWrapper scann1;
+  ASSERT_OK(scann1.Initialize(
+      small_dataset, kSmallN, ScannBruteForceConfig(5, kDim), 1, labels));
+
+  // Serialize.
+  auto tmpdir = std::filesystem::temp_directory_path() / "scann_label_test_204";
+  std::filesystem::create_directories(tmpdir);
+  ASSERT_OK(scann1.Serialize(tmpdir.string()));
+
+  // Verify the labels file was created.
+  EXPECT_TRUE(std::filesystem::exists(tmpdir / "scann_labels.bin"));
+
+  // Load into a fresh wrapper.
+  ScannWrapper scann2;
+  ASSERT_OK(scann2.LoadFromDisk(tmpdir.string()));
+
+  // Search and verify the labels survive the round-trip.
+  std::vector<float> query(small_dataset.begin(), small_dataset.begin() + kDim);
+  auto results = ASSERT_RESULT(scann2.Search(query, 5, 5, 0));
+  ASSERT_FALSE(results.empty());
+
+  for (const auto& r : results) {
+    EXPECT_EQ(r.label, labels[r.index])
+        << "label mismatch for index " << r.index << " after serialize/load";
+  }
+
+  std::filesystem::remove_all(tmpdir);
+}
+
+TEST_F(ScannOpsTest, DeleteByIndexCleansUpLabel) {
+  constexpr int kSmallN = 50;
+  constexpr int kDim = 8;
+  auto small_dataset = RandomDataset(kSmallN, kDim, 205);
+
+  ScannWrapper scann;
+  ASSERT_OK(scann.Initialize(
+      small_dataset, kSmallN, ScannBruteForceConfig(5, kDim, /*fixed_point=*/false), 1));
+
+  auto label = ScannVectorId::GenerateRandom();
+  std::vector<float> pt(kDim, 1.0f);
+  auto idx = ASSERT_RESULT(scann.Insert(pt, "del_label", label));
+
+  // Verify the label is there before delete.
+  std::vector<float> query(kDim, 1.0f);
+  {
+    auto results = ASSERT_RESULT(scann.Search(query, 1, 1, 0));
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].index, idx);
+    EXPECT_EQ(results[0].label, label);
+  }
+
+  // Delete by index.
+  ASSERT_OK(scann.Delete(idx));
+
+  // After deletion, the point should not be returned.  Search for a broader
+  // set and verify the label is gone from the result set.
+  {
+    auto results = ASSERT_RESULT(scann.Search(query, 5, 5, 0));
+    for (const auto& r : results) {
+      EXPECT_NE(r.index, idx);
+    }
+  }
+}
+
+TEST_F(ScannOpsTest, BatchedSearchReturnsLabels) {
+  constexpr int kSmallN = 100;
+  constexpr int kDim = 8;
+  auto small_dataset = RandomDataset(kSmallN, kDim, 206);
+
+  // Initialize with labels.
+  std::vector<ScannVectorId> labels;
+  labels.reserve(kSmallN);
+  for (int i = 0; i < kSmallN; ++i) {
+    labels.push_back(ScannVectorId::GenerateRandom());
+  }
+
+  ScannWrapper scann;
+  ASSERT_OK(scann.Initialize(
+      small_dataset, kSmallN, ScannBruteForceConfig(5, kDim), 1, labels));
+
+  // Batched search with 3 queries.
+  constexpr int kBatchQueries = 3;
+  std::vector<float> queries(small_dataset.begin(),
+                             small_dataset.begin() + kBatchQueries * kDim);
+
+  auto results = ASSERT_RESULT(scann.SearchBatched(queries, kBatchQueries, 5, 5, 0));
+  ASSERT_EQ(results.size(), kBatchQueries);
+
+  for (int q = 0; q < kBatchQueries; ++q) {
+    for (const auto& r : results[q]) {
+      EXPECT_EQ(r.label, labels[r.index])
+          << "query " << q << " index " << r.index << " label mismatch";
+    }
+  }
+}
+
 }  // namespace
-}  // namespace yb
+}  // namespace yb::scann

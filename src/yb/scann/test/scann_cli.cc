@@ -29,13 +29,14 @@
 #include "yb/util/result.h"
 #include "yb/util/status.h"
 
-using yb::ScannSearchResult;
 using yb::scann::ScannAhConfig;
 using yb::scann::ScannBruteForceConfig;
 using yb::scann::ScannConfigToString;
 using yb::scann::ScannReorderConfig;
+using yb::scann::ScannSearchResult;
 using yb::scann::ScannTreeAhConfig;
 using yb::scann::ScannTreeBruteForceConfig;
+using yb::scann::ScannVectorId;
 using yb::scann::ScannWrapper;
 using yb::scann_internal::ScannConfigPtr;
 
@@ -85,7 +86,8 @@ void PrintResults(const std::vector<ScannSearchResult>& results) {
   for (size_t i = 0; i < results.size(); ++i) {
     std::cout << "  #" << i << "  index=" << results[i].index
               << "  distance=" << std::fixed << std::setprecision(6)
-              << results[i].distance << "\n";
+              << results[i].distance
+              << "  label=" << results[i].label.ToString() << "\n";
   }
 }
 
@@ -357,14 +359,16 @@ void CmdInsert(CliState& s) {
   }
   auto docid = ReadString("docid", "doc_" + std::to_string(s.rng_counter));
   auto point = RandomQuery(s.scann.dimensionality(), s.rng_counter++);
+  auto label = ScannVectorId::GenerateRandom();
 
   Timer timer;
-  auto result = s.scann.Insert(point, docid);
+  auto result = s.scann.Insert(point, docid, label);
   if (!result.ok()) {
     std::cout << "  ERROR: " << result.status().ToString() << "\n";
   } else {
     std::cout << "  index=" << *result << ", docid=\"" << docid
-              << "\", n_points=" << s.scann.n_points() << "\n";
+              << "\", label=" << label.ToString()
+              << ", n_points=" << s.scann.n_points() << "\n";
   }
 }
 
@@ -384,7 +388,8 @@ void CmdInsertN(CliState& s) {
   for (int i = 0; i < count; ++i) {
     auto point = RandomQuery(dim, s.rng_counter++);
     std::string docid = "bulk_" + std::to_string(s.rng_counter - 1);
-    auto result = s.scann.Insert(point, docid);
+    auto label = ScannVectorId::GenerateRandom();
+    auto result = s.scann.Insert(point, docid, label);
     if (result.ok()) {
       ++success;
     } else {

@@ -47,9 +47,9 @@ scann_internal::ImplStatus ToImplStatus(const absl::Status& s) {
   return {static_cast<int>(s.code()), std::string(s.message())};
 }
 
-// Convert ScaNN's NNResultsVector to our public ScannSearchResult vector.
+// Convert ScaNN's NNResultsVector to our internal ImplSearchResult vector.
 void ConvertResults(const NNResultsVector& nn_results,
-                    std::vector<ScannSearchResult>* out) {
+                    std::vector<scann_internal::ImplSearchResult>* out) {
   out->resize(nn_results.size());
   for (size_t i = 0; i < nn_results.size(); ++i) {
     (*out)[i].index = static_cast<int32_t>(nn_results[i].first);
@@ -138,7 +138,7 @@ ImplStatus ImplLoadFromDisk(ScannImplOpaque* impl,
 ImplStatus ImplSearch(const ScannImplOpaque* impl,
                       const float* query, size_t query_size,
                       int final_nn, int pre_reorder_nn, int leaves,
-                      std::vector<ScannSearchResult>* results) {
+                      std::vector<ImplSearchResult>* results) {
   NNResultsVector nn_results;
   auto status = impl->scann.Search(
       MakeDatapointPtr(query, static_cast<DimensionIndex>(query_size)),
@@ -154,7 +154,7 @@ ImplStatus ImplSearchBatched(const ScannImplOpaque* impl,
                              const float* queries, size_t queries_size,
                              size_t num_queries,
                              int final_nn, int pre_reorder_nn, int leaves,
-                             std::vector<std::vector<ScannSearchResult>>* results) {
+                             std::vector<std::vector<ImplSearchResult>>* results) {
   DenseDataset<float> query_dataset(
       std::vector<float>(queries, queries + queries_size), num_queries);
 
@@ -178,7 +178,7 @@ ImplStatus ImplSearchBatchedParallel(const ScannImplOpaque* impl,
                                      size_t num_queries,
                                      int final_nn, int pre_reorder_nn,
                                      int leaves, int batch_size,
-                                     std::vector<std::vector<ScannSearchResult>>* results) {
+                                     std::vector<std::vector<ImplSearchResult>>* results) {
   DenseDataset<float> query_dataset(
       std::vector<float>(queries, queries + queries_size), num_queries);
 

@@ -28,13 +28,18 @@
 
 #include "yb/util/status_fwd.h"
 
-#include "scann/scann_wrapper_impl.h"  // ScannSearchResult, ScannImplPtr
+#include "scann/scann_label_map.h"     // ScannVectorId, ScannSearchResult, ScannLabelMap
+#include "scann/scann_wrapper_impl.h"  // ScannImplPtr, ScannConfigPtr
 
 namespace yb::scann {
 
 // High-level wrapper around ScaNN for building, querying, and persisting
 // approximate nearest-neighbor indices.  All ScaNN-specific types are hidden
 // behind the PIMPL so that callers only need standard C++ / YB types.
+//
+// In addition to the vector data managed by ScaNN, the wrapper maintains a
+// ScannLabelMap (index → ScannVectorId) that is stored alongside the ScaNN
+// artifacts on Serialize and restored on LoadFromDisk.
 class ScannWrapper {
  public:
   ScannWrapper();
@@ -58,9 +63,12 @@ class ScannWrapper {
   //   config           – opaque ScannConfig proto built via the Scann*Config
   //                      helpers.
   //   training_threads – number of threads for training/indexing.
+  //   labels           – optional vector of ScannVectorId labels, one per
+  //                      datapoint.  If non-empty, must have size == n_points.
   Status Initialize(const std::vector<float>& dataset, uint32_t n_points,
                     const scann_internal::ScannConfigPtr& config,
-                    int training_threads);
+                    int training_threads,
+                    const std::vector<ScannVectorId>& labels = {});
 
   // Load a previously serialized index from disk.
   //
@@ -78,10 +86,12 @@ class ScannWrapper {
   //
   //   datapoint – float vector of length dimensionality().
   //   docid     – unique string identifier for the datapoint.
+  //   label     – ScannVectorId UUID label for this vector.
   //
   // Returns the assigned datapoint index on success.
   Result<int32_t> Insert(const std::vector<float>& datapoint,
-                         const std::string& docid);
+                         const std::string& docid,
+                         const ScannVectorId& label);
 
   // Delete a datapoint by its string docid.
   Status Delete(const std::string& docid);
@@ -94,6 +104,7 @@ class ScannWrapper {
   // ---------------------------------------------------------------------------
 
   // Single-query ANN search.  `query` must have length == dimensionality().
+  // Results include the ScannVectorId label for each hit.
   Result<std::vector<ScannSearchResult>> Search(
       const std::vector<float>& query,
       int final_nn, int pre_reorder_nn, int leaves) const;
@@ -115,8 +126,9 @@ class ScannWrapper {
   // Persistence
   // ---------------------------------------------------------------------------
 
-  // Serialize the index to `path`.  Writes all artifacts and a
-  // scann_assets.pbtxt manifest file.
+  // Serialize the index to `path`.  Writes all ScaNN artifacts, a
+  // scann_assets.pbtxt manifest file, and a scann_labels.bin file that stores
+  // the index-to-ScannVectorId label map.
   Status Serialize(const std::string& path);
 
   // ---------------------------------------------------------------------------
@@ -134,6 +146,7 @@ class ScannWrapper {
 
  private:
   scann_internal::ScannImplPtr impl_;
+  ScannLabelMap labels_;
 };
 
 // ---------------------------------------------------------------------------
@@ -168,4 +181,4 @@ scann_internal::ScannConfigPtr ScannReorderConfig(int num_neighbors, int dim);
 // logging / debugging).
 std::string ScannConfigToString(const scann_internal::ScannConfigPtr& config);
 
-}  // namespace yb
+}  // namespace yb::scann

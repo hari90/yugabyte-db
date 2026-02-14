@@ -73,38 +73,64 @@ ScannWrapper& ScannWrapper::operator=(ScannWrapper&&) noexcept = default;
 Status ScannWrapper::Initialize(const std::vector<float>& dataset,
                                 uint32_t n_points,
                                 const scann_internal::ScannConfigPtr& config,
-                                int training_threads) {
-  return ImplToYbStatus(
-      scann_internal::ImplInitialize(impl_.get(), dataset.data(), dataset.size(),
-                                     n_points, *config, training_threads));
+                                int training_threads,
+                                const std::vector<ScannVectorId>& labels) {
+  if (!labels.empty() && labels.size() != n_points) {
+    return Status(Status::kInvalidArgument, __FILE__, __LINE__,
+                  "labels size must equal n_points");
+  }
+
+  auto impl_status = scann_internal::ImplInitialize(
+      impl_.get(), dataset.data(), dataset.size(), n_points, *config,
+      training_threads);
+  if (!impl_status.ok()) {
+    return ImplToYbStatus(impl_status);
+  }
+
+  labels_.Reset(labels);
+  return Status();
 }
 
 Status ScannWrapper::LoadFromDisk(const std::string& artifacts_dir,
                                   const std::string& scann_assets_pbtxt) {
-  return ImplToYbStatus(
-      scann_internal::ImplLoadFromDisk(impl_.get(), artifacts_dir,
-                                       scann_assets_pbtxt));
+  auto impl_status = scann_internal::ImplLoadFromDisk(
+      impl_.get(), artifacts_dir, scann_assets_pbtxt);
+  if (!impl_status.ok()) {
+    return ImplToYbStatus(impl_status);
+  }
+
+  return labels_.Load(artifacts_dir);
 }
 
 // -- Mutation -----------------------------------------------------------------
 
 Result<int32_t> ScannWrapper::Insert(const std::vector<float>& datapoint,
-                                     const std::string& docid) {
+                                     const std::string& docid,
+                                     const ScannVectorId& label) {
   int32_t assigned_index;
   auto impl_status = scann_internal::ImplInsert(
       impl_.get(), datapoint.data(), datapoint.size(), docid, &assigned_index);
   if (!impl_status.ok()) {
     return ImplToYbStatus(impl_status);
   }
+
+  labels_.Put(assigned_index, label);
   return assigned_index;
 }
 
 Status ScannWrapper::Delete(const std::string& docid) {
+  // NOTE: Delete-by-docid cannot efficiently clean up the label map because
+  // the mapping from docid to index is internal to ScaNN.  The label entry
+  // will become stale.  Use Delete(int32_t index) to ensure label cleanup.
   return ImplToYbStatus(scann_internal::ImplDelete(impl_.get(), docid));
 }
 
 Status ScannWrapper::Delete(int32_t index) {
-  return ImplToYbStatus(scann_internal::ImplDelete(impl_.get(), index));
+  auto status = ImplToYbStatus(scann_internal::ImplDelete(impl_.get(), index));
+  if (status.ok()) {
+    labels_.Erase(index);
+  }
+  return status;
 }
 
 // -- Search -------------------------------------------------------------------
@@ -115,7 +141,7 @@ Result<std::vector<ScannSearchResult>> ScannWrapper::Search(
   // Route through the batched path (batch_size=1) because ScaNN's single-query
   // FindNeighbors crashes for some searcher types (e.g. plain AH without
   // reordering) while FindNeighborsBatched works universally.
-  std::vector<std::vector<ScannSearchResult>> batch_results;
+  std::vector<std::vector<scann_internal::ImplSearchResult>> batch_results;
   auto impl_status = scann_internal::ImplSearchBatched(
       impl_.get(), query.data(), query.size(), /*num_queries=*/1,
       final_nn, pre_reorder_nn, leaves, &batch_results);
@@ -125,18 +151,24 @@ Result<std::vector<ScannSearchResult>> ScannWrapper::Search(
   if (batch_results.empty()) {
     return std::vector<ScannSearchResult>{};
   }
-  return std::move(batch_results[0]);
+  return labels_.ResolveLabels(batch_results[0]);
 }
 
 Result<std::vector<std::vector<ScannSearchResult>>> ScannWrapper::SearchBatched(
     const std::vector<float>& queries, size_t num_queries,
     int final_nn, int pre_reorder_nn, int leaves) const {
-  std::vector<std::vector<ScannSearchResult>> results;
+  std::vector<std::vector<scann_internal::ImplSearchResult>> impl_results;
   auto impl_status = scann_internal::ImplSearchBatched(
       impl_.get(), queries.data(), queries.size(), num_queries,
-      final_nn, pre_reorder_nn, leaves, &results);
+      final_nn, pre_reorder_nn, leaves, &impl_results);
   if (!impl_status.ok()) {
     return ImplToYbStatus(impl_status);
+  }
+
+  std::vector<std::vector<ScannSearchResult>> results;
+  results.reserve(impl_results.size());
+  for (const auto& batch : impl_results) {
+    results.push_back(labels_.ResolveLabels(batch));
   }
   return results;
 }
@@ -145,12 +177,18 @@ Result<std::vector<std::vector<ScannSearchResult>>>
 ScannWrapper::SearchBatchedParallel(
     const std::vector<float>& queries, size_t num_queries,
     int final_nn, int pre_reorder_nn, int leaves, int batch_size) const {
-  std::vector<std::vector<ScannSearchResult>> results;
+  std::vector<std::vector<scann_internal::ImplSearchResult>> impl_results;
   auto impl_status = scann_internal::ImplSearchBatchedParallel(
       impl_.get(), queries.data(), queries.size(), num_queries,
-      final_nn, pre_reorder_nn, leaves, batch_size, &results);
+      final_nn, pre_reorder_nn, leaves, batch_size, &impl_results);
   if (!impl_status.ok()) {
     return ImplToYbStatus(impl_status);
+  }
+
+  std::vector<std::vector<ScannSearchResult>> results;
+  results.reserve(impl_results.size());
+  for (const auto& batch : impl_results) {
+    results.push_back(labels_.ResolveLabels(batch));
   }
   return results;
 }
@@ -158,7 +196,12 @@ ScannWrapper::SearchBatchedParallel(
 // -- Persistence --------------------------------------------------------------
 
 Status ScannWrapper::Serialize(const std::string& path) {
-  return ImplToYbStatus(scann_internal::ImplSerialize(impl_.get(), path));
+  auto impl_status = scann_internal::ImplSerialize(impl_.get(), path);
+  if (!impl_status.ok()) {
+    return ImplToYbStatus(impl_status);
+  }
+
+  return labels_.Serialize(path);
 }
 
 // -- Configuration ------------------------------------------------------------
@@ -205,4 +248,4 @@ std::string ScannConfigToString(const scann_internal::ScannConfigPtr& config) {
   return scann_internal::ImplConfigToString(*config);
 }
 
-}  // namespace yb
+}  // namespace yb::scann
