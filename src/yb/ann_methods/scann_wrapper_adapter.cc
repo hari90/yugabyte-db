@@ -27,9 +27,9 @@
 
 #include "yb/ann_methods/scann_wrapper_adapter.h"
 
-#include <atomic>
 #include <cstring>
 #include <fstream>
+#include <mutex>
 #include <utility>
 #include <vector>
 
@@ -167,10 +167,17 @@ class ScannIndex :
   // aux_data carries the ybctid bytes when available.
   // ScaNN labels are NOT used — ybctid is stored in a parallel vector and
   // looked up by r.index on search.
+  //
+  // VectorLSM dispatches inserts in parallel via a thread pool.  ScannWrapper
+  // protects its own internals, but we still need to serialize here so that
+  // entries_/ybctids_ stay in sync with the ScaNN index and the initialized_
+  // flag is checked consistently with the Initialize/Insert call.
   Status DoInsert(VectorId vector_id, const Vector& v, Slice aux_data = Slice()) {
     std::vector<float> fvec(v.begin(), v.end());
 
-    if (!initialized_.load(std::memory_order_acquire)) {
+    std::lock_guard lock(mutex_);
+
+    if (!initialized_) {
       // First insert — initialise ScaNN with this single vector as the
       // seed dataset.  Subsequent inserts use dynamic Insert().
       auto config = scann::ScannBruteForceConfig(
@@ -188,7 +195,7 @@ class ScannIndex :
           /*label_width=*/0,
           /*labels=*/{}));
 
-      initialized_.store(true, std::memory_order_release);
+      initialized_ = true;
     } else {
       // Dynamic insert into an already-initialized index.
       VERIFY_RESULT(scann_.Insert(fvec, vector_id.ToString(), /*label=*/Slice()));
@@ -224,7 +231,8 @@ class ScannIndex :
 
   std::vector<VectorWithDistance<DistanceResult>> DoSearch(
       const Vector& query_vector, const SearchOptions& options) const {
-    if (!initialized_.load(std::memory_order_acquire)) {
+    std::lock_guard lock(mutex_);
+    if (!initialized_) {
       return {};
     }
 
@@ -386,7 +394,7 @@ class ScannIndex :
         flat_dataset, count, config, kScannTrainingThreads,
         /*label_width=*/0, /*labels=*/{}));
 
-    initialized_.store(true, std::memory_order_release);
+    initialized_ = true;
     capacity_ = std::max(capacity_, static_cast<size_t>(count));
     return Status::OK();
   }
@@ -418,8 +426,13 @@ class ScannIndex :
   HNSWOptions options_;
   size_t capacity_ = 0;
 
+  // Protects initialized_, entries_, and ybctids_ from concurrent access.
+  // ScannWrapper has its own internal lock for ScaNN data structures; this
+  // mutex ensures the adapter's local bookkeeping stays in sync.
+  mutable std::mutex mutex_;
+
   // ScaNN is lazily initialized on first DoInsert (or DoLoadFromFile).
-  std::atomic<bool> initialized_{false};
+  bool initialized_ = false;
   scann::ScannWrapper scann_;
 
   // Local copy of all (VectorId, Vector) entries for iteration and persistence.
