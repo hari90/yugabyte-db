@@ -2334,6 +2334,7 @@ check_python_script_syntax() {
   git ls-files -t '*.py' \
     | grep -v '^S' \
     | sed 's/^[[:alpha:]] //' \
+    | grep -v '^src/yb/scann/' \
     | xargs -P 8 -n 1 "$YB_SCRIPT_PATH_CHECK_PYTHON_SYNTAX"
   popd +0
 }

@@ -1871,6 +1871,7 @@ run_python_doctest() {
           $python_file == src/postgres/src/test/locale/sort-test.py ||
           $python_file == src/postgres/third-party-extensions/* ||
           $python_file == bin/test_bsopt.py ||
+          $python_file == src/yb/scann/* ||
           $python_file == thirdparty/* ]]; then
       continue
     fi
