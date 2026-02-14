@@ -608,6 +608,8 @@ DEFINE_RUNTIME_bool(vector_index_use_yb_hnsw, true,
 DEFINE_RUNTIME_bool(vector_index_use_hnswlib, false,
     "Whether to use Hnswlib for vector index backend");
 
+DEFINE_RUNTIME_bool(vector_index_use_scann, true, "Whether to use Scann for vector index backend");
+
 DEFINE_test_flag(int32, system_table_num_tablets, -1,
     "Number of tablets to use when creating the system tables. "
     "If -1, the number of tablets will follow the value provided in the CreateTable request.");
@@ -4505,7 +4507,9 @@ Status CatalogManager::CreateTable(const CreateTableRequestPB* orig_req,
     if (is_vector_index) {
       auto& vector_index_options = *index_info.mutable_vector_idx_options();
       vector_index_options.set_id(AsString(VERIFY_RESULT(GetPgsqlTableOid(req.table_id()))));
-      if (FLAGS_vector_index_use_hnswlib) {
+      if (FLAGS_vector_index_use_scann) {
+        vector_index_options.mutable_hnsw()->set_backend(HnswBackend::SCANN);
+      } else if (FLAGS_vector_index_use_hnswlib) {
         vector_index_options.mutable_hnsw()->set_backend(HnswBackend::HNSWLIB);
       } else if (FLAGS_vector_index_use_yb_hnsw) {
         vector_index_options.mutable_hnsw()->set_backend(HnswBackend::YB_HNSW);

@@ -14,6 +14,7 @@
 #pragma once
 
 #include "yb/ann_methods/hnswlib_wrapper.h"
+#include "yb/ann_methods/scann_wrapper_adapter.h"
 #include "yb/ann_methods/usearch_wrapper.h"
 
 #include "yb/util/enums.h"
@@ -28,7 +29,8 @@ namespace yb::ann_methods {
 YB_DEFINE_ENUM(
     ANNMethodKind,
     (kUsearch)
-    (kHnswlib));
+    (kHnswlib)
+    (kScann));
 
 template<ANNMethodKind method_kind>
 struct ANNMethodTraits {
@@ -49,6 +51,13 @@ struct ANNMethodTraits<ANNMethodKind::kHnswlib> {
   template<vector_index::IndexableVectorType Vector,
            vector_index::ValidDistanceResultType DistanceResult>
   using FactoryType = HnswlibIndexFactory<Vector, DistanceResult>;
+};
+
+template<>
+struct ANNMethodTraits<ANNMethodKind::kScann> {
+  template<vector_index::IndexableVectorType Vector,
+           vector_index::ValidDistanceResultType DistanceResult>
+  using FactoryType = ScannIndexFactory<Vector, DistanceResult>;
 };
 
 }  // namespace yb::ann_methods

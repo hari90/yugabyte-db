@@ -27,15 +27,20 @@ ADD_YB_LIBRARY(ann_methods_test_proto
 
 set(ANN_METHODS_SRCS
     hnswlib_wrapper.cc
+    scann_wrapper_adapter.cc
     usearch_wrapper.cc
     yb_hnsw_wrapper.cc
 )
 
-set(ANN_METHODS_DEPS hnsw vector_index)
+set(ANN_METHODS_DEPS hnsw vector_index scann)
 
 ADD_YB_LIBRARY(ann_methods
         SRCS ${ANN_METHODS_SRCS}
         DEPS ${ANN_METHODS_DEPS})
+
+# scann_wrapper_adapter.cc includes scann/scann_wrapper.h which uses
+# #include "scann/..." paths rooted at src/yb.
+target_include_directories(ann_methods PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
 
 set(YB_TEST_LINK_LIBS ann_methods ann_methods_test_proto yrpc hnsw_test_util ${YB_MIN_TEST_LIBS})
 

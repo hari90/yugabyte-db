@@ -16,6 +16,7 @@
 
 #include <boost/algorithm/string.hpp>
 
+#include "yb/ann_methods/scann_wrapper_adapter.h"
 #include "yb/ann_methods/usearch_wrapper.h"
 
 #include "yb/dockv/doc_vector_id.h"
@@ -118,6 +119,13 @@ typename LSM::Options::VectorIndexFactory VectorLSMFactory(
     case HnswBackend::HNSWLIB: {
       using FactoryImpl = vector_index::MakeVectorIndexFactory<
           ann_methods::HnswlibIndexFactory, LSM>;
+      return [hnsw_options](vector_index::FactoryMode mode) {
+        return FactoryImpl::Create(mode, hnsw_options);
+      };
+    }
+    case HnswBackend::SCANN: {
+      using FactoryImpl = vector_index::MakeVectorIndexFactory<
+          ann_methods::ScannIndexFactory, LSM>;
       return [hnsw_options](vector_index::FactoryMode mode) {
         return FactoryImpl::Create(mode, hnsw_options);
       };

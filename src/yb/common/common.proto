@@ -138,6 +138,7 @@ enum HnswBackend {
   USEARCH = 0;
   YB_HNSW = 1;
   HNSWLIB = 2;
+  SCANN = 3;
 };
 
 message HnswIndexOptionsPB {

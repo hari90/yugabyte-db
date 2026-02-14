@@ -65,6 +65,8 @@ using TestUsearchIndexFactory = vector_index::MakeVectorIndexFactory<
     SimplifiedUsearchIndexFactory, FloatVectorLSM>;
 using TestHnswlibIndexFactory = vector_index::MakeVectorIndexFactory<
     HnswlibIndexFactory, FloatVectorLSM>;
+using TestScannIndexFactory = vector_index::MakeVectorIndexFactory<
+    ScannIndexFactory, FloatVectorLSM>;
 
 class SimpleVectorLSMKeyValueStorage {
  public:
@@ -257,6 +259,8 @@ auto GetVectorIndexFactory(ANNMethodKind ann_method) {
       return TestUsearchIndexFactory::Create;
     case ANNMethodKind::kHnswlib:
       return TestHnswlibIndexFactory::Create;
+    case ANNMethodKind::kScann:
+      return TestScannIndexFactory::Create;
   }
   return decltype(&TestUsearchIndexFactory::Create)(nullptr);
 }
