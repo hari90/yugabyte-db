@@ -227,7 +227,7 @@ class HnswlibIndex :
     return Status::OK();
   }
 
-  Status DoInsert(VectorId vector_id, const Vector& v) {
+  Status DoInsert(VectorId vector_id, const Vector& v, Slice /*aux_data*/ = Slice()) {
     hnsw_->addPoint(v.data(), vector_id);
 
     return Status::OK();

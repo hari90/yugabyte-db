@@ -154,6 +154,10 @@ struct VectorWithDistance {
   VectorId vector_id = VectorId::Nil();
   DistanceResult distance{};
 
+  // Optional auxiliary data associated with this vector (e.g. ybctid for ScaNN).
+  // Backends that don't support aux_data leave this empty.
+  std::string aux_data;
+
   // Constructor with the wrong order. Only delete it if DistanceResult is not uint64_t.
   template <typename T = DistanceResult,
             typename std::enable_if<!std::is_same<T, VectorId>::value, int>::type = 0>
@@ -164,6 +168,10 @@ struct VectorWithDistance {
   // Constructor with the correct order
   VectorWithDistance(VectorId vector_id_, DistanceResult distance_)
       : vector_id(vector_id_), distance(distance_) {}
+
+  // Constructor with aux_data
+  VectorWithDistance(VectorId vector_id_, DistanceResult distance_, std::string aux_data_)
+      : vector_id(vector_id_), distance(distance_), aux_data(std::move(aux_data_)) {}
 
   std::string ToString() const {
     return YB_STRUCT_TO_STRING(vector_id, distance);

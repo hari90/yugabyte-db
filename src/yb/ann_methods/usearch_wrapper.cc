@@ -163,7 +163,7 @@ class UsearchIndex :
     return Status::OK();
   }
 
-  Status DoInsert(VectorId vector_id, const Vector& v) {
+  Status DoInsert(VectorId vector_id, const Vector& v, Slice /*aux_data*/ = Slice()) {
     auto se = UpdateConsumptionOnExit();
     auto add_result = index_.add(vector_id, v.data());
     RSTATUS_DCHECK(

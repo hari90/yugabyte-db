@@ -35,6 +35,10 @@ static const char* kLabelsFileName = "scann_labels.bin";
 
 void ScannLabelMap::Reset(size_t label_width, const std::vector<Slice>& labels) {
   label_width_ = label_width;
+  if (label_width_ == 0) {
+    data_.clear();
+    return;
+  }
   data_.resize(labels.size() * label_width_, '\0');
   for (size_t i = 0; i < labels.size(); ++i) {
     DCHECK_EQ(labels[i].size(), label_width_);
@@ -51,7 +55,7 @@ void ScannLabelMap::Clear() {
 // ---------------------------------------------------------------------------
 
 void ScannLabelMap::Put(int32_t index, Slice label) {
-  if (index < 0) return;
+  if (index < 0 || label_width_ == 0) return;
   DCHECK_EQ(label.size(), label_width_);
   auto idx = static_cast<size_t>(index);
   size_t needed = (idx + 1) * label_width_;

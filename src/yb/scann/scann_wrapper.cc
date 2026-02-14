@@ -90,7 +90,9 @@ Status ScannWrapper::Initialize(const std::vector<float>& dataset,
                                 int training_threads,
                                 size_t label_width,
                                 const std::vector<Slice>& labels) {
-  SCHECK_EQ(labels.size(), n_points, InvalidArgument, "labels size must equal n_points");
+  if (label_width > 0) {
+    SCHECK_EQ(labels.size(), n_points, InvalidArgument, "labels size must equal n_points");
+  }
 
   Timer timer("Initialize");
   auto impl_status = scann_internal::ImplInitialize(

@@ -182,6 +182,7 @@ Result<vector_index::VectorLSMInsertEntry<Vector>> ConvertEntry(
   return vector_index::VectorLSMInsertEntry<Vector> {
     .vector_id = VERIFY_RESULT(encoded.DecodeId()),
     .vector = VERIFY_RESULT(VectorFromYSQL<Vector>(encoded.data)),
+    .aux_data = entry.ybctid.ToStringBuffer(),
   };
 }
 
@@ -335,8 +336,9 @@ class DocVectorIndexImpl : public DocVectorIndex {
     auto dump_stats = FLAGS_vector_index_dump_stats;
     auto start_time = MonoTime::Now();
 
-    auto reverse_mapping_reader = VERIFY_RESULT(
-        context_->CreateReverseMappingReader(ReadHybridTime::Max()));
+    // Lazily create the reverse mapping reader only when needed (i.e. when
+    // aux_data/ybctid is not available for some entries).
+    DocVectorIndexReverseMappingReaderPtr reverse_mapping_reader;
 
     DocVectorIndexSearchResult result;
     VLOG_WITH_FUNC(4) << "could_have_missing_entries: " << could_have_missing_entries
@@ -346,7 +348,18 @@ class DocVectorIndexImpl : public DocVectorIndex {
         could_have_missing_entries && entries.size() >= options.max_num_results;
     result.entries.reserve(entries.size());
     for (auto& entry : entries) {
-      auto ybctid = VERIFY_RESULT(reverse_mapping_reader->Fetch(entry.vector_id));
+      Slice ybctid;
+      if (!entry.aux_data.empty()) {
+        // Fast path: ybctid was stored directly in the index (e.g. ScaNN).
+        ybctid = Slice(entry.aux_data);
+      } else {
+        // Slow path: look up ybctid via the reverse mapping in RocksDB.
+        if (!reverse_mapping_reader) {
+          reverse_mapping_reader = VERIFY_RESULT(
+              context_->CreateReverseMappingReader(ReadHybridTime::Max()));
+        }
+        ybctid = VERIFY_RESULT(reverse_mapping_reader->Fetch(entry.vector_id));
+      }
       VLOG_WITH_FUNC(4)
           << "vector_id: " << entry.vector_id << ", ybctid: " << ybctid.ToDebugHexString();
       if (ybctid.empty()) {

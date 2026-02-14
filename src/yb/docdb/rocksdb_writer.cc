@@ -844,13 +844,15 @@ Status ApplyIntentsContext::ProcessVectorIndexes(
         auto table_key_prefix = vector_index.indexed_table_key_prefix();
         if (key.starts_with(table_key_prefix) && vector_index.column_id() == column_id &&
             commit_ht_ > vector_index.hybrid_time()) {
+          auto ybctid = key.Prefix(sizes.doc_key_size).WithoutPrefix(table_key_prefix.size());
           if (ApplyToVectorIndex(i)) {
             vector_index_batches_[i].push_back(DocVectorIndexInsertEntry {
               .value = ValueBuffer(value.WithoutPrefix(1)),
+              .ybctid = KeyBuffer(ybctid),
             });
           }
-          if (need_reverse_entry) {
-            auto ybctid = key.Prefix(sizes.doc_key_size).WithoutPrefix(table_key_prefix.size());
+          if (need_reverse_entry &&
+              vector_index.options().hnsw().backend() != HnswBackend::SCANN) {
             DocVectorIndex::ApplyReverseEntry(
                 handler, ybctid, value, DocHybridTime(commit_ht_, write_id_));
             need_reverse_entry = false;
@@ -919,10 +921,12 @@ Status ApplyIntentsContext::ProcessVectorIndexesForPackedRow(
       vector_index_batches_[i].push_back(DocVectorIndexInsertEntry {
         .value = ValueBuffer(column_value->WithoutPrefix(
             std::is_same_v<Decoder, dockv::PackedRowDecoderV2> ? 0 : 1)),
+        .ybctid = KeyBuffer(ybctid),
       });
     }
 
-    if (apply_to_storages_.TestRegularDB()) {
+    if (apply_to_storages_.TestRegularDB() &&
+        vector_index.options().hnsw().backend() != HnswBackend::SCANN) {
       size_t column_index = schema_packing_->GetIndex(vector_index.column_id());
       columns_added_to_vector_index.resize(
           std::max(columns_added_to_vector_index.size(), column_index + 1));

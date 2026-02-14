@@ -250,8 +250,8 @@ class VectorLSMInsertTask :
     insert_callback_ = std::move(insert_callback);
   }
 
-  void Add(VectorId vector_id, Vector&& vector) {
-    vectors_.emplace_back(vector_id, std::move(vector));
+  void Add(VectorId vector_id, Vector&& vector, std::string aux_data = {}) {
+    vectors_.push_back({vector_id, std::move(vector), std::move(aux_data)});
   }
 
   void Run() override {
@@ -275,10 +275,16 @@ class VectorLSMInsertTask :
   }
 
  protected:
+  struct InsertItem {
+    VectorId vector_id;
+    Vector vector;
+    std::string aux_data;
+  };
+
   Status DoInsert() {
     DCHECK(index_);
-    for (const auto& [vector_id, vector] : vectors_) {
-      RETURN_NOT_OK(index_->Insert(vector_id, vector));
+    for (const auto& item : vectors_) {
+      RETURN_NOT_OK(index_->Insert(item.vector_id, item.vector, item.aux_data));
     }
     return Status::OK();
   }
@@ -287,7 +293,7 @@ class VectorLSMInsertTask :
   std::shared_ptr<InsertRegistry> registry_;
   VectorIndexPtr index_;
   InsertCallback insert_callback_;
-  std::vector<std::pair<VectorId, Vector>> vectors_;
+  std::vector<InsertItem> vectors_;
 };
 
 template<IndexableVectorType Vector, ValidDistanceResultType DistanceResult>
@@ -300,12 +306,12 @@ class VectorLSMInsertTaskSearchWrapper final : public VectorLSMInsertTask<Vector
   void Search(
       SearchHeap& heap, const Vector& query_vector, const SearchOptions& options) const {
     SharedLock lock(mutex_);
-    for (const auto& [id, vector] : vectors_) {
-      if (!options.filter(id)) {
+    for (const auto& item : vectors_) {
+      if (!options.filter(item.vector_id)) {
         continue;
       }
-      auto distance = index_->Distance(query_vector, vector);
-      VectorWithDistance vertex(id, distance);
+      auto distance = index_->Distance(query_vector, item.vector);
+      VectorWithDistance vertex(item.vector_id, distance);
       if (heap.size() < options.max_num_results) {
         heap.push(vertex);
       } else if (heap.top() > vertex) {
@@ -1279,12 +1285,12 @@ Status VectorLSM<Vector, DistanceResult>::Insert(
 
   auto tasks_it = tasks.begin();
   size_t index_in_task = 0;
-  for (auto& [vector_id, v] : entries) {
+  for (auto& entry : entries) {
     if (index_in_task++ >= entries_per_task) {
       ++tasks_it;
       index_in_task = 0;
     }
-    tasks_it->Add(vector_id, std::move(v));
+    tasks_it->Add(entry.vector_id, std::move(entry.vector), std::move(entry.aux_data));
   }
   insert_registry_->ExecuteTasks(tasks);
 

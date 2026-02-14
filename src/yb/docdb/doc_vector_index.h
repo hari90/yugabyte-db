@@ -46,6 +46,11 @@ using EncodedDistance = uint64_t;
 
 struct DocVectorIndexInsertEntry {
   ValueBuffer value;
+
+  // The ybctid (encoded row key) for this vector.  Populated at write time so that
+  // backends like ScaNN can store it alongside the vector and return it directly on
+  // search, avoiding a reverse-mapping lookup in RocksDB.
+  KeyBuffer ybctid;
 };
 
 struct DocVectorIndexSearchResultEntry {
