@@ -30,8 +30,8 @@ namespace yb {
 namespace scann_internal {
 
 // Internal bridge result type: a (datapoint_index, distance) pair.
-// The public-facing ScannSearchResult (with ScannVectorId label) lives in
-// scann_wrapper.h.
+// The public-facing ScannSearchResult (with byte-array label) lives in
+// scann_label_map.h.
 struct ImplSearchResult {
   int32_t index;
   float distance;

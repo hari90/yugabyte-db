@@ -29,6 +29,7 @@
 #include "yb/util/result.h"
 #include "yb/util/status.h"
 
+using yb::Slice;
 using yb::scann::ScannAhConfig;
 using yb::scann::ScannBruteForceConfig;
 using yb::scann::ScannConfigToString;
@@ -36,11 +37,13 @@ using yb::scann::ScannReorderConfig;
 using yb::scann::ScannSearchResult;
 using yb::scann::ScannTreeAhConfig;
 using yb::scann::ScannTreeBruteForceConfig;
-using yb::scann::ScannVectorId;
 using yb::scann::ScannWrapper;
 using yb::scann_internal::ScannConfigPtr;
 
 using Clock = std::chrono::high_resolution_clock;
+
+// Fixed label width for CLI (16 bytes).
+constexpr size_t kLabelWidth = 16;
 
 // ---------------------------------------------------------------------------
 // Shared REPL state
@@ -82,12 +85,29 @@ std::vector<float> RandomQuery(size_t dim, uint32_t seed) {
   return RandomDataset(1, dim, seed);
 }
 
+std::string MakeRandomLabel() {
+  static std::mt19937 rng(12345);
+  std::string label(kLabelWidth, '\0');
+  for (size_t j = 0; j < kLabelWidth; ++j) {
+    label[j] = static_cast<char>(rng() & 0xFF);
+  }
+  return label;
+}
+
+std::string ToHex(const std::string& bytes) {
+  std::ostringstream oss;
+  for (unsigned char c : bytes) {
+    oss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(c);
+  }
+  return oss.str();
+}
+
 void PrintResults(const std::vector<ScannSearchResult>& results) {
   for (size_t i = 0; i < results.size(); ++i) {
     std::cout << "  #" << i << "  index=" << results[i].index
               << "  distance=" << std::fixed << std::setprecision(6)
               << results[i].distance
-              << "  label=" << results[i].label.ToString() << "\n";
+              << "  label=" << ToHex(results[i].label) << "\n";
   }
 }
 
@@ -173,9 +193,6 @@ void PrintHelp() {
 
 // ---------------------------------------------------------------------------
 // Command handlers
-//
-// Each command handler reads its own arguments from stdin, executes the
-// operation, and prints results.  The REPL always prints elapsed time.
 // ---------------------------------------------------------------------------
 
 void CmdInit(CliState& s) {
@@ -190,16 +207,25 @@ void CmdInit(CliState& s) {
   std::cout << "Generating " << n_points << " random " << dim
             << "-d vectors...\n";
   auto dataset = RandomDataset(n_points, dim, /*seed=*/42);
-  auto labels = std::vector<ScannVectorId>(n_points);
+
+  // Generate random labels.
+  std::vector<std::string> label_storage;
+  std::vector<Slice> labels;
+  label_storage.reserve(n_points);
+  labels.reserve(n_points);
   for (int i = 0; i < n_points; ++i) {
-    labels[i] = ScannVectorId::GenerateRandom();
+    label_storage.push_back(MakeRandomLabel());
+  }
+  for (const auto& ls : label_storage) {
+    labels.emplace_back(ls);
   }
 
   std::cout << "Building index...\n";
   s.scann = ScannWrapper();
 
   Timer timer;
-  auto status = s.scann.Initialize(dataset, n_points, s.current_config, threads, labels);
+  auto status = s.scann.Initialize(dataset, n_points, s.current_config, threads,
+                                   kLabelWidth, labels);
   if (!status.ok()) {
     std::cout << "  ERROR: " << status.ToString() << "\n";
   } else {
@@ -362,15 +388,15 @@ void CmdInsert(CliState& s) {
   }
   auto docid = ReadString("docid", "doc_" + std::to_string(s.rng_counter));
   auto point = RandomQuery(s.scann.dimensionality(), s.rng_counter++);
-  auto label = ScannVectorId::GenerateRandom();
+  auto label = MakeRandomLabel();
 
   Timer timer;
-  auto result = s.scann.Insert(point, docid, label);
+  auto result = s.scann.Insert(point, docid, Slice(label));
   if (!result.ok()) {
     std::cout << "  ERROR: " << result.status().ToString() << "\n";
   } else {
     std::cout << "  index=" << *result << ", docid=\"" << docid
-              << "\", label=" << label.ToString()
+              << "\", label=" << ToHex(label)
               << ", n_points=" << s.scann.n_points() << "\n";
   }
 }
@@ -391,8 +417,8 @@ void CmdInsertN(CliState& s) {
   for (int i = 0; i < count; ++i) {
     auto point = RandomQuery(dim, s.rng_counter++);
     std::string docid = "bulk_" + std::to_string(s.rng_counter - 1);
-    auto label = ScannVectorId::GenerateRandom();
-    auto result = s.scann.Insert(point, docid, label);
+    auto label = MakeRandomLabel();
+    auto result = s.scann.Insert(point, docid, Slice(label));
     if (result.ok()) {
       ++success;
     } else {

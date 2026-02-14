@@ -10,52 +10,50 @@
 // or implied.  See the License for the specific language governing permissions and limitations
 // under the License.
 //
-// Manages the index → ScannVectorId label map that lives alongside a ScaNN
-// index.  This is a separate class so that label bookkeeping is cleanly
-// isolated from the ScaNN search/mutation logic in ScannWrapper.
+// Manages the index → label map that lives alongside a ScaNN index.
+//
+// Labels are fixed-width byte arrays.  The width is set at construction time
+// (or when the map is loaded from disk) and is the same for every entry.
 //
 // The label map is offset-based: the datapoint index is used as a direct
-// offset into a flat vector of ScannVectorId values.  Deleted or unassigned
-// slots hold ScannVectorId::Nil().
+// offset into a flat buffer.  Entry `i` occupies bytes
+// [i * label_width, (i+1) * label_width).  Deleted or unassigned slots
+// are filled with zero bytes.
 //
-// On disk the labels are stored consecutively (no per-entry index field),
-// so the label for datapoint index `i` lives at file offset `4 + i * 16`
-// (after the 4-byte entry-count header).
+// On disk the labels file stores:
+//   [4 bytes] uint32_t  label_width
+//   [4 bytes] uint32_t  count (number of slots)
+//   [count * label_width bytes]  raw label data
 
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
 
+#include "yb/util/slice.h"
 #include "yb/util/status_fwd.h"
-#include "yb/util/strongly_typed_uuid.h"
 
 #include "scann/scann_wrapper_impl.h"  // ImplSearchResult
 
 namespace yb::scann {
 
 // ---------------------------------------------------------------------------
-// ScannVectorId — strongly-typed UUID label for each indexed vector.
-// ---------------------------------------------------------------------------
-
-YB_STRONGLY_TYPED_UUID_DECL(ScannVectorId);
-
-// ---------------------------------------------------------------------------
-// Public search result: index + distance + label.
+// Public search result: index + distance + label (owning byte string).
 // ---------------------------------------------------------------------------
 
 struct ScannSearchResult {
   int32_t index;
   float distance;
-  ScannVectorId label;
+  std::string label;  // fixed-width byte array, width == ScannLabelMap::label_width()
 };
 
 // ---------------------------------------------------------------------------
-// ScannLabelMap — offset-based datapoint-index → ScannVectorId mapping.
+// ScannLabelMap — offset-based datapoint-index → fixed-width label mapping.
 //
-// Internally a flat std::vector<ScannVectorId> where position `i` holds the
-// label for datapoint index `i`.  Absent or deleted entries are Nil.
+// Internally a flat byte buffer where position `i` occupies
+// [i * label_width_, (i+1) * label_width_).
 //
 // The map is persisted to / restored from a binary file ("scann_labels.bin")
 // inside the ScaNN artifacts directory.
@@ -75,25 +73,28 @@ class ScannLabelMap {
   // Bulk operations
   // ---------------------------------------------------------------------------
 
-  // Replace the entire map with labels[0..n-1] mapped to indices 0..n-1.
-  void Reset(const std::vector<ScannVectorId>& labels);
+  // Replace the entire map.  `labels` is a flat buffer of size
+  // n_labels * label_width containing all labels concatenated.
+  void Reset(size_t label_width, const std::vector<Slice>& labels);
 
-  // Drop all entries.
+  // Drop all entries (but preserve label_width).
   void Clear();
 
   // ---------------------------------------------------------------------------
   // Single-entry operations
   // ---------------------------------------------------------------------------
 
-  // Insert or overwrite the label for `index`.  Grows the backing vector as
-  // needed, filling new slots with Nil.
-  void Put(int32_t index, const ScannVectorId& label);
+  // Insert or overwrite the label for `index`.  `label.size()` must equal
+  // label_width().  Grows the backing buffer as needed, filling new slots
+  // with zero bytes.
+  void Put(int32_t index, Slice label);
 
-  // Look up the label for `index`.  Returns Nil if the index is out of range
-  // or the slot has been erased.
-  ScannVectorId Get(int32_t index) const;
+  // Look up the label for `index`.  Returns a Slice pointing into the
+  // internal buffer.  The Slice is invalidated by any mutation.
+  // Returns an empty Slice if the index is out of range.
+  Slice Get(int32_t index) const;
 
-  // Clear the label for `index` (sets it to Nil).
+  // Clear the label for `index` (fills with zero bytes).
   void Erase(int32_t index);
 
   // ---------------------------------------------------------------------------
@@ -111,11 +112,10 @@ class ScannLabelMap {
 
   // Write the label map to "scann_labels.bin" inside `artifacts_dir`.
   //
-  // Binary format (offset-based, no per-entry index):
-  //   [4 bytes]          uint32_t  count  — number of entries (= vector size)
-  //   [count * 16 bytes] UUID raw bytes, one per index 0..count-1
-  //
-  // Label for index `i` is at file offset 4 + i * 16.
+  // Binary format:
+  //   [4 bytes] uint32_t  label_width
+  //   [4 bytes] uint32_t  count — number of slots
+  //   [count * label_width bytes]  raw label data
   Status Serialize(const std::string& artifacts_dir) const;
 
   // Read the label map from "scann_labels.bin" inside `artifacts_dir`.
@@ -127,12 +127,19 @@ class ScannLabelMap {
   // Accessors
   // ---------------------------------------------------------------------------
 
-  // Number of slots in the backing vector (max index + 1).
-  size_t size() const { return labels_.size(); }
-  bool empty() const { return labels_.empty(); }
+  // Width in bytes of each label.
+  size_t label_width() const { return label_width_; }
+
+  // Number of slots in the backing buffer (max index + 1).
+  size_t size() const {
+    return label_width_ > 0 ? data_.size() / label_width_ : 0;
+  }
+  bool empty() const { return data_.empty(); }
 
  private:
-  std::vector<ScannVectorId> labels_;
+  size_t label_width_ = 0;
+  // Flat buffer: entry i occupies [i*label_width_, (i+1)*label_width_).
+  std::string data_;
 };
 
 }  // namespace yb::scann

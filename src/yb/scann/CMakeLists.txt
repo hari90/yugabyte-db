@@ -123,13 +123,13 @@ target_compile_options(scann PRIVATE -Wno-unused-private-field -Wno-shorten-64-t
 -Wno-sign-compare -Wno-inconsistent-missing-override -Wno-enum-compare-switch -Wno-mismatched-tags 
 -Wno-unused-lambda-capture
 -Wno-potentially-evaluated-expression -Wno-gnu-alignof-expression 
--Wno-unqualified-std-cast-call -Wno-unused-variable -Wno-implicit-const-int-float-conversion 
+-Wno-unqualified-std-cast-call -Wno-unused-variable -Wno-implicit-const-int-float-conversion
+-Wno-missing-field-initializers
 )
 
 # In linux disable missing-designated-field-initializers 
 if(APPLE)
   target_compile_options(scann PRIVATE
-   -Wno-missing-field-initializers
    -Wno-thread-safety-reference)
 else()
   target_compile_options(scann PRIVATE 

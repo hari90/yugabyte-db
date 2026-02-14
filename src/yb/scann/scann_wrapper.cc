@@ -88,7 +88,8 @@ Status ScannWrapper::Initialize(const std::vector<float>& dataset,
                                 uint32_t n_points,
                                 const scann_internal::ScannConfigPtr& config,
                                 int training_threads,
-                                const std::vector<ScannVectorId>& labels) {
+                                size_t label_width,
+                                const std::vector<Slice>& labels) {
   SCHECK_EQ(labels.size(), n_points, InvalidArgument, "labels size must equal n_points");
 
   Timer timer("Initialize");
@@ -99,7 +100,7 @@ Status ScannWrapper::Initialize(const std::vector<float>& dataset,
     return ImplToYbStatus(impl_status);
   }
 
-  labels_.Reset(labels);
+  labels_.Reset(label_width, labels);
   return Status();
 }
 
@@ -119,7 +120,7 @@ Status ScannWrapper::LoadFromDisk(const std::string& artifacts_dir,
 
 Result<int32_t> ScannWrapper::Insert(const std::vector<float>& datapoint,
                                      const std::string& docid,
-                                     const ScannVectorId& label) {
+                                     Slice label) {
   Timer timer("Insert");
   int32_t assigned_index;
   auto impl_status = scann_internal::ImplInsert(

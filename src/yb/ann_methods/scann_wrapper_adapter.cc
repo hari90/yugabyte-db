@@ -66,7 +66,7 @@ constexpr int kScannMaxNeighbors = 1000;
 // ignores this, but ScaNN still requires a value).
 constexpr int kScannTrainingThreads = 1;
 
-// UUID size in bytes.
+// UUID size in bytes (VectorId is a UUID).
 constexpr size_t kUuidBytes = 16;
 
 // ---------------------------------------------------------------------------
@@ -160,6 +160,9 @@ class ScannIndex :
   Status DoInsert(VectorId vector_id, const Vector& v) {
     std::vector<float> fvec(v.begin(), v.end());
 
+    // Build a Slice over the VectorId's raw UUID bytes.
+    Slice label(vector_id.data(), kUuidBytes);
+
     if (!initialized_.load(std::memory_order_acquire)) {
       // First insert — initialise ScaNN with this single vector as the
       // seed dataset.  Subsequent inserts use dynamic Insert().
@@ -169,21 +172,19 @@ class ScannIndex :
           /*fixed_point=*/false,
           ScannDistanceMeasure(options_.distance_kind));
 
-      std::vector<scann::ScannVectorId> labels = {
-        scann::ScannVectorId(vector_id.GetUuid())
-      };
+      std::vector<Slice> labels = { label };
 
       RETURN_NOT_OK(scann_.Initialize(
           fvec,
           /*n_points=*/1,
           config,
           kScannTrainingThreads,
+          kUuidBytes,
           labels));
 
       initialized_.store(true, std::memory_order_release);
     } else {
       // Dynamic insert into an already-initialized index.
-      auto label = scann::ScannVectorId(vector_id.GetUuid());
       VERIFY_RESULT(scann_.Insert(fvec, vector_id.ToString(), label));
     }
 
@@ -229,9 +230,13 @@ class ScannIndex :
     std::vector<VectorWithDistance<DistanceResult>> result;
     result.reserve(scann_results->size());
     for (const auto& r : *scann_results) {
-      auto vid = VectorId(r.label.GetUuid());
-      if (!vid.IsNil() && options.filter(vid)) {
-        result.push_back({vid, static_cast<DistanceResult>(r.distance)});
+      // Reconstruct VectorId from the label bytes.
+      if (r.label.size() == kUuidBytes) {
+        auto vid = VectorId(
+            Uuid::TryFullyDecode(Slice(r.label.data(), kUuidBytes)));
+        if (!vid.IsNil() && options.filter(vid)) {
+          result.push_back({vid, static_cast<DistanceResult>(r.distance)});
+        }
       }
     }
     return result;
@@ -306,8 +311,12 @@ class ScannIndex :
     std::vector<float> flat_dataset;
     flat_dataset.reserve(static_cast<size_t>(count) * dims);
 
-    std::vector<scann::ScannVectorId> labels;
+    std::vector<Slice> labels;
     labels.reserve(count);
+
+    // We need to keep label data alive until Initialize completes.
+    std::vector<std::string> label_storage;
+    label_storage.reserve(count);
 
     for (uint32_t i = 0; i < count; ++i) {
       // Read VectorId.
@@ -331,7 +340,12 @@ class ScannIndex :
       entries_.emplace_back(vid, std::move(vec));
 
       flat_dataset.insert(flat_dataset.end(), fvec.begin(), fvec.end());
-      labels.push_back(scann::ScannVectorId(vid.GetUuid()));
+      label_storage.emplace_back(reinterpret_cast<const char*>(uuid_bytes), kUuidBytes);
+    }
+
+    // Build Slice vector pointing into label_storage.
+    for (const auto& ls : label_storage) {
+      labels.emplace_back(ls);
     }
 
     // Rebuild the ScaNN index from the raw vectors.
@@ -340,7 +354,7 @@ class ScannIndex :
         ScannDistanceMeasure(options_.distance_kind));
 
     RETURN_NOT_OK(scann_.Initialize(
-        flat_dataset, count, config, kScannTrainingThreads, labels));
+        flat_dataset, count, config, kScannTrainingThreads, kUuidBytes, labels));
 
     initialized_.store(true, std::memory_order_release);
     capacity_ = std::max(capacity_, static_cast<size_t>(count));
