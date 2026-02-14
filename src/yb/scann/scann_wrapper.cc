@@ -264,25 +264,30 @@ size_t ScannWrapper::dimensionality() const {
 // in scann_wrapper_impl.cc (the only TU that can include proto headers).
 // ---------------------------------------------------------------------------
 
-scann_internal::ScannConfigPtr ScannAhConfig(int num_neighbors, int dim) {
-  return scann_internal::ImplAhConfig(num_neighbors, dim);
+scann_internal::ScannConfigPtr ScannAhConfig(
+    int num_neighbors, int dim, const std::string& distance_measure) {
+  return scann_internal::ImplAhConfig(num_neighbors, dim, distance_measure);
 }
 
-scann_internal::ScannConfigPtr ScannTreeAhConfig(int num_neighbors, int dim) {
-  return scann_internal::ImplTreeAhConfig(num_neighbors, dim);
+scann_internal::ScannConfigPtr ScannTreeAhConfig(
+    int num_neighbors, int dim, const std::string& distance_measure) {
+  return scann_internal::ImplTreeAhConfig(num_neighbors, dim, distance_measure);
 }
 
-scann_internal::ScannConfigPtr ScannTreeBruteForceConfig(int num_neighbors, int dim) {
-  return scann_internal::ImplTreeBruteForceConfig(num_neighbors, dim);
+scann_internal::ScannConfigPtr ScannTreeBruteForceConfig(
+    int num_neighbors, int dim, const std::string& distance_measure) {
+  return scann_internal::ImplTreeBruteForceConfig(num_neighbors, dim, distance_measure);
 }
 
 scann_internal::ScannConfigPtr ScannBruteForceConfig(
-    int num_neighbors, int dim, bool fixed_point) {
-  return scann_internal::ImplBruteForceConfig(num_neighbors, dim, fixed_point);
+    int num_neighbors, int dim, bool fixed_point,
+    const std::string& distance_measure) {
+  return scann_internal::ImplBruteForceConfig(num_neighbors, dim, fixed_point, distance_measure);
 }
 
-scann_internal::ScannConfigPtr ScannReorderConfig(int num_neighbors, int dim) {
-  return scann_internal::ImplReorderConfig(num_neighbors, dim);
+scann_internal::ScannConfigPtr ScannReorderConfig(
+    int num_neighbors, int dim, const std::string& distance_measure) {
+  return scann_internal::ImplReorderConfig(num_neighbors, dim, distance_measure);
 }
 
 std::string ScannConfigToString(const scann_internal::ScannConfigPtr& config) {

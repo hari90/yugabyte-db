@@ -170,14 +170,24 @@ class ScannWrapper {
 // returned by a search and `dim` is the dimensionality of the vectors.
 // ---------------------------------------------------------------------------
 
+// All config builders accept an optional distance_measure string.
+// Supported values: "DotProductDistance", "SquaredL2Distance", "CosineDistance".
+// The default is "DotProductDistance" for backward compatibility.
+
 // Asymmetric-hashing (AH) scoring.
-scann_internal::ScannConfigPtr ScannAhConfig(int num_neighbors, int dim);
+scann_internal::ScannConfigPtr ScannAhConfig(
+    int num_neighbors, int dim,
+    const std::string& distance_measure = "DotProductDistance");
 
 // Tree-partitioned + AH scoring.
-scann_internal::ScannConfigPtr ScannTreeAhConfig(int num_neighbors, int dim);
+scann_internal::ScannConfigPtr ScannTreeAhConfig(
+    int num_neighbors, int dim,
+    const std::string& distance_measure = "DotProductDistance");
 
 // Tree-partitioned + brute-force scoring.
-scann_internal::ScannConfigPtr ScannTreeBruteForceConfig(int num_neighbors, int dim);
+scann_internal::ScannConfigPtr ScannTreeBruteForceConfig(
+    int num_neighbors, int dim,
+    const std::string& distance_measure = "DotProductDistance");
 
 // Brute-force scoring (no partitioning).
 //   fixed_point – when true (default), enables fixed-point quantization for
@@ -185,10 +195,13 @@ scann_internal::ScannConfigPtr ScannTreeBruteForceConfig(int num_neighbors, int 
 //                 (Insert/Delete) since dynamically added points are not
 //                 included in the pre-quantized representation.
 scann_internal::ScannConfigPtr ScannBruteForceConfig(
-    int num_neighbors, int dim, bool fixed_point = true);
+    int num_neighbors, int dim, bool fixed_point = true,
+    const std::string& distance_measure = "DotProductDistance");
 
 // AH scoring + exact reordering.
-scann_internal::ScannConfigPtr ScannReorderConfig(int num_neighbors, int dim);
+scann_internal::ScannConfigPtr ScannReorderConfig(
+    int num_neighbors, int dim,
+    const std::string& distance_measure = "DotProductDistance");
 
 // Serialize an opaque config to its text-format representation (useful for
 // logging / debugging).

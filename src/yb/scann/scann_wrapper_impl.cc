@@ -126,6 +126,21 @@ ImplStatus ImplInitialize(ScannImplOpaque* impl,
     if (n_dim != kInvalidDimension) {
       ds->set_dimensionality(n_dim);
     }
+
+    // If the distance measure requires unit-L2-normalized data (e.g.
+    // CosineDistance), normalize the dataset before handing it to ScaNN.
+    // This also sets the normalization tag so that subsequent dynamic
+    // Append operations auto-normalize new datapoints.
+    if (config.config.has_distance_measure()) {
+      const auto& dm = config.config.distance_measure().distance_measure();
+      if (dm == "CosineDistance") {
+        auto status = ds->NormalizeByTag(UNITL2NORM);
+        if (!status.ok()) {
+          return ToImplStatus(status);
+        }
+      }
+    }
+
     ds_ptr = std::move(ds);
   }
 
@@ -331,11 +346,12 @@ void SetupAh(AsymmetricHasherConfig* ah, int dim, bool use_residual) {
 
 }  // namespace
 
-ScannConfigPtr ImplAhConfig(int num_neighbors, int dim) {
+ScannConfigPtr ImplAhConfig(int num_neighbors, int dim,
+                            const std::string& distance_measure) {
   auto cfg = ScannConfigPtr(new ScannConfigOpaque());
   auto& config = cfg->config;
   config.set_num_neighbors(num_neighbors);
-  config.mutable_distance_measure()->set_distance_measure("DotProductDistance");
+  config.mutable_distance_measure()->set_distance_measure(distance_measure);
 
   SetupAh(config.mutable_hash()->mutable_asymmetric_hash(), dim,
            /*use_residual=*/false);
@@ -346,11 +362,12 @@ ScannConfigPtr ImplAhConfig(int num_neighbors, int dim) {
   return cfg;
 }
 
-ScannConfigPtr ImplTreeAhConfig(int num_neighbors, int dim) {
+ScannConfigPtr ImplTreeAhConfig(int num_neighbors, int dim,
+                                const std::string& distance_measure) {
   auto cfg = ScannConfigPtr(new ScannConfigOpaque());
   auto& config = cfg->config;
   config.set_num_neighbors(num_neighbors);
-  config.mutable_distance_measure()->set_distance_measure("DotProductDistance");
+  config.mutable_distance_measure()->set_distance_measure(distance_measure);
 
   auto* part = config.mutable_partitioning();
   part->set_num_children(100);
@@ -364,7 +381,7 @@ ScannConfigPtr ImplTreeAhConfig(int num_neighbors, int dim) {
   spill->set_max_spill_centers(20);
   part->set_expected_sample_size(100000);
   part->mutable_query_tokenization_distance_override()
-      ->set_distance_measure("DotProductDistance");
+      ->set_distance_measure(distance_measure);
   part->set_partitioning_type(PartitioningConfig::GENERIC);
   part->set_query_tokenization_type(PartitioningConfig::FLOAT);
 
@@ -377,11 +394,12 @@ ScannConfigPtr ImplTreeAhConfig(int num_neighbors, int dim) {
   return cfg;
 }
 
-ScannConfigPtr ImplTreeBruteForceConfig(int num_neighbors, int dim) {
+ScannConfigPtr ImplTreeBruteForceConfig(int num_neighbors, int dim,
+                                        const std::string& distance_measure) {
   auto cfg = ScannConfigPtr(new ScannConfigOpaque());
   auto& config = cfg->config;
   config.set_num_neighbors(num_neighbors);
-  config.mutable_distance_measure()->set_distance_measure("DotProductDistance");
+  config.mutable_distance_measure()->set_distance_measure(distance_measure);
 
   auto* part = config.mutable_partitioning();
   part->set_num_children(100);
@@ -395,7 +413,7 @@ ScannConfigPtr ImplTreeBruteForceConfig(int num_neighbors, int dim) {
   spill->set_max_spill_centers(10);
   part->set_expected_sample_size(100000);
   part->mutable_query_tokenization_distance_override()
-      ->set_distance_measure("DotProductDistance");
+      ->set_distance_measure(distance_measure);
   part->set_partitioning_type(PartitioningConfig::GENERIC);
   part->set_query_tokenization_type(PartitioningConfig::FLOAT);
 
@@ -408,11 +426,12 @@ ScannConfigPtr ImplTreeBruteForceConfig(int num_neighbors, int dim) {
 }
 
 ScannConfigPtr ImplBruteForceConfig(int num_neighbors, int dim,
-                                    bool fixed_point) {
+                                    bool fixed_point,
+                                    const std::string& distance_measure) {
   auto cfg = ScannConfigPtr(new ScannConfigOpaque());
   auto& config = cfg->config;
   config.set_num_neighbors(num_neighbors);
-  config.mutable_distance_measure()->set_distance_measure("DotProductDistance");
+  config.mutable_distance_measure()->set_distance_measure(distance_measure);
 
   if (fixed_point) {
     config.mutable_brute_force()->mutable_fixed_point()->set_enabled(true);
@@ -426,11 +445,12 @@ ScannConfigPtr ImplBruteForceConfig(int num_neighbors, int dim,
   return cfg;
 }
 
-ScannConfigPtr ImplReorderConfig(int num_neighbors, int dim) {
+ScannConfigPtr ImplReorderConfig(int num_neighbors, int dim,
+                                 const std::string& distance_measure) {
   auto cfg = ScannConfigPtr(new ScannConfigOpaque());
   auto& config = cfg->config;
   config.set_num_neighbors(num_neighbors);
-  config.mutable_distance_measure()->set_distance_measure("DotProductDistance");
+  config.mutable_distance_measure()->set_distance_measure(distance_measure);
 
   SetupAh(config.mutable_hash()->mutable_asymmetric_hash(), dim,
            /*use_residual=*/false);

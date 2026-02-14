@@ -124,11 +124,16 @@ size_t ImplDimensionality(const ScannImplOpaque* impl);
 // to the proto-based ImplInitialize overload.
 // ---------------------------------------------------------------------------
 
-ScannConfigPtr ImplAhConfig(int num_neighbors, int dim);
-ScannConfigPtr ImplTreeAhConfig(int num_neighbors, int dim);
-ScannConfigPtr ImplTreeBruteForceConfig(int num_neighbors, int dim);
-ScannConfigPtr ImplBruteForceConfig(int num_neighbors, int dim, bool fixed_point);
-ScannConfigPtr ImplReorderConfig(int num_neighbors, int dim);
+ScannConfigPtr ImplAhConfig(int num_neighbors, int dim,
+                            const std::string& distance_measure = "DotProductDistance");
+ScannConfigPtr ImplTreeAhConfig(int num_neighbors, int dim,
+                                const std::string& distance_measure = "DotProductDistance");
+ScannConfigPtr ImplTreeBruteForceConfig(int num_neighbors, int dim,
+                                        const std::string& distance_measure = "DotProductDistance");
+ScannConfigPtr ImplBruteForceConfig(int num_neighbors, int dim, bool fixed_point,
+                                    const std::string& distance_measure = "DotProductDistance");
+ScannConfigPtr ImplReorderConfig(int num_neighbors, int dim,
+                                 const std::string& distance_measure = "DotProductDistance");
 
 // Serialize an opaque config to its text-format representation (useful for
 // logging / debugging).
