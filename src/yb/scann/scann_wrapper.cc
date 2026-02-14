@@ -112,14 +112,20 @@ Status ScannWrapper::Delete(int32_t index) {
 Result<std::vector<ScannSearchResult>> ScannWrapper::Search(
     const std::vector<float>& query,
     int final_nn, int pre_reorder_nn, int leaves) const {
-  std::vector<ScannSearchResult> results;
-  auto impl_status = scann_internal::ImplSearch(
-      impl_.get(), query.data(), query.size(),
-      final_nn, pre_reorder_nn, leaves, &results);
+  // Route through the batched path (batch_size=1) because ScaNN's single-query
+  // FindNeighbors crashes for some searcher types (e.g. plain AH without
+  // reordering) while FindNeighborsBatched works universally.
+  std::vector<std::vector<ScannSearchResult>> batch_results;
+  auto impl_status = scann_internal::ImplSearchBatched(
+      impl_.get(), query.data(), query.size(), /*num_queries=*/1,
+      final_nn, pre_reorder_nn, leaves, &batch_results);
   if (!impl_status.ok()) {
     return ImplToYbStatus(impl_status);
   }
-  return results;
+  if (batch_results.empty()) {
+    return std::vector<ScannSearchResult>{};
+  }
+  return std::move(batch_results[0]);
 }
 
 Result<std::vector<std::vector<ScannSearchResult>>> ScannWrapper::SearchBatched(

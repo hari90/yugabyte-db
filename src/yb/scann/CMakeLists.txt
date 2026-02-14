@@ -154,3 +154,11 @@ YB_TEST_TARGET_INCLUDE_DIRECTORIES(test/scann_ops-test PRIVATE
 YB_TEST_TARGET_COMPILE_OPTIONS(test/scann_ops-test PRIVATE
   -Wno-final-dtor-non-final-class -Wno-shorten-64-to-32 -Wno-sign-compare 
   -Wno-unused-private-field)
+
+add_executable(scann_cli ${CMAKE_CURRENT_SOURCE_DIR}/test/scann_cli.cc)
+target_link_libraries(scann_cli scann yb_util ${YB_BASE_LIBS})
+target_include_directories(scann_cli PRIVATE
+  ${SCANN_INCLUDE_ROOT}
+  ${CMAKE_CURRENT_BINARY_DIR})
+target_compile_options(scann_cli PRIVATE
+  -Wno-final-dtor-non-final-class -Wno-shorten-64-to-32 -Wno-sign-compare)
