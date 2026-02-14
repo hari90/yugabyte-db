@@ -44,14 +44,14 @@ bool XClusterSafeTimeMap::HasNamespace(NamespaceIdView namespace_id) const {
   }
 
   SharedLock l(xcluster_safe_time_map_mutex_);
-  return ContainsKey(xcluster_safe_time_map_, namespace_id);
+  return ContainsKey(xcluster_safe_time_map_, std::string(namespace_id));
 }
 
 Result<std::optional<HybridTime>> XClusterSafeTimeMap::GetSafeTime(
     NamespaceIdView namespace_id) const {
   SharedLock l(xcluster_safe_time_map_mutex_);
   SCHECK(map_initialized_, TryAgain, "XCluster safe time not yet initialized");
-  auto* safe_time = FindOrNull(xcluster_safe_time_map_, namespace_id);
+  auto* safe_time = FindOrNull(xcluster_safe_time_map_, std::string(namespace_id));
   if (!safe_time) {
     return std::nullopt;
   }
