@@ -21,9 +21,8 @@
 // binary file.  On load the ScaNN index is rebuilt from the raw vectors so
 // there is no dependency on ScaNN's own serialization format.
 //
-// The ybctid is stored as a variable-length ScaNN label on each datapoint.
-// On Search, the ybctid is returned via the label in ScannSearchResult so
-// that the caller can skip the reverse mapping lookup in RocksDB.
+// The ybctid is stored as a variable-length ScaNN label on each datapoint
+// and also kept in entries_ for persistence and search-result enrichment.
 //
 // Vector id is not stored in ScaNN as a docid — a simple sequential counter
 // is used instead.  The adapter keeps a local entries_ vector for
@@ -110,35 +109,48 @@ const std::string& ScannDistanceMeasure(DistanceKind kind) {
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// ScannVectorIterator — iterates over the stored (VectorId, Vector) entries
+// Internal entry type — holds VectorId, Vector, and ybctid together.
+// ---------------------------------------------------------------------------
+
+template <IndexableVectorType Vector>
+struct StoredEntry {
+  VectorId vector_id;
+  Vector vector;
+  std::string ybctid;
+};
+
+// ---------------------------------------------------------------------------
+// ScannVectorIterator — iterates over the stored entries, producing
+// (VectorId, Vector) pairs as required by the VectorIndexIf interface.
 // ---------------------------------------------------------------------------
 
 template <IndexableVectorType Vector, ValidDistanceResultType DistanceResult>
 class ScannVectorIterator : public AbstractIterator<std::pair<VectorId, Vector>> {
  public:
-  using Entry = std::pair<VectorId, Vector>;
+  using IterEntry = std::pair<VectorId, Vector>;
 
   ScannVectorIterator(
-      const std::vector<Entry>* entries,
+      const std::vector<StoredEntry<Vector>>* entries,
       size_t position)
       : entries_(entries), position_(position) {}
 
  protected:
-  Entry Dereference() const override {
-    return (*entries_)[position_];
+  IterEntry Dereference() const override {
+    const auto& e = (*entries_)[position_];
+    return {e.vector_id, e.vector};
   }
 
   void Next() override {
     ++position_;
   }
 
-  bool NotEquals(const AbstractIterator<Entry>& other) const override {
+  bool NotEquals(const AbstractIterator<IterEntry>& other) const override {
     const auto& o = down_cast<const ScannVectorIterator&>(other);
     return position_ != o.position_;
   }
 
  private:
-  const std::vector<Entry>* entries_;
+  const std::vector<StoredEntry<Vector>>* entries_;
   size_t position_;
 };
 
@@ -167,7 +179,7 @@ class ScannIndex :
   }
 
   // Called from IndexWrapperBase::Insert (non-const).
-  // ybctid is stored as the ScaNN label for this datapoint.
+  // ybctid is stored both as the ScaNN label and in entries_.
   // Vector id is not stored in ScaNN — a simple sequential docid is used.
   //
   // VectorLSM dispatches inserts in parallel via a thread pool.  ScannWrapper
@@ -207,8 +219,8 @@ class ScannIndex :
       VERIFY_RESULT(scann_.Insert(fvec, docid, ybctid));
     }
 
-    // Keep a local copy for iteration / persistence.
-    entries_.emplace_back(vector_id, v);
+    // Keep a local copy for iteration / persistence / search enrichment.
+    entries_.push_back({vector_id, v, ybctid.ToBuffer()});
     return Status::OK();
   }
 
@@ -253,13 +265,13 @@ class ScannIndex :
       if (r.index < 0 || static_cast<size_t>(r.index) >= entries_.size()) {
         continue;
       }
-      // Look up VectorId by ScaNN result index.
-      auto vid = entries_[r.index].first;
-      if (!options.filter(vid)) {
+      const auto& entry = entries_[r.index];
+      if (!options.filter(entry.vector_id)) {
         continue;
       }
-      // The ybctid is stored as the ScaNN label.
-      result.emplace_back(vid, static_cast<DistanceResult>(r.distance), r.label);
+      // The ybctid is stored in entries_.
+      result.emplace_back(
+          entry.vector_id, static_cast<DistanceResult>(r.distance), entry.ybctid);
     }
     return result;
   }
@@ -288,23 +300,19 @@ class ScannIndex :
     out.write(reinterpret_cast<const char*>(&dims), sizeof(dims));
     out.write(reinterpret_cast<const char*>(&count), sizeof(count));
 
-    for (size_t i = 0; i < entries_.size(); ++i) {
-      const auto& [vid, vec] = entries_[i];
-
+    for (const auto& entry : entries_) {
       // Write the 16-byte VectorId UUID.
-      out.write(reinterpret_cast<const char*>(vid.data()), kUuidBytes);
+      out.write(reinterpret_cast<const char*>(entry.vector_id.data()), kUuidBytes);
 
       // Write ybctid: [uint16_t length][data].
-      // Retrieve ybctid from the ScaNN label map.
-      auto label = scann_.GetLabel(static_cast<int32_t>(i));
-      auto ybctid_len = static_cast<uint16_t>(label.size());
+      auto ybctid_len = static_cast<uint16_t>(entry.ybctid.size());
       out.write(reinterpret_cast<const char*>(&ybctid_len), sizeof(ybctid_len));
       if (ybctid_len > 0) {
-        out.write(label.cdata(), ybctid_len);
+        out.write(entry.ybctid.data(), ybctid_len);
       }
 
       // Write the vector as floats.
-      std::vector<float> fvec(vec.begin(), vec.end());
+      std::vector<float> fvec(entry.vector.begin(), entry.vector.end());
       out.write(reinterpret_cast<const char*>(fvec.data()),
                 static_cast<std::streamsize>(dims * sizeof(float)));
     }
@@ -344,9 +352,7 @@ class ScannIndex :
     std::vector<float> flat_dataset;
     flat_dataset.reserve(static_cast<size_t>(count) * dims);
 
-    std::vector<std::string> ybctid_storage;
     std::vector<Slice> labels;
-    ybctid_storage.reserve(count);
     labels.reserve(count);
 
     for (uint32_t i = 0; i < count; ++i) {
@@ -372,7 +378,6 @@ class ScannIndex :
           return STATUS_FORMAT(Corruption, "Failed to read ybctid data $0 from $1", i, path);
         }
       }
-      ybctid_storage.push_back(std::move(ybctid));
 
       // Read vector data as floats.
       std::vector<float> fvec(dims);
@@ -384,14 +389,14 @@ class ScannIndex :
 
       // Build the typed vector and collect into entries_.
       Vector vec(fvec.begin(), fvec.end());
-      entries_.emplace_back(vid, std::move(vec));
+      entries_.push_back({vid, std::move(vec), std::move(ybctid)});
 
       flat_dataset.insert(flat_dataset.end(), fvec.begin(), fvec.end());
     }
 
-    // Build Slice labels from the stored ybctids.
-    for (const auto& s : ybctid_storage) {
-      labels.emplace_back(s);
+    // Build Slice labels from the ybctids stored in entries_.
+    for (const auto& e : entries_) {
+      labels.emplace_back(e.ybctid);
     }
 
     // Rebuild the ScaNN index from the raw vectors with ybctid labels.
@@ -444,8 +449,9 @@ class ScannIndex :
   // Sequential docid counter for ScaNN Insert (vector id is not used as docid).
   uint64_t next_docid_ = 1;
 
-  // Local copy of all (VectorId, Vector) entries for iteration and persistence.
-  std::vector<Entry> entries_;
+  // Local copy of all entries for iteration, persistence, and search enrichment.
+  // Each entry holds VectorId, Vector, and ybctid.
+  std::vector<StoredEntry<Vector>> entries_;
 };
 
 }  // namespace
