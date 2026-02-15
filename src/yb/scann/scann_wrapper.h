@@ -153,9 +153,14 @@ class ScannWrapper {
   // Set/change the number of threads for parallel batched search.
   void SetNumThreads(int num_threads);
 
-  // Retrieve the label for a given datapoint index.
-  // Returns an empty Slice if the index is out of range.
-  Slice GetLabel(int32_t index) const;
+  // A datapoint retrieved from the index: the float vector and its label.
+  struct Datapoint {
+    std::vector<float> vector;
+    std::string label;
+  };
+
+  // Retrieve the float vector and its label for a given datapoint index.
+  Result<Datapoint> GetDatapoint(int32_t index) const;
 
   // Number of indexed datapoints.
   size_t n_points() const;

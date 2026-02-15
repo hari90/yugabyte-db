@@ -249,8 +249,15 @@ Status ScannWrapper::Serialize(const std::string& path) {
 
 // -- Configuration ------------------------------------------------------------
 
-Slice ScannWrapper::GetLabel(int32_t index) const {
-  return labels_.Get(index);
+Result<ScannWrapper::Datapoint> ScannWrapper::GetDatapoint(int32_t index) const {
+  Datapoint dp;
+  auto impl_status = scann_internal::ImplGetDatapoint(impl_.get(), index, &dp.vector);
+  if (!impl_status.ok()) {
+    return ImplToYbStatus(impl_status);
+  }
+  auto label_slice = labels_.Get(index);
+  dp.label.assign(label_slice.cdata(), label_slice.size());
+  return dp;
 }
 
 void ScannWrapper::SetNumThreads(int num_threads) {
