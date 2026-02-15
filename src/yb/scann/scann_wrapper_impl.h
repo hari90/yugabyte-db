@@ -115,6 +115,11 @@ ImplStatus ImplRetrainAndReindex(ScannImplOpaque* impl);
 
 ImplStatus ImplSerialize(ScannImplOpaque* impl, const std::string& path);
 
+// Retrieve the float vector for a given datapoint index via the Mutator.
+// Populates `output` with the vector values.
+ImplStatus ImplGetDatapoint(const ScannImplOpaque* impl, int32_t index,
+                            std::vector<float>* output);
+
 void ImplSetNumThreads(ScannImplOpaque* impl, int num_threads);
 size_t ImplNPoints(const ScannImplOpaque* impl);
 size_t ImplDimensionality(const ScannImplOpaque* impl);

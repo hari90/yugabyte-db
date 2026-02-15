@@ -30,8 +30,8 @@
 // returned in ScannSearchResult, avoiding any external lookup.
 //
 // Vector id is not stored in ScaNN as a docid — a simple sequential counter
-// is used instead.  The adapter keeps a local entries_ vector for
-// iteration during the in-memory (mutable) phase.
+// is used instead.  Iteration reads vectors and labels directly from the
+// ScaNN index via ScannWrapper::GetDatapoint() and ScannWrapper::GetLabel().
 
 #include "yb/ann_methods/scann_wrapper_adapter.h"
 
@@ -135,20 +135,9 @@ std::string DecodeYbctid(const std::string& label) {
 }
 
 // ---------------------------------------------------------------------------
-// Internal entry type — holds VectorId, Vector, and ybctid together.
-// Used during the mutable (in-memory) phase for iteration.
-// ---------------------------------------------------------------------------
-
-template <IndexableVectorType Vector>
-struct StoredEntry {
-  VectorId vector_id;
-  Vector vector;
-  std::string ybctid;
-};
-
-// ---------------------------------------------------------------------------
-// ScannVectorIterator — iterates over the stored entries, producing
-// (VectorId, Vector) pairs as required by the VectorIndexIf interface.
+// ScannVectorIterator — iterates over the ScaNN index, producing
+// (VectorId, Vector) pairs by reading labels and vectors directly from the
+// ScannWrapper via GetLabel() and GetDatapoint().
 // ---------------------------------------------------------------------------
 
 template <IndexableVectorType Vector, ValidDistanceResultType DistanceResult>
@@ -157,14 +146,28 @@ class ScannVectorIterator : public AbstractIterator<std::pair<VectorId, Vector>>
   using IterEntry = std::pair<VectorId, Vector>;
 
   ScannVectorIterator(
-      const std::vector<StoredEntry<Vector>>* entries,
+      const scann::ScannWrapper* scann,
       size_t position)
-      : entries_(entries), position_(position) {}
+      : scann_(scann), position_(position) {}
 
  protected:
   IterEntry Dereference() const override {
-    const auto& e = (*entries_)[position_];
-    return {e.vector_id, e.vector};
+    // Decode VectorId from the label (first 16 bytes).
+    auto label = scann_->GetLabel(static_cast<int32_t>(position_));
+    auto vid = DecodeVectorId(std::string(label.cdata(), label.size()));
+
+    // Retrieve the vector from the ScaNN index.
+    auto dp_result = scann_->GetDatapoint(static_cast<int32_t>(position_));
+    Vector vec;
+    if (dp_result.ok()) {
+      const auto& fvec = *dp_result;
+      vec.assign(fvec.begin(), fvec.end());
+    } else {
+      LOG(DFATAL) << "Failed to get datapoint " << position_
+                  << " from ScaNN index: " << dp_result.status();
+      vec.resize(scann_->dimensionality(), 0);
+    }
+    return {vid, std::move(vec)};
   }
 
   void Next() override {
@@ -177,7 +180,7 @@ class ScannVectorIterator : public AbstractIterator<std::pair<VectorId, Vector>>
   }
 
  private:
-  const std::vector<StoredEntry<Vector>>* entries_;
+  const scann::ScannWrapper* scann_;
   size_t position_;
 };
 
@@ -201,20 +204,19 @@ class ScannIndex :
 
   Status Reserve(size_t num_vectors, size_t, size_t) override {
     capacity_ = num_vectors;
-    entries_.reserve(num_vectors);
     return Status::OK();
   }
 
   // Called from IndexWrapperBase::Insert (non-const).
   // The ScaNN label stores VectorId + ybctid so that search can decode both
-  // without looking up entries_.
+  // without any external lookup.
   // Vector id is not stored in ScaNN as a docid — a simple sequential counter
   // is used instead.
   //
   // VectorLSM dispatches inserts in parallel via a thread pool.  ScannWrapper
   // protects its own internals, but we still need to serialize here so that
-  // entries_ stays in sync with the ScaNN index and the initialized_ flag is
-  // checked consistently with the Initialize/Insert call.
+  // the initialized_ flag is checked consistently with the
+  // Initialize/Insert call.
   Status DoInsert(VectorId vector_id, const Vector& v, Slice ybctid = Slice()) {
     std::vector<float> fvec(v.begin(), v.end());
     std::string label = EncodeLabel(vector_id, ybctid);
@@ -248,8 +250,6 @@ class ScannIndex :
       VERIFY_RESULT(scann_.Insert(fvec, docid, Slice(label)));
     }
 
-    // Keep a local copy for iteration during the mutable phase.
-    entries_.push_back({vector_id, v, ybctid.ToBuffer()});
     return Status::OK();
   }
 
@@ -337,6 +337,9 @@ class ScannIndex :
 
   // ---------------------------------------------------------------------------
   // Vector retrieval / iteration
+  //
+  // Iteration reads directly from the ScaNN index: labels provide VectorId
+  // (and ybctid), and GetDatapoint() provides the raw float vector.
   // ---------------------------------------------------------------------------
 
   Result<Vector> GetVector(VectorId) const override {
@@ -344,11 +347,11 @@ class ScannIndex :
   }
 
   std::unique_ptr<AbstractIterator<Entry>> BeginImpl() const override {
-    return std::make_unique<IteratorImpl>(&entries_, 0);
+    return std::make_unique<IteratorImpl>(&scann_, 0);
   }
 
   std::unique_ptr<AbstractIterator<Entry>> EndImpl() const override {
-    return std::make_unique<IteratorImpl>(&entries_, entries_.size());
+    return std::make_unique<IteratorImpl>(&scann_, Size());
   }
 
   std::string IndexStatsStr() const override {
@@ -360,7 +363,7 @@ class ScannIndex :
   HNSWOptions options_;
   size_t capacity_ = 0;
 
-  // Protects initialized_, entries_, and next_docid_ from concurrent access.
+  // Protects initialized_ and next_docid_ from concurrent access.
   // ScannWrapper has its own internal lock for ScaNN data structures; this
   // mutex ensures the adapter's local bookkeeping stays in sync.
   mutable std::mutex mutex_;
@@ -371,11 +374,6 @@ class ScannIndex :
 
   // Sequential docid counter for ScaNN Insert (vector id is not used as docid).
   uint64_t next_docid_ = 1;
-
-  // Local copy of all entries for iteration during the mutable phase.
-  // Each entry holds VectorId, Vector, and ybctid.
-  // Not populated when loading from disk (the index is immutable after load).
-  std::vector<StoredEntry<Vector>> entries_;
 };
 
 }  // namespace

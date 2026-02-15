@@ -157,6 +157,10 @@ class ScannWrapper {
   // Returns an empty Slice if the index is out of range.
   Slice GetLabel(int32_t index) const;
 
+  // Retrieve the float vector for a given datapoint index.
+  // Returns a vector of dimensionality() floats on success.
+  Result<std::vector<float>> GetDatapoint(int32_t index) const;
+
   // Number of indexed datapoints.
   size_t n_points() const;
 
