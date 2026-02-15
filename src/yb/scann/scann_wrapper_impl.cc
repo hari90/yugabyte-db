@@ -306,15 +306,10 @@ ImplStatus ImplSerialize(ScannImplOpaque* impl, const std::string& path) {
 
 ImplStatus ImplGetDatapoint(const ScannImplOpaque* impl, int32_t index,
                             std::vector<float>* output) {
-  auto mutator_or = impl->scann.GetMutator();
-  if (!mutator_or.ok()) {
-    return ToImplStatus(mutator_or.status());
+  auto status = impl->scann.GetDatapoint(static_cast<DatapointIndex>(index), output);
+  if (!status.ok()) {
+    return ToImplStatus(status);
   }
-  auto dp_or = mutator_or.value()->GetDatapoint(static_cast<DatapointIndex>(index));
-  if (!dp_or.ok()) {
-    return ToImplStatus(dp_or.status());
-  }
-  *output = dp_or.value().values();
   return StatusOK;
 }
 

@@ -219,6 +219,22 @@ class ScannInterface {
     return scann_->SharedFloatDatasetIfNeeded();
   }
 
+  /// Retrieves the float vector for a given datapoint index directly from the
+  /// dataset.  Works on both mutable and immutable (loaded from disk) indexes.
+  ///
+  /// \param index Datapoint index to retrieve.
+  /// \param output Output vector that will be populated with the float values.
+  /// \return OkStatus on success, or error if the dataset is unavailable.
+  Status GetDatapoint(DatapointIndex index, std::vector<float>* output) const {
+    auto* dataset = dynamic_cast<const DenseDataset<float>*>(scann_->dataset());
+    if (!dataset) {
+      return FailedPreconditionError("Float dataset not available");
+    }
+    auto dp = (*dataset)[index];
+    output->assign(dp.values(), dp.values() + dp.dimensionality());
+    return OkStatus();
+  }
+
   /// Returns the number of datapoints in the indexed dataset.
   size_t n_points() const { return scann_->DatasetSize().value(); }
 

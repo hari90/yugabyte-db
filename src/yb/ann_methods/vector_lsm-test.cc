@@ -672,7 +672,11 @@ TEST_P(VectorLSMTest, AllVectorsRemovalCompaction) {
 }
 
 TEST_P(VectorLSMTest, BackgroundCompactionSizeAmp) {
-  constexpr size_t kDimensions = 8;
+  // Use enough dimensions so that per-vector data dominates the fixed per-file
+  // overhead across all backends (HNSW graph vs ScaNN brute-force).  This keeps
+  // file-size ratios proportional to vector counts, which the size-amplification
+  // thresholds below rely on.
+  constexpr size_t kDimensions = 64;
   constexpr size_t kNumChunks  = 6;
 
   // Make sure background compaction are turned on.
@@ -742,7 +746,11 @@ TEST_P(VectorLSMTest, BackgroundCompactionSizeAmp) {
 }
 
 void VectorLSMTest::TestBackgroundCompactionSizeRatio(bool test_metrics) {
-  constexpr size_t kDimensions = 8;
+  // Use enough dimensions so that per-vector data dominates the fixed per-file
+  // overhead across all backends (HNSW graph vs ScaNN brute-force).  This keeps
+  // file-size ratios proportional to vector counts, which the size-ratio
+  // thresholds below rely on.
+  constexpr size_t kDimensions = 64;
   constexpr size_t kNumLargeChunks = 2;
   constexpr size_t kNumSmallChunks = 6;
   constexpr size_t kNumMinChunks = 2;
@@ -1203,6 +1211,55 @@ TEST_F(ScannAuxDataTest, AuxDataVariableLengthsSurviveSaveAndLoad) {
     ASSERT_EQ(result_map[id1], short_ybctid);
     ASSERT_TRUE(result_map[id2].empty());
     ASSERT_EQ(result_map[id3], long_ybctid);
+  }
+}
+
+// Verify that iterating over a loaded-from-disk ScaNN index produces the
+// correct (VectorId, Vector) pairs.  This is the code path used by VectorLSM
+// merge/compaction when reading source chunks from immutable on-disk indexes.
+TEST_F(ScannAuxDataTest, IterationAfterLoadFromDisk) {
+  constexpr size_t kDim = 4;
+
+  std::string test_dir;
+  ASSERT_OK(Env::Default()->GetTestDirectory(&test_dir));
+  auto file_path = JoinPathSegments(test_dir, "scann_iter_test_" +
+                                    Uuid::Generate().ToString());
+
+  auto id1 = VectorId::GenerateRandom();
+  auto id2 = VectorId::GenerateRandom();
+  auto id3 = VectorId::GenerateRandom();
+
+  Vector v1(kDim, 1.0f);
+  Vector v2(kDim, 2.0f);
+  Vector v3(kDim, 3.0f);
+
+  // Create, insert, and save to disk.
+  {
+    auto index = CreateIndex(kDim);
+    ASSERT_OK(index->Reserve(10, 1, 1));
+    ASSERT_OK(index->Insert(id1, v1, Slice("ybctid_a")));
+    ASSERT_OK(index->Insert(id2, v2, Slice("ybctid_b")));
+    ASSERT_OK(index->Insert(id3, v3, Slice("ybctid_c")));
+    ASSERT_RESULT(index->SaveToFile(file_path));
+  }
+
+  // Load from disk and iterate — this is the merge/compaction path.
+  {
+    auto index = CreateIndex(kDim);
+    ASSERT_OK(index->LoadFromFile(file_path, 1));
+    ASSERT_EQ(index->Size(), 3);
+
+    // Collect all (VectorId, Vector) pairs via the iterator.
+    std::unordered_map<VectorId, Vector> iter_map;
+    for (auto it = index->begin(); it != index->end(); ++it) {
+      auto [vid, vec] = *it;
+      iter_map[vid] = vec;
+    }
+
+    ASSERT_EQ(iter_map.size(), 3);
+    ASSERT_EQ(iter_map[id1], v1);
+    ASSERT_EQ(iter_map[id2], v2);
+    ASSERT_EQ(iter_map[id3], v3);
   }
 }
 

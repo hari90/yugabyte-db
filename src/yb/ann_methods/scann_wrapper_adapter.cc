@@ -318,6 +318,7 @@ class ScannIndex :
   // ---------------------------------------------------------------------------
 
   Result<VectorIndexIfPtr<Vector, DistanceResult>> DoSaveToFile(const std::string& path) {
+    LOG(INFO) << "ScaNN: DoSaveToFile: Count: " << Size() << ", path: " << path;
     // ScannWrapper::Serialize writes multiple files into a directory.
     RETURN_NOT_OK(Env::Default()->CreateDirs(path));
     RETURN_NOT_OK(scann_.Serialize(path));
