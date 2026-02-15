@@ -42,9 +42,9 @@ struct VectorLSMInsertEntry {
   VectorId vector_id;
   Vector   vector;
 
-  // Optional auxiliary data to be stored alongside the vector (e.g. ybctid for ScaNN).
-  // Backends that don't support aux_data ignore this field.
-  std::string aux_data;
+  // Optional ybctid stored alongside the vector.
+  // Backends that don't need it ignore this field.
+  std::string ybctid;
 };
 
 struct VectorLSMInsertContext {

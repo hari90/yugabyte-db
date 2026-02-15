@@ -63,9 +63,9 @@ class ShardedVectorIndex : public VectorIndexIf<Vector, DistanceResult> {
   }
 
   // Insert a vector into the current shard using round-robin.
-  Status Insert(VectorId vector_id, const Vector& vector, Slice aux_data = Slice()) override {
+  Status Insert(VectorId vector_id, const Vector& vector, Slice ybctid = Slice()) override {
     size_t current_index = round_robin_counter_.fetch_add(1) % indexes_.size();
-    return indexes_[current_index]->Insert(vector_id, vector, aux_data);
+    return indexes_[current_index]->Insert(vector_id, vector, ybctid);
   }
 
   // Retrieve a vector from any shard.

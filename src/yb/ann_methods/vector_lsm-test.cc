@@ -980,11 +980,11 @@ INSTANTIATE_TEST_SUITE_P(
     , VectorLSMTest, ::testing::ValuesIn(kANNMethodKindArray), ANNMethodKindToString);
 
 // ---------------------------------------------------------------------------
-// ScaNN adapter aux_data (ybctid) tests
+// ScaNN adapter ybctid tests
 // ---------------------------------------------------------------------------
 //
 // These tests exercise the ScaNN VectorIndexIf adapter directly (not through
-// VectorLSM) to verify that aux_data supplied at Insert time is returned
+// VectorLSM) to verify that ybctid supplied at Insert time is returned
 // correctly by Search and survives save/load.
 
 class ScannAuxDataTest : public YBTest {
@@ -1007,7 +1007,7 @@ TEST_F(ScannAuxDataTest, AuxDataReturnedOnSearch) {
   auto index = CreateIndex(kDim);
   ASSERT_OK(index->Reserve(10, 1, 1));
 
-  // Insert three vectors with distinct aux_data values (simulating ybctids).
+  // Insert three vectors with distinct ybctid values.
   auto id1 = VectorId::GenerateRandom();
   auto id2 = VectorId::GenerateRandom();
   auto id3 = VectorId::GenerateRandom();
@@ -1024,10 +1024,10 @@ TEST_F(ScannAuxDataTest, AuxDataReturnedOnSearch) {
   auto results = ASSERT_RESULT(index->Search(Vector(kDim, 0.0f), opts));
   ASSERT_EQ(results.size(), 3);
 
-  // Build a map from vector_id -> aux_data for easy checking.
+  // Build a map from vector_id -> ybctid for easy checking.
   std::unordered_map<VectorId, std::string> result_map;
   for (const auto& r : results) {
-    result_map[r.vector_id] = r.aux_data;
+    result_map[r.vector_id] = r.ybctid;
   }
 
   ASSERT_EQ(result_map[id1], "ybctid_aaa");
@@ -1041,7 +1041,7 @@ TEST_F(ScannAuxDataTest, AuxDataEmptyWhenNotProvided) {
   ASSERT_OK(index->Reserve(5, 1, 1));
 
   auto id1 = VectorId::GenerateRandom();
-  // Insert without aux_data (default empty Slice).
+  // Insert without ybctid (default empty Slice).
   ASSERT_OK(index->Insert(id1, Vector(kDim, 1.0f)));
 
   vector_index::SearchOptions opts = {
@@ -1051,7 +1051,7 @@ TEST_F(ScannAuxDataTest, AuxDataEmptyWhenNotProvided) {
   auto results = ASSERT_RESULT(index->Search(Vector(kDim, 1.0f), opts));
   ASSERT_EQ(results.size(), 1);
   ASSERT_EQ(results[0].vector_id, id1);
-  ASSERT_TRUE(results[0].aux_data.empty());
+  ASSERT_TRUE(results[0].ybctid.empty());
 }
 
 TEST_F(ScannAuxDataTest, AuxDataSurvivesSaveAndLoad) {
@@ -1059,13 +1059,13 @@ TEST_F(ScannAuxDataTest, AuxDataSurvivesSaveAndLoad) {
 
   std::string test_dir;
   ASSERT_OK(Env::Default()->GetTestDirectory(&test_dir));
-  auto file_path = JoinPathSegments(test_dir, "scann_aux_data_test_" +
+  auto file_path = JoinPathSegments(test_dir, "scann_ybctid_test_" +
                                     Uuid::Generate().ToString());
 
   auto id1 = VectorId::GenerateRandom();
   auto id2 = VectorId::GenerateRandom();
 
-  // Insert with aux_data and save.
+  // Insert with ybctid and save.
   {
     auto index = CreateIndex(kDim);
     ASSERT_OK(index->Reserve(5, 1, 1));
@@ -1074,7 +1074,7 @@ TEST_F(ScannAuxDataTest, AuxDataSurvivesSaveAndLoad) {
     auto new_index = ASSERT_RESULT(index->SaveToFile(file_path));
   }
 
-  // Load from file and verify aux_data is preserved.
+  // Load from file and verify ybctid is preserved.
   {
     auto index = CreateIndex(kDim);
     ASSERT_OK(index->LoadFromFile(file_path, 1));
@@ -1088,7 +1088,7 @@ TEST_F(ScannAuxDataTest, AuxDataSurvivesSaveAndLoad) {
 
     std::unordered_map<VectorId, std::string> result_map;
     for (const auto& r : results) {
-      result_map[r.vector_id] = r.aux_data;
+      result_map[r.vector_id] = r.ybctid;
     }
 
     ASSERT_EQ(result_map[id1], "ybctid_one");
@@ -1105,9 +1105,9 @@ TEST_F(ScannAuxDataTest, MixedAuxDataAndNoAuxData) {
   auto id2 = VectorId::GenerateRandom();
   auto id3 = VectorId::GenerateRandom();
 
-  // Insert: first with aux_data, second without, third with.
+  // Insert: first with ybctid, second without, third with.
   ASSERT_OK(index->Insert(id1, Vector(kDim, 0.0f), Slice("ybctid_first")));
-  ASSERT_OK(index->Insert(id2, Vector(kDim, 1.0f)));  // no aux_data
+  ASSERT_OK(index->Insert(id2, Vector(kDim, 1.0f)));  // no ybctid
   ASSERT_OK(index->Insert(id3, Vector(kDim, 2.0f), Slice("ybctid_third")));
 
   vector_index::SearchOptions opts = {
@@ -1119,7 +1119,7 @@ TEST_F(ScannAuxDataTest, MixedAuxDataAndNoAuxData) {
 
   std::unordered_map<VectorId, std::string> result_map;
   for (const auto& r : results) {
-    result_map[r.vector_id] = r.aux_data;
+    result_map[r.vector_id] = r.ybctid;
   }
 
   ASSERT_EQ(result_map[id1], "ybctid_first");
@@ -1135,7 +1135,7 @@ TEST_F(ScannAuxDataTest, AuxDataVariableLengths) {
   auto id1 = VectorId::GenerateRandom();
   auto id2 = VectorId::GenerateRandom();
 
-  // Use aux_data of very different lengths.
+  // Use ybctid of very different lengths.
   std::string short_ybctid = "ab";
   std::string long_ybctid(500, 'x');
 
@@ -1151,7 +1151,7 @@ TEST_F(ScannAuxDataTest, AuxDataVariableLengths) {
 
   std::unordered_map<VectorId, std::string> result_map;
   for (const auto& r : results) {
-    result_map[r.vector_id] = r.aux_data;
+    result_map[r.vector_id] = r.ybctid;
   }
 
   ASSERT_EQ(result_map[id1], short_ybctid);
@@ -1177,7 +1177,7 @@ TEST_F(ScannAuxDataTest, AuxDataVariableLengthsSurviveSaveAndLoad) {
     auto index = CreateIndex(kDim);
     ASSERT_OK(index->Reserve(5, 1, 1));
     ASSERT_OK(index->Insert(id1, Vector(kDim, 0.0f), Slice(short_ybctid)));
-    ASSERT_OK(index->Insert(id2, Vector(kDim, 1.0f)));  // empty aux_data
+    ASSERT_OK(index->Insert(id2, Vector(kDim, 1.0f)));  // empty ybctid
     ASSERT_OK(index->Insert(id3, Vector(kDim, 2.0f), Slice(long_ybctid)));
     ASSERT_RESULT(index->SaveToFile(file_path));
   }
@@ -1195,7 +1195,7 @@ TEST_F(ScannAuxDataTest, AuxDataVariableLengthsSurviveSaveAndLoad) {
 
     std::unordered_map<VectorId, std::string> result_map;
     for (const auto& r : results) {
-      result_map[r.vector_id] = r.aux_data;
+      result_map[r.vector_id] = r.ybctid;
     }
 
     ASSERT_EQ(result_map[id1], short_ybctid);

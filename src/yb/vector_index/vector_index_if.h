@@ -81,9 +81,9 @@ class VectorIndexWriterIf {
   // Returns the number of reserved vectors
   virtual size_t Capacity() const = 0;
 
-  // aux_data is optional auxiliary data stored alongside the vector (e.g. ybctid).
+  // ybctid is optional data stored alongside the vector.
   // Backends that don't need it may ignore the parameter.
-  virtual Status Insert(VectorId vector_id, const Vector& vector, Slice aux_data = Slice()) = 0;
+  virtual Status Insert(VectorId vector_id, const Vector& vector, Slice ybctid = Slice()) = 0;
 };
 
 template<IndexableVectorType Vector, ValidDistanceResultType DistanceResult>

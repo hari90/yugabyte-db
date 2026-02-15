@@ -21,9 +21,9 @@
 // binary file.  On load the ScaNN index is rebuilt from the raw vectors so
 // there is no dependency on ScaNN's own serialization format.
 //
-// When aux_data (ybctid) is provided during Insert, it is stored alongside
-// each entry.  On Search, the ybctid is returned in VectorWithDistance::aux_data
-// so that the caller can skip the reverse mapping lookup in RocksDB.
+// When ybctid is provided during Insert, it is stored alongside each entry.
+// On Search, the ybctid is returned in VectorWithDistance::ybctid so that
+// the caller can skip the reverse mapping lookup in RocksDB.
 
 #include "yb/ann_methods/scann_wrapper_adapter.h"
 
@@ -164,7 +164,7 @@ class ScannIndex :
   }
 
   // Called from IndexWrapperBase::Insert (non-const).
-  // aux_data carries the ybctid bytes when available.
+  // ybctid carries the ybctid bytes when available.
   // ScaNN labels are NOT used — ybctid is stored in a parallel vector and
   // looked up by r.index on search.
   //
@@ -172,7 +172,7 @@ class ScannIndex :
   // protects its own internals, but we still need to serialize here so that
   // entries_/ybctids_ stay in sync with the ScaNN index and the initialized_
   // flag is checked consistently with the Initialize/Insert call.
-  Status DoInsert(VectorId vector_id, const Vector& v, Slice aux_data = Slice()) {
+  Status DoInsert(VectorId vector_id, const Vector& v, Slice ybctid = Slice()) {
     std::vector<float> fvec(v.begin(), v.end());
 
     std::lock_guard lock(mutex_);
@@ -205,7 +205,7 @@ class ScannIndex :
     entries_.emplace_back(vector_id, v);
     // Store ybctid in a parallel vector indexed by insertion order.
     // On search, r.index from ScaNN maps directly into this vector.
-    ybctids_.emplace_back(aux_data.ToBuffer());
+    ybctids_.emplace_back(ybctid.ToBuffer());
     return Status::OK();
   }
 
