@@ -284,6 +284,7 @@ FloatVectorLSM::InsertEntries CubeInsertEntries(size_t dimensions) {
     result.emplace_back(FloatVectorLSM::InsertEntry {
       .vector_id = VectorId::GenerateRandom(),
       .vector = std::move(vector),
+      .ybctid = {},
     });
   }
   return result;
@@ -297,6 +298,7 @@ FloatVectorLSM::InsertEntries RandomEntries(size_t dimensions, size_t num_entrie
     result.emplace_back(FloatVectorLSM::InsertEntry {
       .vector_id = VectorId::GenerateRandom(),
       .vector = RandomFloatVector(dimensions, distribution),
+      .ybctid = {},
     });
   }
   return result;

@@ -88,9 +88,8 @@ Status ScannWrapper::Initialize(const std::vector<float>& dataset,
                                 uint32_t n_points,
                                 const scann_internal::ScannConfigPtr& config,
                                 int training_threads,
-                                size_t label_width,
                                 const std::vector<Slice>& labels) {
-  if (label_width > 0) {
+  if (!labels.empty()) {
     SCHECK_EQ(labels.size(), n_points, InvalidArgument, "labels size must equal n_points");
   }
 
@@ -102,7 +101,7 @@ Status ScannWrapper::Initialize(const std::vector<float>& dataset,
     return ImplToYbStatus(impl_status);
   }
 
-  labels_.Reset(label_width, labels);
+  labels_.Reset(labels);
   return Status();
 }
 
@@ -249,6 +248,10 @@ Status ScannWrapper::Serialize(const std::string& path) {
 }
 
 // -- Configuration ------------------------------------------------------------
+
+Slice ScannWrapper::GetLabel(int32_t index) const {
+  return labels_.Get(index);
+}
 
 void ScannWrapper::SetNumThreads(int num_threads) {
   scann_internal::ImplSetNumThreads(impl_.get(), num_threads);
