@@ -42,8 +42,8 @@ using yb::scann_internal::ScannConfigPtr;
 
 using Clock = std::chrono::high_resolution_clock;
 
-// Fixed label width for CLI (16 bytes).
-constexpr size_t kLabelWidth = 16;
+// Default label size for CLI (16 bytes).
+constexpr size_t kDefaultLabelSize = 16;
 
 // ---------------------------------------------------------------------------
 // Shared REPL state
@@ -87,8 +87,9 @@ std::vector<float> RandomQuery(size_t dim, uint32_t seed) {
 
 std::string MakeRandomLabel() {
   static std::mt19937 rng(12345);
-  std::string label(kLabelWidth, '\0');
-  for (size_t j = 0; j < kLabelWidth; ++j) {
+  size_t len = 8 + (rng() % 17);  // 8–24 bytes (variable length)
+  std::string label(len, '\0');
+  for (size_t j = 0; j < len; ++j) {
     label[j] = static_cast<char>(rng() & 0xFF);
   }
   return label;
@@ -224,8 +225,7 @@ void CmdInit(CliState& s) {
   s.scann = ScannWrapper();
 
   Timer timer;
-  auto status = s.scann.Initialize(dataset, n_points, s.current_config, threads,
-                                   kLabelWidth, labels);
+  auto status = s.scann.Initialize(dataset, n_points, s.current_config, threads, labels);
   if (!status.ok()) {
     std::cout << "  ERROR: " << status.ToString() << "\n";
   } else {

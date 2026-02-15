@@ -10,7 +10,7 @@
 // or implied.  See the License for the specific language governing permissions and limitations
 // under the License.
 //
-// ScannLabelMap implementation — offset-based index → fixed-width byte label storage.
+// ScannLabelMap implementation — offset-based index → variable-length byte label storage.
 
 #include "scann/scann_label_map.h"
 
@@ -33,16 +33,10 @@ static const char* kLabelsFileName = "scann_labels.bin";
 // Bulk operations
 // ---------------------------------------------------------------------------
 
-void ScannLabelMap::Reset(size_t label_width, const std::vector<Slice>& labels) {
-  label_width_ = label_width;
-  if (label_width_ == 0) {
-    data_.clear();
-    return;
-  }
-  data_.resize(labels.size() * label_width_, '\0');
+void ScannLabelMap::Reset(const std::vector<Slice>& labels) {
+  data_.resize(labels.size());
   for (size_t i = 0; i < labels.size(); ++i) {
-    DCHECK_EQ(labels[i].size(), label_width_);
-    std::memcpy(&data_[i * label_width_], labels[i].data(), label_width_);
+    data_[i].assign(labels[i].cdata(), labels[i].size());
   }
 }
 
@@ -55,31 +49,28 @@ void ScannLabelMap::Clear() {
 // ---------------------------------------------------------------------------
 
 void ScannLabelMap::Put(int32_t index, Slice label) {
-  if (index < 0 || label_width_ == 0) return;
-  DCHECK_EQ(label.size(), label_width_);
+  if (index < 0) return;
   auto idx = static_cast<size_t>(index);
-  size_t needed = (idx + 1) * label_width_;
-  if (needed > data_.size()) {
-    // Grow with some headroom (1000 extra slots).
-    data_.resize(needed + 1000 * label_width_, '\0');
+  if (idx >= data_.size()) {
+    data_.resize(idx + 1);
   }
-  std::memcpy(&data_[idx * label_width_], label.data(), label_width_);
+  data_[idx].assign(label.cdata(), label.size());
 }
 
 Slice ScannLabelMap::Get(int32_t index) const {
-  if (index < 0 || label_width_ == 0) return Slice();
+  if (index < 0) return Slice();
   auto idx = static_cast<size_t>(index);
-  if ((idx + 1) * label_width_ > data_.size()) {
+  if (idx >= data_.size()) {
     return Slice();
   }
-  return Slice(&data_[idx * label_width_], label_width_);
+  return Slice(data_[idx]);
 }
 
 void ScannLabelMap::Erase(int32_t index) {
-  if (index < 0 || label_width_ == 0) return;
+  if (index < 0) return;
   auto idx = static_cast<size_t>(index);
-  if ((idx + 1) * label_width_ <= data_.size()) {
-    std::memset(&data_[idx * label_width_], 0, label_width_);
+  if (idx < data_.size()) {
+    data_[idx].clear();
   }
 }
 
@@ -105,10 +96,11 @@ std::vector<ScannSearchResult> ScannLabelMap::ResolveLabels(
 // ---------------------------------------------------------------------------
 // Persistence
 //
-// Binary format:
-//   [4 bytes] uint32_t  label_width
+// Binary format (variable-length):
 //   [4 bytes] uint32_t  count — number of slots
-//   [count * label_width bytes]  raw label data
+//   For each slot:
+//     [4 bytes] uint32_t  label_length
+//     [label_length bytes] label data
 // ---------------------------------------------------------------------------
 
 Status ScannLabelMap::Serialize(const std::string& artifacts_dir) const {
@@ -120,11 +112,16 @@ Status ScannLabelMap::Serialize(const std::string& artifacts_dir) const {
                   "Failed to open " + path + " for writing");
   }
 
-  auto lw = static_cast<uint32_t>(label_width_);
-  auto count = static_cast<uint32_t>(size());
-  out.write(reinterpret_cast<const char*>(&lw), sizeof(lw));
+  auto count = static_cast<uint32_t>(data_.size());
   out.write(reinterpret_cast<const char*>(&count), sizeof(count));
-  out.write(data_.data(), static_cast<std::streamsize>(count * label_width_));
+
+  for (const auto& label : data_) {
+    auto len = static_cast<uint32_t>(label.size());
+    out.write(reinterpret_cast<const char*>(&len), sizeof(len));
+    if (len > 0) {
+      out.write(label.data(), static_cast<std::streamsize>(len));
+    }
+  }
 
   if (!out) {
     return Status(Status::kInternalError, __FILE__, __LINE__,
@@ -135,7 +132,6 @@ Status ScannLabelMap::Serialize(const std::string& artifacts_dir) const {
 
 Status ScannLabelMap::Load(const std::string& artifacts_dir) {
   data_.clear();
-  label_width_ = 0;
 
   std::string path = artifacts_dir + "/" + kLabelsFileName;
 
@@ -145,23 +141,29 @@ Status ScannLabelMap::Load(const std::string& artifacts_dir) {
     return Status();
   }
 
-  uint32_t lw = 0;
   uint32_t count = 0;
-  in.read(reinterpret_cast<char*>(&lw), sizeof(lw));
   in.read(reinterpret_cast<char*>(&count), sizeof(count));
   if (!in) {
     return Status(Status::kInternalError, __FILE__, __LINE__,
                   "Failed to read label header from " + path);
   }
 
-  label_width_ = lw;
-  size_t total_bytes = static_cast<size_t>(count) * label_width_;
-  data_.resize(total_bytes);
-  in.read(&data_[0], static_cast<std::streamsize>(total_bytes));
-
-  if (!in) {
-    return Status(Status::kInternalError, __FILE__, __LINE__,
-                  "Truncated label data in " + path);
+  data_.resize(count);
+  for (uint32_t i = 0; i < count; ++i) {
+    uint32_t len = 0;
+    in.read(reinterpret_cast<char*>(&len), sizeof(len));
+    if (!in) {
+      return Status(Status::kInternalError, __FILE__, __LINE__,
+                    "Truncated label length in " + path);
+    }
+    if (len > 0) {
+      data_[i].resize(len);
+      in.read(&data_[i][0], static_cast<std::streamsize>(len));
+      if (!in) {
+        return Status(Status::kInternalError, __FILE__, __LINE__,
+                      "Truncated label data in " + path);
+      }
+    }
   }
 
   return Status();

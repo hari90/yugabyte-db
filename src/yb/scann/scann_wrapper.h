@@ -39,8 +39,8 @@ namespace yb::scann {
 // behind the PIMPL so that callers only need standard C++ / YB types.
 //
 // In addition to the vector data managed by ScaNN, the wrapper maintains a
-// ScannLabelMap (index → fixed-width byte label) that is stored alongside the
-// ScaNN artifacts on Serialize and restored on LoadFromDisk.
+// ScannLabelMap (index → variable-length byte label) that is stored alongside
+// the ScaNN artifacts on Serialize and restored on LoadFromDisk.
 class ScannWrapper {
  public:
   ScannWrapper();
@@ -64,15 +64,13 @@ class ScannWrapper {
   //   config           – opaque ScannConfig proto built via the Scann*Config
   //                      helpers.
   //   training_threads – number of threads for training/indexing.
-  //   label_width      – fixed width in bytes for each label.
   //   labels           – vector of Slice labels, one per datapoint.
-  //                      Each Slice must have size == label_width.
-  //                      Must have size == n_points.
+  //                      Each Slice can be any length (variable-width).
+  //                      Must have size == n_points (or be empty for no labels).
   Status Initialize(const std::vector<float>& dataset, uint32_t n_points,
                     const scann_internal::ScannConfigPtr& config,
                     int training_threads,
-                    size_t label_width,
-                    const std::vector<Slice>& labels);
+                    const std::vector<Slice>& labels = {});
 
   // Load a previously serialized index from disk.
   //
@@ -90,7 +88,7 @@ class ScannWrapper {
   //
   //   datapoint – float vector of length dimensionality().
   //   docid     – unique string identifier for the datapoint.
-  //   label     – fixed-width byte label (size must equal label_width).
+  //   label     – variable-length byte label.
   //
   // Returns the assigned datapoint index on success.
   Result<int32_t> Insert(const std::vector<float>& datapoint,
@@ -145,7 +143,7 @@ class ScannWrapper {
 
   // Serialize the index to `path`.  Writes all ScaNN artifacts, a
   // scann_assets.pbtxt manifest file, and a scann_labels.bin file that stores
-  // the label map (including label_width).
+  // the label map.
   Status Serialize(const std::string& path);
 
   // ---------------------------------------------------------------------------
@@ -154,6 +152,10 @@ class ScannWrapper {
 
   // Set/change the number of threads for parallel batched search.
   void SetNumThreads(int num_threads);
+
+  // Retrieve the label for a given datapoint index.
+  // Returns an empty Slice if the index is out of range.
+  Slice GetLabel(int32_t index) const;
 
   // Number of indexed datapoints.
   size_t n_points() const;

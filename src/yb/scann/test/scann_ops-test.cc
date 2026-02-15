@@ -39,10 +39,7 @@ constexpr int kNumQueries = 100;
 constexpr int kDimension = 32;
 constexpr uint32_t kSeed = 518;
 
-// Fixed label width for tests (16 bytes, like a UUID).
-constexpr size_t kLabelWidth = 16;
-
-// Returns a vector of n_points random labels (each kLabelWidth bytes) and
+// Returns a vector of n_points random labels (variable-length) and
 // the backing storage.  The returned Slices point into `storage`.
 struct RandomLabelResult {
   std::vector<std::string> storage;
@@ -55,8 +52,10 @@ RandomLabelResult RandomLabels(size_t n_points) {
   result.slices.reserve(n_points);
   std::mt19937 rng(42);
   for (size_t i = 0; i < n_points; ++i) {
-    std::string bytes(kLabelWidth, '\0');
-    for (size_t j = 0; j < kLabelWidth; ++j) {
+    // Generate labels of varying lengths (8–24 bytes).
+    size_t label_len = 8 + (rng() % 17);
+    std::string bytes(label_len, '\0');
+    for (size_t j = 0; j < label_len; ++j) {
       bytes[j] = static_cast<char>(rng() & 0xFF);
     }
     result.storage.push_back(std::move(bytes));
@@ -121,8 +120,7 @@ class ScannOpsTest : public YBTest {
   void SerializationTester(const scann_internal::ScannConfigPtr& config) {
     auto rl = RandomLabels(kNumDatasetPoints);
     ScannWrapper scann1;
-    ASSERT_OK(scann1.Initialize(dataset_, kNumDatasetPoints, config, 4,
-                                kLabelWidth, rl.slices));
+    ASSERT_OK(scann1.Initialize(dataset_, kNumDatasetPoints, config, 4, rl.slices));
 
     auto results1 = ASSERT_RESULT(scann1.SearchBatched(queries_, kNumQueries, 15, 15, 0));
 
@@ -177,8 +175,7 @@ TEST_F(ScannOpsTest, BruteForceMatchesReference) {
   auto rl = RandomLabels(kNumDatasetPoints);
   ScannWrapper scann;
   ASSERT_OK(scann.Initialize(
-      dataset_, kNumDatasetPoints, ScannBruteForceConfig(10, kDimension), 4,
-      kLabelWidth, rl.slices));
+      dataset_, kNumDatasetPoints, ScannBruteForceConfig(10, kDimension), 4, rl.slices));
 
   auto results = ASSERT_RESULT(scann.SearchBatched(queries_, kNumQueries, 10, 10, 0));
 
@@ -208,8 +205,7 @@ TEST_F(ScannOpsTest, BruteForceFinalNumNeighbors) {
   auto rl = RandomLabels(kNumDatasetPoints);
   ScannWrapper scann;
   ASSERT_OK(scann.Initialize(
-      dataset_, kNumDatasetPoints, ScannBruteForceConfig(10, kDimension), 4,
-      kLabelWidth, rl.slices));
+      dataset_, kNumDatasetPoints, ScannBruteForceConfig(10, kDimension), 4, rl.slices));
 
   auto results20 = ASSERT_RESULT(scann.SearchBatched(queries_, kNumQueries, 20, 20, 0));
 
@@ -240,8 +236,7 @@ TEST_F(ScannOpsTest, SingleQuerySearch) {
   auto rl = RandomLabels(kNumDatasetPoints);
   ScannWrapper scann;
   ASSERT_OK(scann.Initialize(
-      dataset_, kNumDatasetPoints, ScannBruteForceConfig(10, kDimension), 4,
-      kLabelWidth, rl.slices));
+      dataset_, kNumDatasetPoints, ScannBruteForceConfig(10, kDimension), 4, rl.slices));
 
   std::vector<int32_t> ref_indices;
   std::vector<float> ref_distances;
@@ -270,8 +265,7 @@ TEST_F(ScannOpsTest, ParallelMatchesSequential) {
 
   auto rl = RandomLabels(10000);
   ScannWrapper scann;
-  ASSERT_OK(scann.Initialize(dataset, 10000, ScannTreeAhConfig(10, 32), 4,
-                             kLabelWidth, rl.slices));
+  ASSERT_OK(scann.Initialize(dataset, 10000, ScannTreeAhConfig(10, 32), 4, rl.slices));
 
   scann.SetNumThreads(4);
 
@@ -293,8 +287,7 @@ TEST_F(ScannOpsTest, ReorderingShapes) {
   auto rl = RandomLabels(kNumDatasetPoints);
   ScannWrapper scann;
   ASSERT_OK(scann.Initialize(
-      dataset_, kNumDatasetPoints, ScannReorderConfig(5, kDimension), 4,
-      kLabelWidth, rl.slices));
+      dataset_, kNumDatasetPoints, ScannReorderConfig(5, kDimension), 4, rl.slices));
 
   // -- Batched searches -------------------------------------------------------
   {
@@ -347,8 +340,7 @@ TEST_F(ScannOpsTest, NPointsAndDimensionality) {
   auto rl = RandomLabels(kNumDatasetPoints);
   ScannWrapper scann;
   ASSERT_OK(scann.Initialize(
-      dataset_, kNumDatasetPoints, ScannBruteForceConfig(10, kDimension), 4,
-      kLabelWidth, rl.slices));
+      dataset_, kNumDatasetPoints, ScannBruteForceConfig(10, kDimension), 4, rl.slices));
 
   EXPECT_EQ(scann.n_points(), kNumDatasetPoints);
   EXPECT_EQ(scann.dimensionality(), kDimension);
@@ -358,8 +350,7 @@ TEST_F(ScannOpsTest, MoveConstructor) {
   auto rl = RandomLabels(kNumDatasetPoints);
   ScannWrapper scann1;
   ASSERT_OK(scann1.Initialize(
-      dataset_, kNumDatasetPoints, ScannBruteForceConfig(10, kDimension), 4,
-      kLabelWidth, rl.slices));
+      dataset_, kNumDatasetPoints, ScannBruteForceConfig(10, kDimension), 4, rl.slices));
 
   // Search before move.
   std::vector<float> query(queries_.begin(), queries_.begin() + kDimension);
@@ -384,8 +375,7 @@ TEST_F(ScannOpsTest, MoveAssignment) {
   auto rl = RandomLabels(kNumDatasetPoints);
   ScannWrapper scann1;
   ASSERT_OK(scann1.Initialize(
-      dataset_, kNumDatasetPoints, ScannBruteForceConfig(10, kDimension), 4,
-      kLabelWidth, rl.slices));
+      dataset_, kNumDatasetPoints, ScannBruteForceConfig(10, kDimension), 4, rl.slices));
 
   std::vector<float> query(queries_.begin(), queries_.begin() + kDimension);
   auto before = ASSERT_RESULT(scann1.Search(query, 5, 5, 0));
@@ -403,11 +393,12 @@ TEST_F(ScannOpsTest, MoveAssignment) {
   }
 }
 
-// Helper: make a single random label as an owning string.
+// Helper: make a single random label as an owning string (variable-length).
 std::string MakeRandomLabel() {
-  std::string label(kLabelWidth, '\0');
   static std::mt19937 rng(999);
-  for (size_t j = 0; j < kLabelWidth; ++j) {
+  size_t len = 8 + (rng() % 17);  // 8–24 bytes
+  std::string label(len, '\0');
+  for (size_t j = 0; j < len; ++j) {
     label[j] = static_cast<char>(rng() & 0xFF);
   }
   return label;
@@ -417,8 +408,7 @@ TEST_F(ScannOpsTest, InsertIncreasesNPoints) {
   auto rl = RandomLabels(kNumDatasetPoints);
   ScannWrapper scann;
   ASSERT_OK(scann.Initialize(
-      dataset_, kNumDatasetPoints, ScannBruteForceConfig(10, kDimension), 4,
-      kLabelWidth, rl.slices));
+      dataset_, kNumDatasetPoints, ScannBruteForceConfig(10, kDimension), 4, rl.slices));
 
   ASSERT_EQ(scann.n_points(), kNumDatasetPoints);
 
@@ -448,7 +438,7 @@ TEST_F(ScannOpsTest, InsertedPointIsSearchable) {
   ScannWrapper scann;
   ASSERT_OK(scann.Initialize(
       small_dataset, kSmallN, ScannBruteForceConfig(5, kDim, /*fixed_point=*/false), 1,
-      kLabelWidth, rl.slices));
+      rl.slices));
 
   // Create a distinctive point: all ones.
   std::vector<float> inserted(kDim, 1.0f);
@@ -473,7 +463,7 @@ TEST_F(ScannOpsTest, InsertMultipleThenBatchSearch) {
   ScannWrapper scann;
   ASSERT_OK(scann.Initialize(
       small_dataset, kSmallN, ScannBruteForceConfig(5, kDim, /*fixed_point=*/false), 1,
-      kLabelWidth, rl.slices));
+      rl.slices));
 
   constexpr int kInsertCount = kDim;
   constexpr float kLargeVal = 100.0f;
@@ -514,7 +504,7 @@ TEST_F(ScannOpsTest, DeleteByDocidDecreasesNPoints) {
   auto rl = RandomLabels(kSmallN);
   ScannWrapper scann;
   ASSERT_OK(scann.Initialize(
-      small_dataset, kSmallN, ScannBruteForceConfig(5, kDim), 1, kLabelWidth, rl.slices));
+      small_dataset, kSmallN, ScannBruteForceConfig(5, kDim), 1, rl.slices));
 
   std::vector<float> pt(kDim, 1.0f);
   auto lbl = MakeRandomLabel();
@@ -533,7 +523,7 @@ TEST_F(ScannOpsTest, DeleteByIndexDecreasesNPoints) {
   auto rl = RandomLabels(kSmallN);
   ScannWrapper scann;
   ASSERT_OK(scann.Initialize(
-      small_dataset, kSmallN, ScannBruteForceConfig(5, kDim), 1, kLabelWidth, rl.slices));
+      small_dataset, kSmallN, ScannBruteForceConfig(5, kDim), 1, rl.slices));
 
   std::vector<float> pt(kDim, 1.0f);
   auto lbl = MakeRandomLabel();
@@ -553,7 +543,7 @@ TEST_F(ScannOpsTest, DeletedPointNotReturnedBySearch) {
   ScannWrapper scann;
   ASSERT_OK(scann.Initialize(
       small_dataset, kSmallN, ScannBruteForceConfig(5, kDim, /*fixed_point=*/false), 1,
-      kLabelWidth, rl.slices));
+      rl.slices));
 
   std::vector<float> pt(kDim, 1.0f);
   auto lbl = MakeRandomLabel();
@@ -578,7 +568,7 @@ TEST_F(ScannOpsTest, DeletedPointNotReturnedBySearch) {
 }
 
 // ---------------------------------------------------------------------------
-// Label tests (byte-array labels)
+// Label tests (variable-length byte-array labels)
 // ---------------------------------------------------------------------------
 
 TEST_F(ScannOpsTest, InsertedLabelReturnedBySearch) {
@@ -590,7 +580,7 @@ TEST_F(ScannOpsTest, InsertedLabelReturnedBySearch) {
   ScannWrapper scann;
   ASSERT_OK(scann.Initialize(
       small_dataset, kSmallN, ScannBruteForceConfig(5, kDim, /*fixed_point=*/false), 1,
-      kLabelWidth, rl.slices));
+      rl.slices));
 
   // Insert a distinctive all-ones point with a known label.
   auto expected_label = MakeRandomLabel();
@@ -613,7 +603,7 @@ TEST_F(ScannOpsTest, InitializeWithLabels) {
 
   ScannWrapper scann;
   ASSERT_OK(scann.Initialize(
-      small_dataset, kSmallN, ScannBruteForceConfig(5, kDim), 1, kLabelWidth, rl.slices));
+      small_dataset, kSmallN, ScannBruteForceConfig(5, kDim), 1, rl.slices));
 
   // Search and verify the labels in the results match what we passed in.
   std::vector<float> query(small_dataset.begin(), small_dataset.begin() + kDim);
@@ -633,13 +623,13 @@ TEST_F(ScannOpsTest, InitializeWithRandomLabelsGivesNonEmptyLabels) {
   auto rl = RandomLabels(kSmallN);
   ScannWrapper scann;
   ASSERT_OK(scann.Initialize(
-      small_dataset, kSmallN, ScannBruteForceConfig(5, kDim), 1, kLabelWidth, rl.slices));
+      small_dataset, kSmallN, ScannBruteForceConfig(5, kDim), 1, rl.slices));
 
   std::vector<float> query(small_dataset.begin(), small_dataset.begin() + kDim);
   auto results = ASSERT_RESULT(scann.Search(query, 5, 5, 0));
   ASSERT_FALSE(results.empty());
   for (const auto& r : results) {
-    EXPECT_EQ(r.label.size(), kLabelWidth) << "index " << r.index << " expected non-empty label";
+    EXPECT_FALSE(r.label.empty()) << "index " << r.index << " expected non-empty label";
     EXPECT_EQ(r.label, rl.storage[r.index])
         << "index " << r.index << " label mismatch";
   }
@@ -655,7 +645,7 @@ TEST_F(ScannOpsTest, InitializeWithWrongLabelCountFails) {
 
   ScannWrapper scann;
   auto status = scann.Initialize(
-      small_dataset, kSmallN, ScannBruteForceConfig(5, kDim), 1, kLabelWidth, rl.slices);
+      small_dataset, kSmallN, ScannBruteForceConfig(5, kDim), 1, rl.slices);
   EXPECT_NOK(status);
 }
 
@@ -668,7 +658,7 @@ TEST_F(ScannOpsTest, LabelsSerializeAndLoad) {
 
   ScannWrapper scann1;
   ASSERT_OK(scann1.Initialize(
-      small_dataset, kSmallN, ScannBruteForceConfig(5, kDim), 1, kLabelWidth, rl.slices));
+      small_dataset, kSmallN, ScannBruteForceConfig(5, kDim), 1, rl.slices));
 
   auto tmpdir = std::filesystem::temp_directory_path() / "scann_label_test_204";
   std::filesystem::create_directories(tmpdir);
@@ -700,7 +690,7 @@ TEST_F(ScannOpsTest, DeleteByIndexCleansUpLabel) {
   ScannWrapper scann;
   ASSERT_OK(scann.Initialize(
       small_dataset, kSmallN, ScannBruteForceConfig(5, kDim, /*fixed_point=*/false), 1,
-      kLabelWidth, rl.slices));
+      rl.slices));
 
   auto label = MakeRandomLabel();
   std::vector<float> pt(kDim, 1.0f);
@@ -733,7 +723,7 @@ TEST_F(ScannOpsTest, BatchedSearchReturnsLabels) {
 
   ScannWrapper scann;
   ASSERT_OK(scann.Initialize(
-      small_dataset, kSmallN, ScannBruteForceConfig(5, kDim), 1, kLabelWidth, rl.slices));
+      small_dataset, kSmallN, ScannBruteForceConfig(5, kDim), 1, rl.slices));
 
   constexpr int kBatchQueries = 3;
   std::vector<float> queries(small_dataset.begin(),
@@ -746,6 +736,23 @@ TEST_F(ScannOpsTest, BatchedSearchReturnsLabels) {
     for (const auto& r : results[q]) {
       EXPECT_EQ(r.label, rl.storage[r.index])
           << "query " << q << " index " << r.index << " label mismatch";
+    }
+  }
+}
+
+// Test that Initialize with no labels (default) works fine.
+TEST_F(ScannOpsTest, InitializeWithNoLabels) {
+  ScannWrapper scann;
+  ASSERT_OK(scann.Initialize(
+      dataset_, kNumDatasetPoints, ScannBruteForceConfig(10, kDimension), 4));
+
+  auto results = ASSERT_RESULT(scann.SearchBatched(queries_, kNumQueries, 10, 10, 0));
+  ASSERT_EQ(results.size(), kNumQueries);
+  for (int q = 0; q < kNumQueries; ++q) {
+    ASSERT_EQ(results[q].size(), 10u) << "query " << q;
+    for (const auto& r : results[q]) {
+      EXPECT_TRUE(r.label.empty()) << "query " << q << " index " << r.index
+                                    << " expected empty label when initialized without labels";
     }
   }
 }
