@@ -109,7 +109,7 @@ const std::string& ScannDistanceMeasure(DistanceKind kind) {
 // ---------------------------------------------------------------------------
 
 // Encode VectorId + ybctid into a single label string.
-std::string EncodeLabel(VectorId vector_id, Slice ybctid) {
+std::string EncodeLabel(const VectorId& vector_id, Slice ybctid) {
   std::string label;
   label.resize(kUuidBytes + ybctid.size());
   std::memcpy(label.data(), vector_id.data(), kUuidBytes);
