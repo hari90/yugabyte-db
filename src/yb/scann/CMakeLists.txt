@@ -50,9 +50,14 @@ foreach(P ${SCANN_PROTO_FILES})
   list(APPEND SCANN_PROTO_FILES_ABS ${CMAKE_CURRENT_SOURCE_DIR}/${P})
 endforeach()
 
+# BINARY_ROOT must match SOURCE_ROOT's level (src/yb) so that the generated
+# .pb.{h,cc} files land at paths like $BUILD_ROOT/src/yb/scann/proto/foo.pb.h
+# matching the source layout.  Using CMAKE_CURRENT_BINARY_DIR would produce
+# an extra "scann/" nesting ($BUILD_ROOT/src/yb/scann/scann/proto/...) which
+# confuses the dependency graph tool.
 PROTOBUF_GENERATE_CPP(SCANN_PROTO_SRCS SCANN_PROTO_HDRS SCANN_PROTO_TGTS
   SOURCE_ROOT ${SCANN_PROTO_SOURCE_ROOT}
-  BINARY_ROOT ${CMAKE_CURRENT_BINARY_DIR}
+  BINARY_ROOT ${CMAKE_CURRENT_BINARY_DIR}/..
   PROTO_FILES ${SCANN_PROTO_FILES_ABS})
 
 # Batch size sharder: generates .cc files from .tpl.cc templates by substituting {BATCH_SIZE}
@@ -117,7 +122,7 @@ ADD_YB_LIBRARY(scann
 
 target_include_directories(scann PRIVATE
   ${SCANN_INCLUDE_ROOT}
-  ${CMAKE_CURRENT_BINARY_DIR})
+  ${CMAKE_CURRENT_BINARY_DIR}/..)
 
 target_compile_options(scann PRIVATE -Wno-unused-private-field -Wno-shorten-64-to-32 -Wno-final-dtor-non-final-class 
 -Wno-sign-compare -Wno-inconsistent-missing-override -Wno-enum-compare-switch -Wno-mismatched-tags 
@@ -150,7 +155,7 @@ set(YB_TEST_LINK_LIBS scann ${YB_MIN_TEST_LIBS})
 ADD_YB_TEST(test/scann_ops-test)
 YB_TEST_TARGET_INCLUDE_DIRECTORIES(test/scann_ops-test PRIVATE
   ${SCANN_INCLUDE_ROOT}
-  ${CMAKE_CURRENT_BINARY_DIR})
+  ${CMAKE_CURRENT_BINARY_DIR}/..)
 YB_TEST_TARGET_COMPILE_OPTIONS(test/scann_ops-test PRIVATE
   -Wno-final-dtor-non-final-class -Wno-shorten-64-to-32 -Wno-sign-compare 
   -Wno-unused-private-field)
@@ -159,6 +164,6 @@ add_executable(scann_cli ${CMAKE_CURRENT_SOURCE_DIR}/test/scann_cli.cc)
 target_link_libraries(scann_cli scann yb_util ${YB_BASE_LIBS})
 target_include_directories(scann_cli PRIVATE
   ${SCANN_INCLUDE_ROOT}
-  ${CMAKE_CURRENT_BINARY_DIR})
+  ${CMAKE_CURRENT_BINARY_DIR}/..)
 target_compile_options(scann_cli PRIVATE
   -Wno-final-dtor-non-final-class -Wno-shorten-64-to-32 -Wno-sign-compare)
