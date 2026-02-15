@@ -43,6 +43,7 @@
 #include "yb/gutil/casts.h"
 
 #include "yb/util/env.h"
+#include "yb/util/flags.h"
 #include "yb/util/status.h"
 
 #include "yb/vector_index/distance.h"
@@ -51,6 +52,55 @@
 
 // ScaNN wrapper headers — safe to include here (no absl leakage).
 #include "scann/scann_wrapper.h"
+
+// ---------------------------------------------------------------------------
+// gFlags for ScaNN tree index configuration
+// ---------------------------------------------------------------------------
+
+DEFINE_RUNTIME_int32(scann_max_num_levels, 1,
+    "Maximum number of centroid levels in the ScaNN K-means clustering tree. "
+    "1 = two-level tree (recommended for < 10M vectors). "
+    "2 = three-level tree (recommended for > 100M vectors). "
+    "For 10M-100M vectors, use 2 for faster build or 1 for better recall.");
+
+DEFINE_RUNTIME_int32(scann_num_leaves, 0,
+    "Number of partitions (leaves) for the ScaNN tree index. "
+    "0 = auto-calculate based on dataset size (ROWS/100). "
+    "Two-level tree: use sqrt(ROWS) as a starting point, or ROWS/100 for "
+    "optimal recall. "
+    "Three-level tree: use power(ROWS, 2/3) as a starting point, or ROWS/100 "
+    "for optimal recall. "
+    "Valid range: 1 to 1048576.");
+
+DEFINE_RUNTIME_string(scann_quantizer, "SQ8",
+    "Quantizer type for the ScaNN tree index. "
+    "SQ8 = asymmetric hashing (faster search, minimal recall loss < 1-2%). "
+    "FLAT = exact brute-force scoring (recall >= 99%).");
+
+DEFINE_RUNTIME_bool(scann_enable_pca, true,
+    "Enable Principal Component Analysis (PCA) for ScaNN's asymmetric hashing "
+    "projection. PCA automatically reduces embedding dimensions when possible, "
+    "improving quantization efficiency. Set to false if recall degrades.");
+
+// ---------------------------------------------------------------------------
+// gFlags for ScaNN query-time configuration
+// ---------------------------------------------------------------------------
+
+DEFINE_RUNTIME_int32(scann_num_leaves_to_search, 0,
+    "Number of tree leaves (partitions) to search per query. "
+    "Higher values improve recall at the cost of QPS. "
+    "0 = auto-calculate as 1% of num_leaves.");
+
+DEFINE_RUNTIME_int32(scann_pre_reordering_num_neighbors, 0,
+    "Number of candidate neighbors to consider during exact reordering after "
+    "the initial AH search. Must be >= the final number of neighbors (LIMIT). "
+    "Higher values improve recall at the cost of QPS. "
+    "0 = disabled (no reordering) when PCA is off; 50 * LIMIT when PCA is on.");
+
+DEFINE_RUNTIME_int32(scann_num_search_threads, 2,
+    "Number of threads for parallel ScaNN ANN search. "
+    "Increasing this reduces single-query latency if the server is not already "
+    "CPU-bound. Default is 2.");
 
 namespace yb::ann_methods {
 
@@ -248,6 +298,7 @@ class ScannIndex :
           kScannTrainingThreads,
           labels));
 
+      scann_.SetNumThreads(FLAGS_scann_num_search_threads);
       initialized_ = true;
     } else {
       // Dynamic insert into an already-initialized index.
@@ -288,7 +339,13 @@ class ScannIndex :
 
     std::vector<float> query(query_vector.begin(), query_vector.end());
     int k = static_cast<int>(options.max_num_results);
-    auto scann_results = scann_.Search(query, k, k, /*leaves=*/0);
+
+    int leaves = FLAGS_scann_num_leaves_to_search;
+    int pre_reorder_nn = FLAGS_scann_pre_reordering_num_neighbors > 0
+                             ? FLAGS_scann_pre_reordering_num_neighbors
+                             : (FLAGS_scann_enable_pca ? k * 50 : k);
+
+    auto scann_results = scann_.Search(query, k, pre_reorder_nn, leaves);
     if (!scann_results.ok()) {
       LOG(WARNING) << "ScaNN search failed: " << scann_results.status();
       return {};
@@ -330,14 +387,35 @@ class ScannIndex :
     LOG(INFO) << "ScaNN: DoSaveToFile: Count: " << n << ", path: " << path;
     RETURN_NOT_OK(Env::Default()->CreateDirs(path));
 
+    // Hold the mutex for the entire save: Rebuild() replaces impl_ in place,
+    // so concurrent searches must be blocked to avoid a use-after-free on the
+    // old searcher.  This is acceptable because save is called once when the
+    // mutable chunk is being finalized.
+    std::lock_guard lock(mutex_);
+
     if (n >= kTreeAhThreshold) {
-      // Rebuild as Tree-AH for faster search on large datasets.
-      // CosineDistance and DotProductDistance require L2-normalised vectors
-      // for Tree-AH's asymmetric hashing to pass the factory validation.
+      const auto dim = static_cast<int>(options_.dimensions);
+      const auto& distance = ScannDistanceMeasure(options_.distance_kind);
       bool normalize = options_.distance_kind != DistanceKind::kL2Squared;
-      auto config = scann::ScannTreeAhConfig(
-          kScannMaxNeighbors, static_cast<int>(options_.dimensions),
-          ScannDistanceMeasure(options_.distance_kind));
+
+      // Build tree options from gFlags.
+      scann::ScannTreeOptions tree_opts;
+      tree_opts.num_leaves = FLAGS_scann_num_leaves > 0
+                                 ? FLAGS_scann_num_leaves
+                                 : static_cast<int>(n / 100);
+      tree_opts.max_num_levels = FLAGS_scann_max_num_levels;
+      tree_opts.enable_pca = FLAGS_scann_enable_pca;
+
+      scann_internal::ScannConfigPtr config;
+      if (FLAGS_scann_quantizer == "FLAT") {
+        config = scann::ScannTreeBruteForceConfig(
+            kScannMaxNeighbors, dim, distance, tree_opts);
+      } else {
+        // Default to SQ8 (Tree-AH).
+        config = scann::ScannTreeAhConfig(
+            kScannMaxNeighbors, dim, distance, tree_opts);
+      }
+
       RETURN_NOT_OK(scann_.Rebuild(config, kTreeAhTrainingThreads, normalize));
     }
 
@@ -349,6 +427,7 @@ class ScannIndex :
     // ScannWrapper::LoadFromDisk restores the ScaNN index and the label map
     // from the artifacts directory written by Serialize().
     RETURN_NOT_OK(scann_.LoadFromDisk(path));
+    scann_.SetNumThreads(FLAGS_scann_num_search_threads);
     initialized_ = true;
     capacity_ = std::max(capacity_, scann_.n_points());
     return Status::OK();

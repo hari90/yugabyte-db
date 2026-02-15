@@ -320,13 +320,19 @@ scann_internal::ScannConfigPtr ScannAhConfig(
 }
 
 scann_internal::ScannConfigPtr ScannTreeAhConfig(
-    int num_neighbors, int dim, const std::string& distance_measure) {
-  return scann_internal::ImplTreeAhConfig(num_neighbors, dim, distance_measure);
+    int num_neighbors, int dim, const std::string& distance_measure,
+    const ScannTreeOptions& tree_opts) {
+  return scann_internal::ImplTreeAhConfig(
+      num_neighbors, dim, distance_measure,
+      tree_opts.num_leaves, tree_opts.max_num_levels, tree_opts.enable_pca);
 }
 
 scann_internal::ScannConfigPtr ScannTreeBruteForceConfig(
-    int num_neighbors, int dim, const std::string& distance_measure) {
-  return scann_internal::ImplTreeBruteForceConfig(num_neighbors, dim, distance_measure);
+    int num_neighbors, int dim, const std::string& distance_measure,
+    const ScannTreeOptions& tree_opts) {
+  return scann_internal::ImplTreeBruteForceConfig(
+      num_neighbors, dim, distance_measure,
+      tree_opts.num_leaves, tree_opts.max_num_levels);
 }
 
 scann_internal::ScannConfigPtr ScannBruteForceConfig(

@@ -199,6 +199,19 @@ class ScannWrapper {
 // Supported values: "DotProductDistance", "SquaredL2Distance", "CosineDistance".
 // The default is "DotProductDistance" for backward compatibility.
 
+// Options for tree-partitioned configs (Tree-AH and Tree-BruteForce).
+struct ScannTreeOptions {
+  // Number of partitions (leaves).  0 = auto-calculate as n_points/100.
+  int num_leaves = 0;
+
+  // Maximum centroid levels in the K-means tree.
+  // 1 = two-level tree, 2 = three-level tree.
+  int max_num_levels = 1;
+
+  // Enable PCA projection in the AH quantizer.
+  bool enable_pca = true;
+};
+
 // Asymmetric-hashing (AH) scoring.
 scann_internal::ScannConfigPtr ScannAhConfig(
     int num_neighbors, int dim,
@@ -207,12 +220,14 @@ scann_internal::ScannConfigPtr ScannAhConfig(
 // Tree-partitioned + AH scoring.
 scann_internal::ScannConfigPtr ScannTreeAhConfig(
     int num_neighbors, int dim,
-    const std::string& distance_measure = "DotProductDistance");
+    const std::string& distance_measure = "DotProductDistance",
+    const ScannTreeOptions& tree_opts = {});
 
 // Tree-partitioned + brute-force scoring.
 scann_internal::ScannConfigPtr ScannTreeBruteForceConfig(
     int num_neighbors, int dim,
-    const std::string& distance_measure = "DotProductDistance");
+    const std::string& distance_measure = "DotProductDistance",
+    const ScannTreeOptions& tree_opts = {});
 
 // Brute-force scoring (no partitioning).
 //   fixed_point – when true (default), enables fixed-point quantization for

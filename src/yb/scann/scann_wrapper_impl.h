@@ -132,9 +132,12 @@ size_t ImplDimensionality(const ScannImplOpaque* impl);
 ScannConfigPtr ImplAhConfig(int num_neighbors, int dim,
                             const std::string& distance_measure = "DotProductDistance");
 ScannConfigPtr ImplTreeAhConfig(int num_neighbors, int dim,
-                                const std::string& distance_measure = "DotProductDistance");
+                                const std::string& distance_measure = "DotProductDistance",
+                                int num_leaves = 0, int max_num_levels = 1,
+                                bool enable_pca = true);
 ScannConfigPtr ImplTreeBruteForceConfig(int num_neighbors, int dim,
-                                        const std::string& distance_measure = "DotProductDistance");
+                                        const std::string& distance_measure = "DotProductDistance",
+                                        int num_leaves = 0, int max_num_levels = 1);
 ScannConfigPtr ImplBruteForceConfig(int num_neighbors, int dim, bool fixed_point,
                                     const std::string& distance_measure = "DotProductDistance");
 ScannConfigPtr ImplReorderConfig(int num_neighbors, int dim,

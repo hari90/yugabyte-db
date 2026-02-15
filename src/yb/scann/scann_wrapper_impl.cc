@@ -350,7 +350,10 @@ namespace {
 
 // Shared helper: configures the AsymmetricHasherConfig block that is common to
 // AH, TreeAH, and Reorder configs.
-void SetupAh(AsymmetricHasherConfig* ah, int dim, bool use_residual) {
+//   enable_pca – if true, uses PCA projection for automatic dimension reduction;
+//                if false, uses CHUNK projection (identity chunking).
+void SetupAh(AsymmetricHasherConfig* ah, int dim, bool use_residual,
+             bool enable_pca = true) {
   ah->set_lookup_type(AsymmetricHasherConfig::INT8_LUT16);
   ah->set_use_residual_quantization(use_residual);
   ah->set_use_global_topn(true);
@@ -359,9 +362,15 @@ void SetupAh(AsymmetricHasherConfig* ah, int dim, bool use_residual) {
 
   auto* proj = ah->mutable_projection();
   proj->set_input_dim(dim);
-  proj->set_projection_type(ProjectionConfig::CHUNK);
   proj->set_num_blocks(dim / 2);
   proj->set_num_dims_per_block(2);
+  if (enable_pca) {
+    // PCA learns an optimal rotation before chunking, improving quantization
+    // quality.  num_blocks and num_dims_per_block still define the AH structure.
+    proj->set_projection_type(ProjectionConfig::PCA);
+  } else {
+    proj->set_projection_type(ProjectionConfig::CHUNK);
+  }
 
   ah->mutable_fixed_point_lut_conversion_options()
       ->set_float_to_int_conversion_method(
@@ -396,14 +405,20 @@ ScannConfigPtr ImplAhConfig(int num_neighbors, int dim,
 }
 
 ScannConfigPtr ImplTreeAhConfig(int num_neighbors, int dim,
-                                const std::string& distance_measure) {
+                                const std::string& distance_measure,
+                                int num_leaves, int max_num_levels,
+                                bool enable_pca) {
   auto cfg = ScannConfigPtr(new ScannConfigOpaque());
   auto& config = cfg->config;
   config.set_num_neighbors(num_neighbors);
   config.mutable_distance_measure()->set_distance_measure(distance_measure);
 
+  // Default num_leaves to 100 if not specified.
+  if (num_leaves <= 0) num_leaves = 100;
+
   auto* part = config.mutable_partitioning();
-  part->set_num_children(100);
+  part->set_num_children(num_leaves);
+  part->set_max_num_levels(max_num_levels);
   part->set_min_cluster_size(20);
   part->set_max_clustering_iterations(12);
   part->set_single_machine_center_initialization(
@@ -426,7 +441,8 @@ ScannConfigPtr ImplTreeAhConfig(int num_neighbors, int dim,
 
   // Residual quantization only works with DotProductDistance.
   bool use_residual = (distance_measure == kDotProductDistance);
-  SetupAh(config.mutable_hash()->mutable_asymmetric_hash(), dim, use_residual);
+  SetupAh(config.mutable_hash()->mutable_asymmetric_hash(), dim, use_residual,
+           enable_pca);
 
   // Exact reordering re-scores the top AH candidates with exact float
   // distances, improving quality.  It also forces ScaNN to retain the raw
@@ -442,14 +458,19 @@ ScannConfigPtr ImplTreeAhConfig(int num_neighbors, int dim,
 }
 
 ScannConfigPtr ImplTreeBruteForceConfig(int num_neighbors, int dim,
-                                        const std::string& distance_measure) {
+                                        const std::string& distance_measure,
+                                        int num_leaves, int max_num_levels) {
   auto cfg = ScannConfigPtr(new ScannConfigOpaque());
   auto& config = cfg->config;
   config.set_num_neighbors(num_neighbors);
   config.mutable_distance_measure()->set_distance_measure(distance_measure);
 
+  // Default num_leaves to 100 if not specified.
+  if (num_leaves <= 0) num_leaves = 100;
+
   auto* part = config.mutable_partitioning();
-  part->set_num_children(100);
+  part->set_num_children(num_leaves);
+  part->set_max_num_levels(max_num_levels);
   part->set_min_cluster_size(10);
   part->set_max_clustering_iterations(12);
   part->set_single_machine_center_initialization(
