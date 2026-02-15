@@ -41,6 +41,11 @@ int GetNumCPUs() { return std::max(absl::base_internal::NumCPUs(), 1); }
 
 static const scann_internal::ImplStatus StatusOK = {0, ""};
 
+// ScaNN distance measure name strings.
+const std::string kCosineDistance = "CosineDistance";
+const std::string kDotProductDistance = "DotProductDistance";
+const std::string kSquaredL2Distance = "SquaredL2Distance";
+
 // Convert an absl::Status to our lightweight ImplStatus POD.
 scann_internal::ImplStatus ToImplStatus(const absl::Status& s) {
   if (s.ok()) {
@@ -133,7 +138,7 @@ ImplStatus ImplInitialize(ScannImplOpaque* impl,
     // Append operations auto-normalize new datapoints.
     if (config.config.has_distance_measure()) {
       const auto& dm = config.config.distance_measure().distance_measure();
-      if (dm == "CosineDistance") {
+      if (dm == kCosineDistance) {
         auto status = ds->NormalizeByTag(UNITL2NORM);
         if (!status.ok()) {
           return ToImplStatus(status);
@@ -156,7 +161,19 @@ ImplStatus ImplLoadFromDisk(ScannImplOpaque* impl,
   if (!load_or.ok()) {
     return ToImplStatus(load_or.status());
   }
-  return ToImplStatus(impl->scann.Initialize(std::move(load_or).value()));
+
+  // The serialized dataset.npy doesn't preserve the normalization tag.
+  // Restore it for distance measures that require unit-L2-normalised data,
+  // otherwise the factory rejects the dataset during CreateSearcher.
+  auto& [config, dataset, opts] = *load_or;
+  if (dataset && config.has_distance_measure()) {
+    const auto& dm = config.distance_measure().distance_measure();
+    if (dm == kCosineDistance || dm == kDotProductDistance) {
+      dataset->set_normalization_tag(UNITL2NORM);
+    }
+  }
+
+  return ToImplStatus(impl->scann.Initialize(std::move(*load_or)));
 }
 
 ImplStatus ImplSearch(const ScannImplOpaque* impl,
@@ -337,7 +354,7 @@ void SetupAh(AsymmetricHasherConfig* ah, int dim, bool use_residual) {
   ah->set_lookup_type(AsymmetricHasherConfig::INT8_LUT16);
   ah->set_use_residual_quantization(use_residual);
   ah->set_use_global_topn(true);
-  ah->mutable_quantization_distance()->set_distance_measure("SquaredL2Distance");
+  ah->mutable_quantization_distance()->set_distance_measure(kSquaredL2Distance);
   ah->set_num_clusters_per_block(16);
 
   auto* proj = ah->mutable_projection();
@@ -351,6 +368,13 @@ void SetupAh(AsymmetricHasherConfig* ah, int dim, bool use_residual) {
           AsymmetricHasherConfig::FixedPointLUTConversionOptions::ROUND);
   ah->set_expected_sample_size(100000);
   ah->set_max_clustering_iterations(10);
+}
+
+// Returns true if the distance measure requires unit-L2-normalised data
+// (and therefore SPHERICAL partitioning instead of GENERIC).
+bool RequiresSphericalPartitioning(const std::string& distance_measure) {
+  return distance_measure == kCosineDistance ||
+         distance_measure == kDotProductDistance;
 }
 
 }  // namespace
@@ -384,18 +408,32 @@ ScannConfigPtr ImplTreeAhConfig(int num_neighbors, int dim,
   part->set_max_clustering_iterations(12);
   part->set_single_machine_center_initialization(
       PartitioningConfig::RANDOM_INITIALIZATION);
-  part->mutable_partitioning_distance()->set_distance_measure("SquaredL2Distance");
+  // Partitioning distance must match the main distance measure's
+  // normalization requirement (e.g. CosineDistance → UNITL2NORM).
+  part->mutable_partitioning_distance()->set_distance_measure(distance_measure);
   auto* spill = part->mutable_query_spilling();
   spill->set_spilling_type(QuerySpillingConfig::FIXED_NUMBER_OF_CENTERS);
   spill->set_max_spill_centers(20);
   part->set_expected_sample_size(100000);
   part->mutable_query_tokenization_distance_override()
       ->set_distance_measure(distance_measure);
-  part->set_partitioning_type(PartitioningConfig::GENERIC);
+  // CosineDistance / DotProductDistance require SPHERICAL partitioning
+  // (spherical k-means with normalised centers).
+  part->set_partitioning_type(RequiresSphericalPartitioning(distance_measure)
+                                  ? PartitioningConfig::SPHERICAL
+                                  : PartitioningConfig::GENERIC);
   part->set_query_tokenization_type(PartitioningConfig::FLOAT);
 
-  SetupAh(config.mutable_hash()->mutable_asymmetric_hash(), dim,
-           /*use_residual=*/true);
+  // Residual quantization only works with DotProductDistance.
+  bool use_residual = (distance_measure == kDotProductDistance);
+  SetupAh(config.mutable_hash()->mutable_asymmetric_hash(), dim, use_residual);
+
+  // Exact reordering re-scores the top AH candidates with exact float
+  // distances, improving quality.  It also forces ScaNN to retain the raw
+  // float dataset, which is required for iteration during merge/compaction.
+  auto* reorder = config.mutable_exact_reordering();
+  reorder->set_approx_num_neighbors(num_neighbors * 2);
+  reorder->mutable_fixed_point()->set_enabled(false);
 
   config.mutable_input_output()->mutable_pure_dynamic_config()
       ->set_dimensionality(dim);
@@ -416,14 +454,18 @@ ScannConfigPtr ImplTreeBruteForceConfig(int num_neighbors, int dim,
   part->set_max_clustering_iterations(12);
   part->set_single_machine_center_initialization(
       PartitioningConfig::RANDOM_INITIALIZATION);
-  part->mutable_partitioning_distance()->set_distance_measure("SquaredL2Distance");
+  // Partitioning distance must match the main distance measure's
+  // normalization requirement (e.g. CosineDistance → UNITL2NORM).
+  part->mutable_partitioning_distance()->set_distance_measure(distance_measure);
   auto* spill = part->mutable_query_spilling();
   spill->set_spilling_type(QuerySpillingConfig::FIXED_NUMBER_OF_CENTERS);
   spill->set_max_spill_centers(10);
   part->set_expected_sample_size(100000);
   part->mutable_query_tokenization_distance_override()
       ->set_distance_measure(distance_measure);
-  part->set_partitioning_type(PartitioningConfig::GENERIC);
+  part->set_partitioning_type(RequiresSphericalPartitioning(distance_measure)
+                                  ? PartitioningConfig::SPHERICAL
+                                  : PartitioningConfig::GENERIC);
   part->set_query_tokenization_type(PartitioningConfig::FLOAT);
 
   config.mutable_brute_force()->mutable_fixed_point()->set_enabled(true);

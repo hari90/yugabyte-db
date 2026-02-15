@@ -78,6 +78,14 @@ constexpr int kScannMaxNeighbors = 1000;
 // ignores this, but ScaNN still requires a value).
 constexpr int kScannTrainingThreads = 1;
 
+// When the index has at least this many vectors, DoSaveToFile rebuilds
+// the index with a Tree-AH config before serializing.  Tree-AH is
+// significantly faster for search on large datasets.
+constexpr size_t kTreeAhThreshold = 100000;
+
+// Number of training threads used when rebuilding for Tree-AH on save.
+constexpr int kTreeAhTrainingThreads = 4;
+
 // UUID size in bytes (VectorId is a UUID).
 constexpr size_t kUuidBytes = 16;
 
@@ -318,9 +326,21 @@ class ScannIndex :
   // ---------------------------------------------------------------------------
 
   Result<VectorIndexIfPtr<Vector, DistanceResult>> DoSaveToFile(const std::string& path) {
-    LOG(INFO) << "ScaNN: DoSaveToFile: Count: " << Size() << ", path: " << path;
-    // ScannWrapper::Serialize writes multiple files into a directory.
+    const auto n = Size();
+    LOG(INFO) << "ScaNN: DoSaveToFile: Count: " << n << ", path: " << path;
     RETURN_NOT_OK(Env::Default()->CreateDirs(path));
+
+    if (n >= kTreeAhThreshold) {
+      // Rebuild as Tree-AH for faster search on large datasets.
+      // CosineDistance and DotProductDistance require L2-normalised vectors
+      // for Tree-AH's asymmetric hashing to pass the factory validation.
+      bool normalize = options_.distance_kind != DistanceKind::kL2Squared;
+      auto config = scann::ScannTreeAhConfig(
+          kScannMaxNeighbors, static_cast<int>(options_.dimensions),
+          ScannDistanceMeasure(options_.distance_kind));
+      RETURN_NOT_OK(scann_.Rebuild(config, kTreeAhTrainingThreads, normalize));
+    }
+
     RETURN_NOT_OK(scann_.Serialize(path));
     return nullptr;
   }

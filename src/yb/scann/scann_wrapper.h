@@ -114,6 +114,20 @@ class ScannWrapper {
   // when incremental maintenance signals that the index has drifted too far.
   Status Retrain();
 
+  // Rebuild the index with a different ScaNN config.
+  //
+  // Collects all vectors from the current index, re-initializes a fresh
+  // ScaNN instance with the given config (which triggers training for
+  // tree/AH configs).  The existing label map is reused as-is, avoiding any label re-collection.
+  //
+  //   config           – the new ScaNN config (e.g. from ScannTreeAhConfig).
+  //   training_threads – number of threads for training/indexing.
+  //   normalize        – if true, L2-normalize each vector before rebuilding.
+  //                      Required for CosineDistance / DotProductDistance with
+  //                      Tree-AH, whose asymmetric hashing expects unit vectors.
+  Status Rebuild(const scann_internal::ScannConfigPtr& config, int training_threads,
+                 bool normalize = false);
+
   // ---------------------------------------------------------------------------
   // Search
   // ---------------------------------------------------------------------------
