@@ -27,11 +27,25 @@ namespace yb::vector_index {
 template<class Impl, IndexableVectorType Vector, ValidDistanceResultType DistanceResult>
 class IndexWrapperBase : public VectorIndexIf<Vector, DistanceResult> {
  public:
+  using BatchEntry = InsertBatchEntry<Vector>;
+
   Status Insert(VectorId vector_id, const Vector& v, Slice aux_data = Slice()) override {
     if (immutable_) {
       return STATUS_FORMAT(IllegalState, "Attempt to insert value to immutable vector");
     }
     RETURN_NOT_OK(impl().DoInsert(vector_id, v, aux_data));
+    return Status::OK();
+  }
+
+  // Default InsertBatch: check immutability, then delegate each entry to DoInsert.
+  // Subclasses like ScannIndex override this for efficient batch processing.
+  Status InsertBatch(const std::vector<BatchEntry>& entries) override {
+    if (immutable_) {
+      return STATUS_FORMAT(IllegalState, "Attempt to insert values to immutable vector");
+    }
+    for (const auto& e : entries) {
+      RETURN_NOT_OK(impl().DoInsert(e.vector_id, e.vector, Slice(e.aux_data)));
+    }
     return Status::OK();
   }
 

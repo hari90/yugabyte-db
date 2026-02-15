@@ -67,8 +67,17 @@ class VectorIndexReaderIf {
 };
 
 template<IndexableVectorType Vector>
+struct InsertBatchEntry {
+  VectorId vector_id;
+  Vector vector;
+  std::string aux_data;
+};
+
+template<IndexableVectorType Vector>
 class VectorIndexWriterIf {
  public:
+  using BatchEntry = InsertBatchEntry<Vector>;
+
   virtual ~VectorIndexWriterIf() = default;
 
   // Reserves capacity for this number of vectors.
@@ -84,6 +93,16 @@ class VectorIndexWriterIf {
   // aux_data is optional auxiliary data stored alongside the vector (e.g. ybctid).
   // Backends that don't need it may ignore the parameter.
   virtual Status Insert(VectorId vector_id, const Vector& vector, Slice aux_data = Slice()) = 0;
+
+  // Batch insert. Default implementation calls Insert() in a loop.
+  // Override for backends that can process batches more efficiently (e.g. ScaNN
+  // uses parallel precomputation and a single maintenance pass).
+  virtual Status InsertBatch(const std::vector<BatchEntry>& entries) {
+    for (const auto& e : entries) {
+      RETURN_NOT_OK(Insert(e.vector_id, e.vector, Slice(e.aux_data)));
+    }
+    return Status::OK();
+  }
 };
 
 template<IndexableVectorType Vector, ValidDistanceResultType DistanceResult>

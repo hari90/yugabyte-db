@@ -209,6 +209,70 @@ class ScannIndex :
     return Status::OK();
   }
 
+  // ---------------------------------------------------------------------------
+  // Batch insert — overrides IndexWrapperBase default for efficient ScaNN
+  // batch processing: parallel precomputation of mutation artifacts and a
+  // single maintenance pass instead of per-vector maintenance.
+  // ---------------------------------------------------------------------------
+  using BatchEntry = vector_index::InsertBatchEntry<Vector>;
+
+  Status InsertBatch(const std::vector<BatchEntry>& entries) override {
+    if (entries.empty()) {
+      return Status::OK();
+    }
+
+    const size_t dims = options_.dimensions;
+    const size_t n = entries.size();
+
+    // Build a flat row-major float dataset and docid list.
+    std::vector<float> flat_dataset;
+    flat_dataset.reserve(n * dims);
+    std::vector<std::string> docids;
+    docids.reserve(n);
+
+    for (const auto& e : entries) {
+      for (auto val : e.vector) {
+        flat_dataset.push_back(static_cast<float>(val));
+      }
+      docids.push_back(e.vector_id.ToString());
+    }
+
+    std::lock_guard lock(mutex_);
+
+    if (!initialized_) {
+      // First batch — initialise ScaNN with all vectors as the seed dataset.
+      auto config = scann::ScannBruteForceConfig(
+          kScannMaxNeighbors,
+          static_cast<int>(dims),
+          /*fixed_point=*/false,
+          ScannDistanceMeasure(options_.distance_kind));
+
+      RETURN_NOT_OK(scann_.Initialize(
+          flat_dataset,
+          /*n_points=*/static_cast<uint32_t>(n),
+          config,
+          kScannTrainingThreads,
+          /*label_width=*/0,
+          /*labels=*/{}));
+
+      initialized_ = true;
+    } else {
+      // Batch insert into an already-initialized index using parallel
+      // precomputation and single maintenance.
+      VERIFY_RESULT(scann_.InsertBatch(
+          flat_dataset, n, docids,
+          /*label_width=*/0, /*labels=*/{}));
+    }
+
+    // Update local bookkeeping for iteration / persistence / search.
+    for (const auto& e : entries) {
+      entries_.emplace_back(e.vector_id, e.vector);
+      ybctids_.emplace_back(e.aux_data);
+    }
+
+    return Status::OK();
+  }
+
   size_t Size() const override {
     return entries_.size();
   }

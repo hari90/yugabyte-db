@@ -97,6 +97,24 @@ class ScannWrapper {
                          const std::string& docid,
                          Slice label);
 
+  // Batch insert: adds multiple datapoints using parallel precomputation of
+  // mutation artifacts and a single maintenance pass at the end.
+  //
+  //   dataset     – flat row-major float vector of size (n_points * dim).
+  //   n_points    – number of vectors.
+  //   docids      – one string identifier per vector.
+  //   label_width – fixed width in bytes for each label.
+  //   labels      – one label per vector (size must match n_points if
+  //                 label_width > 0).
+  //
+  // Returns the assigned datapoint indices on success.
+  Result<std::vector<int32_t>> InsertBatch(
+      const std::vector<float>& dataset,
+      size_t n_points,
+      const std::vector<std::string>& docids,
+      size_t label_width,
+      const std::vector<Slice>& labels);
+
   // Delete a datapoint by its string docid.
   Status Delete(const std::string& docid);
 

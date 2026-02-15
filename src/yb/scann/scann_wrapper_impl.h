@@ -106,6 +106,16 @@ ImplStatus ImplInsert(ScannImplOpaque* impl,
                       const std::string& docid,
                       int32_t* assigned_index);
 
+// Batch insert: inserts n_points vectors from a flat row-major dataset using
+// parallel precomputation of mutation artifacts and a single maintenance pass
+// at the end (instead of per-vector maintenance).
+ImplStatus ImplInsertBatch(ScannImplOpaque* impl,
+                           const float* dataset, size_t dataset_size,
+                           size_t n_points,
+                           const std::vector<std::string>& docids,
+                           std::vector<int32_t>* assigned_indices,
+                           bool* retrain_needed);
+
 ImplStatus ImplDelete(ScannImplOpaque* impl, const std::string& docid);
 ImplStatus ImplDelete(ScannImplOpaque* impl, int32_t index);
 

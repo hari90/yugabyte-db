@@ -137,6 +137,33 @@ Result<int32_t> ScannWrapper::Insert(const std::vector<float>& datapoint,
   return assigned_index;
 }
 
+Result<std::vector<int32_t>> ScannWrapper::InsertBatch(
+    const std::vector<float>& dataset,
+    size_t n_points,
+    const std::vector<std::string>& docids,
+    size_t label_width,
+    const std::vector<Slice>& labels) {
+  Timer timer("InsertBatch");
+
+  std::vector<int32_t> assigned_indices;
+  bool retrain_needed = false;
+  auto impl_status = scann_internal::ImplInsertBatch(
+      impl_.get(), dataset.data(), dataset.size(), n_points,
+      docids, &assigned_indices, &retrain_needed);
+  if (!impl_status.ok()) {
+    return ImplToYbStatus(impl_status);
+  }
+
+  // Update label map for all inserted datapoints.
+  if (label_width > 0) {
+    for (size_t i = 0; i < n_points && i < labels.size(); ++i) {
+      labels_.Put(assigned_indices[i], labels[i]);
+    }
+  }
+
+  return assigned_indices;
+}
+
 Status ScannWrapper::Delete(const std::string& docid) {
   // NOTE: Delete-by-docid cannot efficiently clean up the label map because
   // the mapping from docid to index is internal to ScaNN.  The label entry

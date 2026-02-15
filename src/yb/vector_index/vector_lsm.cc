@@ -283,10 +283,13 @@ class VectorLSMInsertTask :
 
   Status DoInsert() {
     DCHECK(index_);
+    using BatchEntry = vector_index::InsertBatchEntry<Vector>;
+    std::vector<BatchEntry> batch;
+    batch.reserve(vectors_.size());
     for (const auto& item : vectors_) {
-      RETURN_NOT_OK(index_->Insert(item.vector_id, item.vector, item.aux_data));
+      batch.push_back({item.vector_id, item.vector, item.aux_data});
     }
-    return Status::OK();
+    return index_->InsertBatch(batch);
   }
 
   mutable rw_spinlock mutex_;

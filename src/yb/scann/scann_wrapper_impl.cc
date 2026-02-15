@@ -239,6 +239,68 @@ ImplStatus ImplInsert(
   return StatusOK;
 }
 
+ImplStatus ImplInsertBatch(
+    ScannImplOpaque* impl, const float* dataset, size_t dataset_size,
+    size_t n_points, const std::vector<std::string>& docids,
+    std::vector<int32_t>* assigned_indices, bool* retrain_needed) {
+  using MutationOptions = UntypedSingleMachineSearcherBase::MutationOptions;
+
+  auto mutator_or = impl->scann.GetMutator();
+  if (!mutator_or.ok()) {
+    return ToImplStatus(mutator_or.status());
+  }
+  auto* mutator = mutator_or.value();
+
+  // Use the parallel query pool for precomputation of mutation artifacts.
+  auto pool = impl->scann.parallel_query_pool();
+  if (pool) {
+    mutator->set_mutation_threadpool(pool);
+  }
+
+  DimensionIndex dim = ImplDimensionality(impl);
+
+  // Build DenseDataset for batch precomputation.
+  DenseDataset<float> ds(
+      std::vector<float>(dataset, dataset + dataset_size), n_points);
+
+  // Precompute mutation artifacts in parallel (e.g. tree tokenization).
+  // For brute-force configs this returns nullptrs, which is harmless.
+  auto precomputed = mutator->ComputePrecomputedMutationArtifacts(ds, pool);
+
+  assigned_indices->resize(n_points);
+
+  for (size_t i = 0; i < n_points; ++i) {
+    MutationOptions mo;
+    if (i < precomputed.size() && precomputed[i]) {
+      mo.precomputed_mutation_artifacts = precomputed[i].get();
+    }
+    const float* dp = dataset + i * dim;
+    auto index_or = mutator->AddDatapoint(
+        MakeDatapointPtr(dp, static_cast<DimensionIndex>(dim)),
+        docids[i], mo);
+    if (!index_or.ok()) {
+      return ToImplStatus(index_or.status());
+    }
+    (*assigned_indices)[i] = static_cast<int32_t>(index_or.value());
+  }
+
+  // Run maintenance once for the entire batch instead of per vector.
+  auto maint_or = mutator->IncrementalMaintenance();
+  if (!maint_or.ok()) {
+    return ToImplStatus(maint_or.status());
+  }
+  *retrain_needed = maint_or.value().has_value();
+  if (*retrain_needed) {
+    auto status_or = impl->scann.RetrainAndReindex(
+        ConfigToString(maint_or.value().value()));
+    if (!status_or.ok()) {
+      return ToImplStatus(status_or.status());
+    }
+  }
+
+  return StatusOK;
+}
+
 ImplStatus ImplDelete(ScannImplOpaque* impl, const std::string& docid) {
   auto mutator_or = impl->scann.GetMutator();
   if (!mutator_or.ok()) {
