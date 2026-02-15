@@ -70,6 +70,7 @@ METRIC_DEFINE_event_stats(table, vector_index_result_size,
     "Resulting entries of vector index search", yb::MetricUnit::kEntries,
     "Number of entries returned by vector index search.");
 
+DECLARE_bool(vector_index_scann_skip_reverse_entry);
 DECLARE_bool(vector_index_dump_stats);
 DECLARE_bool(vector_index_skip_filter_check);
 
@@ -349,7 +350,7 @@ class DocVectorIndexImpl : public DocVectorIndex {
     result.entries.reserve(entries.size());
     for (auto& entry : entries) {
       Slice ybctid;
-      if (!entry.ybctid.empty()) {
+      if (FLAGS_vector_index_scann_skip_reverse_entry && !entry.ybctid.empty()) {
         // Fast path: ybctid was stored directly in the index (e.g. ScaNN).
         ybctid = Slice(entry.ybctid);
       } else {

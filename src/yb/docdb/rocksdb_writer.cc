@@ -56,6 +56,9 @@ DEFINE_UNKNOWN_int32(txn_max_apply_batch_records, 100000,
              "When a transaction's data in one tablet does not fit into specified number of "
              "records, it will be applied using multiple RocksDB write batches.");
 
+DEFINE_RUNTIME_bool(vector_index_scann_skip_reverse_entry, true,
+    "Whether to skip reverse entry for ScaNN vector indexes.");
+
 DEFINE_test_flag(bool, docdb_sort_weak_intents, false,
                 "Sort weak intents to make their order deterministic.");
 DEFINE_test_flag(bool, fail_on_replicated_batch_idx_set_in_txn_record, false,
@@ -852,7 +855,8 @@ Status ApplyIntentsContext::ProcessVectorIndexes(
             });
           }
           if (need_reverse_entry &&
-              vector_index.options().hnsw().backend() != HnswBackend::SCANN) {
+              (!FLAGS_vector_index_scann_skip_reverse_entry ||
+               vector_index.options().hnsw().backend() != HnswBackend::SCANN)) {
             DocVectorIndex::ApplyReverseEntry(
                 handler, ybctid, value, DocHybridTime(commit_ht_, write_id_));
             need_reverse_entry = false;
