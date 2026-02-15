@@ -17,9 +17,9 @@
 // The distance measure is derived from HNSWOptions::distance_kind so that
 // ScaNN's search results are directly usable without recomputation.
 //
-// Persistence stores every (VectorId, ybctid, Vector) tuple in a single flat
-// binary file.  On load the ScaNN index is rebuilt from the raw vectors so
-// there is no dependency on ScaNN's own serialization format.
+// Persistence is delegated to ScannWrapper::Serialize() and
+// ScannWrapper::LoadFromDisk(), which store / restore the ScaNN index and its
+// label map to / from a directory on disk.
 //
 // The ScaNN label for each datapoint is the concatenation of the 16-byte
 // VectorId UUID and the variable-length ybctid:
@@ -27,22 +27,22 @@
 //   label = [16 bytes VectorId][ybctid bytes]
 //
 // On search, VectorId and ybctid are decoded directly from the label
-// returned in ScannSearchResult, avoiding any lookup into entries_.
+// returned in ScannSearchResult, avoiding any external lookup.
 //
 // Vector id is not stored in ScaNN as a docid — a simple sequential counter
 // is used instead.  The adapter keeps a local entries_ vector for
-// iteration / persistence.
+// iteration during the in-memory (mutable) phase.
 
 #include "yb/ann_methods/scann_wrapper_adapter.h"
 
 #include <cstring>
-#include <fstream>
 #include <mutex>
 #include <utility>
 #include <vector>
 
 #include "yb/gutil/casts.h"
 
+#include "yb/util/env.h"
 #include "yb/util/status.h"
 
 #include "yb/vector_index/distance.h"
@@ -135,19 +135,8 @@ std::string DecodeYbctid(const std::string& label) {
 }
 
 // ---------------------------------------------------------------------------
-// File format for SaveToFile / LoadFromFile
-//
-//   [uint32_t] dimensions
-//   [uint32_t] num_vectors
-//   For each vector:
-//     [16 bytes]                           VectorId UUID
-//     [uint16_t]                           ybctid_length (0 if absent)
-//     [ybctid_length bytes]                ybctid data
-//     [dimensions * sizeof(float)]         vector data (as float)
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
 // Internal entry type — holds VectorId, Vector, and ybctid together.
+// Used during the mutable (in-memory) phase for iteration.
 // ---------------------------------------------------------------------------
 
 template <IndexableVectorType Vector>
@@ -259,13 +248,13 @@ class ScannIndex :
       VERIFY_RESULT(scann_.Insert(fvec, docid, Slice(label)));
     }
 
-    // Keep a local copy for iteration / persistence.
+    // Keep a local copy for iteration during the mutable phase.
     entries_.push_back({vector_id, v, ybctid.ToBuffer()});
     return Status::OK();
   }
 
   size_t Size() const override {
-    return entries_.size();
+    return initialized_ ? scann_.n_points() : 0;
   }
 
   size_t Capacity() const override {
@@ -331,131 +320,18 @@ class ScannIndex :
   // ---------------------------------------------------------------------------
 
   Result<VectorIndexIfPtr<Vector, DistanceResult>> DoSaveToFile(const std::string& path) {
-    std::ofstream out(path, std::ios::binary);
-    if (!out) {
-      return STATUS_FORMAT(IOError, "Cannot open $0 for writing", path);
-    }
-
-    auto dims = static_cast<uint32_t>(options_.dimensions);
-    auto count = static_cast<uint32_t>(entries_.size());
-    out.write(reinterpret_cast<const char*>(&dims), sizeof(dims));
-    out.write(reinterpret_cast<const char*>(&count), sizeof(count));
-
-    for (const auto& entry : entries_) {
-      // Write the 16-byte VectorId UUID.
-      out.write(reinterpret_cast<const char*>(entry.vector_id.data()), kUuidBytes);
-
-      // Write ybctid: [uint16_t length][data].
-      auto ybctid_len = static_cast<uint16_t>(entry.ybctid.size());
-      out.write(reinterpret_cast<const char*>(&ybctid_len), sizeof(ybctid_len));
-      if (ybctid_len > 0) {
-        out.write(entry.ybctid.data(), ybctid_len);
-      }
-
-      // Write the vector as floats.
-      std::vector<float> fvec(entry.vector.begin(), entry.vector.end());
-      out.write(reinterpret_cast<const char*>(fvec.data()),
-                static_cast<std::streamsize>(dims * sizeof(float)));
-    }
-
-    if (!out) {
-      return STATUS_FORMAT(IOError, "Error writing ScaNN index to $0", path);
-    }
-
+    // ScannWrapper::Serialize writes multiple files into a directory.
+    RETURN_NOT_OK(Env::Default()->CreateDirs(path));
+    RETURN_NOT_OK(scann_.Serialize(path));
     return nullptr;
   }
 
   Status DoLoadFromFile(const std::string& path, size_t) {
-    std::ifstream in(path, std::ios::binary);
-    if (!in) {
-      return STATUS_FORMAT(IOError, "Cannot open $0 for reading", path);
-    }
-
-    uint32_t dims = 0;
-    uint32_t count = 0;
-    in.read(reinterpret_cast<char*>(&dims), sizeof(dims));
-    in.read(reinterpret_cast<char*>(&count), sizeof(count));
-    if (!in) {
-      return STATUS_FORMAT(Corruption, "Failed to read header from $0", path);
-    }
-
-    if (dims != options_.dimensions) {
-      return STATUS_FORMAT(
-          Corruption,
-          "Dimension mismatch in $0: file has $1, expected $2",
-          path, dims, options_.dimensions);
-    }
-
-    // Read all entries.
-    entries_.clear();
-    entries_.reserve(count);
-
-    std::vector<float> flat_dataset;
-    flat_dataset.reserve(static_cast<size_t>(count) * dims);
-
-    // Build encoded labels (VectorId + ybctid) for ScaNN initialization.
-    std::vector<std::string> label_storage;
-    label_storage.reserve(count);
-
-    for (uint32_t i = 0; i < count; ++i) {
-      // Read VectorId.
-      uint8_t uuid_bytes[kUuidBytes];
-      in.read(reinterpret_cast<char*>(uuid_bytes), kUuidBytes);
-      if (!in) {
-        return STATUS_FORMAT(Corruption, "Failed to read VectorId $0 from $1", i, path);
-      }
-      auto vid = VectorId(Uuid::TryFullyDecode(Slice(uuid_bytes, kUuidBytes)));
-
-      // Read ybctid: [uint16_t length][data].
-      uint16_t ybctid_len = 0;
-      in.read(reinterpret_cast<char*>(&ybctid_len), sizeof(ybctid_len));
-      if (!in) {
-        return STATUS_FORMAT(Corruption, "Failed to read ybctid length $0 from $1", i, path);
-      }
-      std::string ybctid;
-      if (ybctid_len > 0) {
-        ybctid.resize(ybctid_len);
-        in.read(ybctid.data(), ybctid_len);
-        if (!in) {
-          return STATUS_FORMAT(Corruption, "Failed to read ybctid data $0 from $1", i, path);
-        }
-      }
-
-      // Read vector data as floats.
-      std::vector<float> fvec(dims);
-      in.read(reinterpret_cast<char*>(fvec.data()),
-              static_cast<std::streamsize>(dims * sizeof(float)));
-      if (!in) {
-        return STATUS_FORMAT(Corruption, "Failed to read vector $0 from $1", i, path);
-      }
-
-      // Build encoded label (VectorId + ybctid) for ScaNN.
-      label_storage.push_back(EncodeLabel(vid, Slice(ybctid)));
-
-      // Build the typed vector and collect into entries_.
-      Vector vec(fvec.begin(), fvec.end());
-      entries_.push_back({vid, std::move(vec), std::move(ybctid)});
-
-      flat_dataset.insert(flat_dataset.end(), fvec.begin(), fvec.end());
-    }
-
-    // Build Slice labels pointing into label_storage.
-    std::vector<Slice> labels;
-    labels.reserve(count);
-    for (const auto& s : label_storage) {
-      labels.emplace_back(s);
-    }
-
-    // Rebuild the ScaNN index from the raw vectors with encoded labels.
-    auto config = scann::ScannBruteForceConfig(
-        kScannMaxNeighbors, static_cast<int>(dims), /*fixed_point=*/false,
-        ScannDistanceMeasure(options_.distance_kind));
-
-    RETURN_NOT_OK(scann_.Initialize(
-        flat_dataset, count, config, kScannTrainingThreads, labels));
-
+    // ScannWrapper::LoadFromDisk restores the ScaNN index and the label map
+    // from the artifacts directory written by Serialize().
+    RETURN_NOT_OK(scann_.LoadFromDisk(path));
     initialized_ = true;
-    capacity_ = std::max(capacity_, static_cast<size_t>(count));
+    capacity_ = std::max(capacity_, scann_.n_points());
     return Status::OK();
   }
 
@@ -477,7 +353,7 @@ class ScannIndex :
 
   std::string IndexStatsStr() const override {
     return Format("ScaNN brute-force index, $0 vectors, $1 dimensions",
-                  entries_.size(), options_.dimensions);
+                  Size(), options_.dimensions);
   }
 
  private:
@@ -496,8 +372,9 @@ class ScannIndex :
   // Sequential docid counter for ScaNN Insert (vector id is not used as docid).
   uint64_t next_docid_ = 1;
 
-  // Local copy of all entries for iteration and persistence.
+  // Local copy of all entries for iteration during the mutable phase.
   // Each entry holds VectorId, Vector, and ybctid.
+  // Not populated when loading from disk (the index is immutable after load).
   std::vector<StoredEntry<Vector>> entries_;
 };
 
