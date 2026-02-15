@@ -152,21 +152,19 @@ class ScannVectorIterator : public AbstractIterator<std::pair<VectorId, Vector>>
 
  protected:
   IterEntry Dereference() const override {
-    // Decode VectorId from the label (first 16 bytes).
-    auto label = scann_->GetLabel(static_cast<int32_t>(position_));
-    auto vid = DecodeVectorId(std::string(label.cdata(), label.size()));
-
-    // Retrieve the vector from the ScaNN index.
+    // Retrieve both vector and label in a single call.
     auto dp_result = scann_->GetDatapoint(static_cast<int32_t>(position_));
-    Vector vec;
-    if (dp_result.ok()) {
-      const auto& fvec = *dp_result;
-      vec.assign(fvec.begin(), fvec.end());
-    } else {
+    if (!dp_result.ok()) {
       LOG(DFATAL) << "Failed to get datapoint " << position_
                   << " from ScaNN index: " << dp_result.status();
-      vec.resize(scann_->dimensionality(), 0);
+      return {VectorId(), Vector(scann_->dimensionality(), 0)};
     }
+    auto& dp = *dp_result;
+
+    // Decode VectorId from the label (first 16 bytes).
+    auto vid = DecodeVectorId(dp.label);
+
+    Vector vec(dp.vector.begin(), dp.vector.end());
     return {vid, std::move(vec)};
   }
 

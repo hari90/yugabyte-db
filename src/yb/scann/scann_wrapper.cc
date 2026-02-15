@@ -253,13 +253,15 @@ Slice ScannWrapper::GetLabel(int32_t index) const {
   return labels_.Get(index);
 }
 
-Result<std::vector<float>> ScannWrapper::GetDatapoint(int32_t index) const {
-  std::vector<float> result;
-  auto impl_status = scann_internal::ImplGetDatapoint(impl_.get(), index, &result);
+Result<ScannWrapper::Datapoint> ScannWrapper::GetDatapoint(int32_t index) const {
+  Datapoint dp;
+  auto impl_status = scann_internal::ImplGetDatapoint(impl_.get(), index, &dp.vector);
   if (!impl_status.ok()) {
     return ImplToYbStatus(impl_status);
   }
-  return result;
+  auto label_slice = labels_.Get(index);
+  dp.label.assign(label_slice.cdata(), label_slice.size());
+  return dp;
 }
 
 void ScannWrapper::SetNumThreads(int num_threads) {
