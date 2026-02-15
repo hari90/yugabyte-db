@@ -249,10 +249,6 @@ Status ScannWrapper::Serialize(const std::string& path) {
 
 // -- Configuration ------------------------------------------------------------
 
-Slice ScannWrapper::GetLabel(int32_t index) const {
-  return labels_.Get(index);
-}
-
 Result<ScannWrapper::Datapoint> ScannWrapper::GetDatapoint(int32_t index) const {
   Datapoint dp;
   auto impl_status = scann_internal::ImplGetDatapoint(impl_.get(), index, &dp.vector);

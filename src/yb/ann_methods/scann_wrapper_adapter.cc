@@ -31,7 +31,7 @@
 //
 // Vector id is not stored in ScaNN as a docid — a simple sequential counter
 // is used instead.  Iteration reads vectors and labels directly from the
-// ScaNN index via ScannWrapper::GetDatapoint() and ScannWrapper::GetLabel().
+// ScaNN index via ScannWrapper::GetDatapoint().
 
 #include "yb/ann_methods/scann_wrapper_adapter.h"
 
@@ -136,8 +136,8 @@ std::string DecodeYbctid(const std::string& label) {
 
 // ---------------------------------------------------------------------------
 // ScannVectorIterator — iterates over the ScaNN index, producing
-// (VectorId, Vector) pairs by reading labels and vectors directly from the
-// ScannWrapper via GetLabel() and GetDatapoint().
+// (VectorId, Vector) pairs by reading vectors and labels directly from the
+// ScannWrapper via GetDatapoint().
 // ---------------------------------------------------------------------------
 
 template <IndexableVectorType Vector, ValidDistanceResultType DistanceResult>
