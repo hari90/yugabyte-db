@@ -42,9 +42,6 @@ using yb::scann_internal::ScannConfigPtr;
 
 using Clock = std::chrono::high_resolution_clock;
 
-// Default label size for CLI (16 bytes).
-constexpr size_t kDefaultLabelSize = 16;
-
 // ---------------------------------------------------------------------------
 // Shared REPL state
 // ---------------------------------------------------------------------------
