@@ -250,8 +250,8 @@ class VectorLSMInsertTask :
     insert_callback_ = std::move(insert_callback);
   }
 
-  void Add(VectorId vector_id, Vector&& vector, std::string aux_data = {}) {
-    vectors_.push_back({vector_id, std::move(vector), std::move(aux_data)});
+  void Add(VectorId vector_id, Vector&& vector, std::string ybctid = {}) {
+    vectors_.push_back({vector_id, std::move(vector), std::move(ybctid)});
   }
 
   void Run() override {
@@ -278,13 +278,13 @@ class VectorLSMInsertTask :
   struct InsertItem {
     VectorId vector_id;
     Vector vector;
-    std::string aux_data;
+    std::string ybctid;
   };
 
   Status DoInsert() {
     DCHECK(index_);
     for (const auto& item : vectors_) {
-      RETURN_NOT_OK(index_->Insert(item.vector_id, item.vector, item.aux_data));
+      RETURN_NOT_OK(index_->Insert(item.vector_id, item.vector, item.ybctid));
     }
     return Status::OK();
   }
@@ -1290,7 +1290,7 @@ Status VectorLSM<Vector, DistanceResult>::Insert(
       ++tasks_it;
       index_in_task = 0;
     }
-    tasks_it->Add(entry.vector_id, std::move(entry.vector), std::move(entry.aux_data));
+    tasks_it->Add(entry.vector_id, std::move(entry.vector), std::move(entry.ybctid));
   }
   insert_registry_->ExecuteTasks(tasks);
 

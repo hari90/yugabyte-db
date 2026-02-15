@@ -140,7 +140,7 @@ class YbHnswIndex :
     return index_.Search(query_vector.data(), options, context->context);
   }
 
-  Status DoInsert(VectorId vector_id, const Vector& v, Slice /*aux_data*/ = Slice()) {
+  Status DoInsert(VectorId vector_id, const Vector& v, Slice /*ybctid*/ = Slice()) {
     return STATUS_FORMAT(NotSupported, "DoInsert not implemented");
   }
 
