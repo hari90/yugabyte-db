@@ -152,18 +152,17 @@ size_t MaxConcurrentReads() {
 // Return the total size of a chunk path.  If `path` is a regular file return
 // its size directly; if it is a directory, sum the sizes of every file inside
 // it (recursively).
-Result<uint64_t> GetChunkSize(Env* env, const std::string& path) {
-  auto is_dir = VERIFY_RESULT(env->IsDirectory(path));
-  if (!is_dir) {
-    return env->GetFileSize(path);
+Result<uint64_t> GetChunkSize(Env& env, const std::string& path) {
+  if (!VERIFY_RESULT(env.IsDirectory(path))) {
+    return env.GetFileSize(path);
   }
   uint64_t total = 0;
-  RETURN_NOT_OK(env->Walk(
+  RETURN_NOT_OK(env.Walk(
       path, Env::DirectoryOrder::PRE_ORDER,
-      [env, &total](Env::FileType type, const std::string& dir, const std::string& name)
+      [&env, &total](Env::FileType type, const std::string& dir, const std::string& name)
           -> Status {
         if (type == Env::FILE_TYPE) {
-          total += VERIFY_RESULT(env->GetFileSize(JoinPathSegments(dir, name)));
+          total += VERIFY_RESULT(env.GetFileSize(JoinPathSegments(dir, name)));
         }
         return Status::OK();
       }));
@@ -172,28 +171,26 @@ Result<uint64_t> GetChunkSize(Env* env, const std::string& path) {
 
 // Link or copy a chunk from `src` to `dest`.  For plain files this creates a
 // hard link; for directories it recursively hard-links every contained file.
-Status LinkChunk(Env* env, const std::string& src, const std::string& dest) {
-  auto is_dir = VERIFY_RESULT(env->IsDirectory(src));
-  if (!is_dir) {
-    return env->LinkFile(src, dest);
+Status LinkChunk(Env& env, const std::string& src, const std::string& dest) {
+  if (!VERIFY_RESULT(env.IsDirectory(src))) {
+    return env.LinkFile(src, dest);
   }
   return CopyDirectory(
-      env, src, dest,
+      &env, src, dest,
       CopyOption::kCreateIfMissing, CopyOption::kUseHardLinks, CopyOption::kRecursive);
 }
 
 // Delete a chunk at `path`.  Handles both plain files and directories.
-Status DeleteChunk(Env* env, const std::string& path) {
-  auto is_dir = VERIFY_RESULT(env->IsDirectory(path));
-  if (!is_dir) {
-    return env->DeleteFile(path);
+Status DeleteChunk(Env& env, const std::string& path) {
+  if (!VERIFY_RESULT(env.IsDirectory(path))) {
+    return env.DeleteFile(path);
   }
-  return env->DeleteRecursively(path);
+  return env.DeleteRecursively(path);
 }
 
 // Check whether a chunk exists at `path` (file or directory).
-bool ChunkExists(Env* env, const std::string& path) {
-  return env->FileExists(path) || env->DirExists(path);
+bool ChunkExists(Env& env, const std::string& path) {
+  return env.FileExists(path) || env.DirExists(path);
 }
 
 int32_t CompactionPriorityStartBound() {
@@ -1277,7 +1274,7 @@ Status VectorLSM<Vector, DistanceResult>::CreateCheckpoint(const std::string& ou
     if (chunk->file) {
       const auto serial_no = chunk->file->serial_no();
       RETURN_NOT_OK(LinkChunk(
-          env_,
+          *env_,
           GetChunkPath(options_, serial_no),
           GetChunkPath(out, options_.file_extension, serial_no)));
     }
@@ -1629,7 +1626,7 @@ auto VectorLSM<Vector, DistanceResult>::SaveIndexToFile(VectorIndex& index, uint
   auto new_index = VERIFY_RESULT(index.SaveToFile(file_path));
   auto& actual_index = new_index ? *new_index : index;
 
-  const auto file_size = VERIFY_RESULT(GetChunkSize(env_, file_path));
+  const auto file_size = VERIFY_RESULT(GetChunkSize(*env_, file_path));
   LOG_WITH_PREFIX(INFO) << Format(
       "Saved vector index on disk, serial_no: $0, num entries: $1, file size: $2, path: $3",
       serial_no, actual_index.Size(), file_size, file_path);
@@ -1804,7 +1801,7 @@ Status VectorLSM<Vector, DistanceResult>::RollChunk(size_t min_vectors) {
 
 template<IndexableVectorType Vector, ValidDistanceResultType DistanceResult>
 Result<uint64_t> VectorLSM<Vector, DistanceResult>::GetChunkFileSize(uint64_t serial_no) const {
-  return GetChunkSize(env_, GetChunkPath(options_, serial_no));
+  return GetChunkSize(*env_, GetChunkPath(options_, serial_no));
 }
 
 template<IndexableVectorType Vector, ValidDistanceResultType DistanceResult>
@@ -2065,12 +2062,12 @@ void VectorLSM<Vector, DistanceResult>::DeleteFile(const VectorLSMFileMetaData& 
   DCHECK(file.IsObsolete());
 
   auto path = GetChunkPath(options_, file.serial_no());
-  if (!ChunkExists(env_, path)) {
+  if (!ChunkExists(*env_, path)) {
     LOG_WITH_PREFIX(WARNING) << "Chunk does not exist " << path;
     return;
   }
 
-  auto status = DeleteChunk(env_, path);
+  auto status = DeleteChunk(*env_, path);
   if (status.ok()) {
     LOG_WITH_PREFIX(INFO) << "Deleted chunk " << path;
   } else {
