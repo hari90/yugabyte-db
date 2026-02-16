@@ -139,6 +139,10 @@
           <protocExecutable>${project.basedir}/dev-support/build-proto.sh</protocExecutable>
           <excludes>
             <exclude>**/*test*.proto</exclude>
+            <!-- ScaNN protos use import paths relative to src/yb (the C++ proto
+                 root), not src/ (the Java proto root).  They are only consumed
+                 by the C++ ScaNN library and have no Java bindings. -->
+            <exclude>**/yb/scann/**/*.proto</exclude>
           </excludes>
         </configuration>
         <executions>
