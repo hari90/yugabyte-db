@@ -118,15 +118,17 @@ class ScannWrapper {
   //
   // Collects all vectors from the current index, re-initializes a fresh
   // ScaNN instance with the given config (which triggers training for
-  // tree/AH configs).  The existing label map is reused as-is, avoiding any label re-collection.
+  // tree/AH configs).  The existing label map is reused as-is, avoiding any
+  // label re-collection.
+  //
+  // Normalization is handled automatically: if the distance measure requires
+  // unit-L2-normalised data (CosineDistance or DotProductDistance), vectors
+  // are normalised before rebuilding and the original norms are preserved
+  // so that GetDatapoint() can return denormalised vectors.
   //
   //   config           – the new ScaNN config (e.g. from ScannTreeAhConfig).
   //   training_threads – number of threads for training/indexing.
-  //   normalize        – if true, L2-normalize each vector before rebuilding.
-  //                      Required for CosineDistance / DotProductDistance with
-  //                      Tree-AH, whose asymmetric hashing expects unit vectors.
-  Status Rebuild(const scann_internal::ScannConfigPtr& config, int training_threads,
-                 bool normalize = false);
+  Status Rebuild(const scann_internal::ScannConfigPtr& config, int training_threads);
 
   // ---------------------------------------------------------------------------
   // Search
@@ -183,8 +185,19 @@ class ScannWrapper {
   size_t dimensionality() const;
 
  private:
+  // Returns true if the stored distance measure requires L2-normalised vectors.
+  bool NeedsNormalization() const;
+
   scann_internal::ScannImplPtr impl_;
   ScannLabelMap labels_;
+
+  bool normalized_ = false;
+
+  // Original L2 norms of each vector, indexed by datapoint index.
+  // Populated when normalization is applied so that GetDatapoint() can
+  // return the original (denormalized) vectors.  Empty when no
+  // normalization has been performed.
+  std::vector<float> norms_;
 };
 
 // ---------------------------------------------------------------------------

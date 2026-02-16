@@ -143,6 +143,21 @@ ScannConfigPtr ImplBruteForceConfig(int num_neighbors, int dim, bool fixed_point
 ScannConfigPtr ImplReorderConfig(int num_neighbors, int dim,
                                  const std::string& distance_measure = "DotProductDistance");
 
+// Extract the distance measure string from an opaque ScaNN config.
+std::string ImplGetDistanceMeasure(const ScannConfigOpaque& config);
+
+// Returns true if the given distance measure requires L2-normalised vectors
+// (CosineDistance or DotProductDistance).
+inline bool NeedsNormalization(const std::string& distance_measure) {
+  return distance_measure == "CosineDistance" || distance_measure == "DotProductDistance";
+}
+
+// Returns true if the given distance measure causes ScaNN to internally
+// normalise vectors during Initialize/Insert (only CosineDistance).
+inline bool ScannNormalizesVectors(const std::string& distance_measure) {
+  return distance_measure == "CosineDistance";
+}
+
 // Serialize an opaque config to its text-format representation (useful for
 // logging / debugging).
 std::string ImplConfigToString(const ScannConfigOpaque& config);

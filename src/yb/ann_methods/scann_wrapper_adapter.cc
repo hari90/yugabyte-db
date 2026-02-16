@@ -396,7 +396,6 @@ class ScannIndex :
     if (n >= kTreeAhThreshold) {
       const auto dim = static_cast<int>(options_.dimensions);
       const auto& distance = ScannDistanceMeasure(options_.distance_kind);
-      bool normalize = options_.distance_kind != DistanceKind::kL2Squared;
 
       // Build tree options from gFlags.
       scann::ScannTreeOptions tree_opts;
@@ -416,7 +415,7 @@ class ScannIndex :
             kScannMaxNeighbors, dim, distance, tree_opts);
       }
 
-      RETURN_NOT_OK(scann_.Rebuild(config, kTreeAhTrainingThreads, normalize));
+      RETURN_NOT_OK(scann_.Rebuild(config, kTreeAhTrainingThreads));
     }
 
     RETURN_NOT_OK(scann_.Serialize(path));

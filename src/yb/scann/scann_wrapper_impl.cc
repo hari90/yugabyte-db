@@ -166,6 +166,7 @@ ImplStatus ImplLoadFromDisk(ScannImplOpaque* impl,
   // Restore it for distance measures that require unit-L2-normalised data,
   // otherwise the factory rejects the dataset during CreateSearcher.
   auto& [config, dataset, opts] = *load_or;
+
   if (dataset && config.has_distance_measure()) {
     const auto& dm = config.distance_measure().distance_measure();
     if (dm == kCosineDistance || dm == kDotProductDistance) {
@@ -535,6 +536,13 @@ ScannConfigPtr ImplReorderConfig(int num_neighbors, int dim,
       ->set_dimensionality(dim);
 
   return cfg;
+}
+
+std::string ImplGetDistanceMeasure(const ScannConfigOpaque& config) {
+  if (config.config.has_distance_measure()) {
+    return config.config.distance_measure().distance_measure();
+  }
+  return "";
 }
 
 std::string ImplConfigToString(const ScannConfigOpaque& config) {

@@ -757,5 +757,183 @@ TEST_F(ScannOpsTest, InitializeWithNoLabels) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// GetDatapoint denormalization tests
+//
+// Verify that GetDatapoint() returns the original (pre-normalisation) vectors
+// for distance measures that trigger internal normalisation.
+// ---------------------------------------------------------------------------
+
+// Helper: compute L2 norm of a float vector.
+float L2Norm(const std::vector<float>& v) {
+  float sum = 0.0f;
+  for (float x : v) sum += x * x;
+  return std::sqrt(sum);
+}
+
+TEST_F(ScannOpsTest, GetDatapointDenormalizesCosine) {
+  constexpr int kSmallN = 50;
+  constexpr int kDim = 8;
+  auto small_dataset = RandomDataset(kSmallN, kDim, 300);
+
+  auto rl = RandomLabels(kSmallN);
+  ScannWrapper scann;
+  ASSERT_OK(scann.Initialize(
+      small_dataset, kSmallN,
+      ScannBruteForceConfig(5, kDim, /*fixed_point=*/false, "CosineDistance"),
+      1, rl.slices));
+
+  // GetDatapoint should return the original vectors (denormalized).
+  for (int i = 0; i < kSmallN; ++i) {
+    auto dp = ASSERT_RESULT(scann.GetDatapoint(i));
+    ASSERT_EQ(dp.vector.size(), kDim);
+    for (int d = 0; d < kDim; ++d) {
+      EXPECT_NEAR(dp.vector[d], small_dataset[i * kDim + d], 1e-4f)
+          << "datapoint " << i << " dim " << d;
+    }
+  }
+}
+
+TEST_F(ScannOpsTest, GetDatapointDenormalizesInsertedCosine) {
+  constexpr int kDim = 8;
+  constexpr int kSmallN = 10;
+  auto small_dataset = RandomDataset(kSmallN, kDim, 301);
+
+  auto rl = RandomLabels(kSmallN);
+  ScannWrapper scann;
+  ASSERT_OK(scann.Initialize(
+      small_dataset, kSmallN,
+      ScannBruteForceConfig(5, kDim, /*fixed_point=*/false, "CosineDistance"),
+      1, rl.slices));
+
+  // Insert a vector with a known non-unit norm.
+  std::vector<float> inserted(kDim);
+  for (int d = 0; d < kDim; ++d) inserted[d] = static_cast<float>(d + 1);
+  float expected_norm = L2Norm(inserted);
+  ASSERT_GT(expected_norm, 1.0f);
+
+  auto lbl = MakeRandomLabel();
+  auto idx = ASSERT_RESULT(scann.Insert(inserted, "denorm_test", Slice(lbl)));
+
+  auto dp = ASSERT_RESULT(scann.GetDatapoint(idx));
+  ASSERT_EQ(dp.vector.size(), kDim);
+  for (int d = 0; d < kDim; ++d) {
+    EXPECT_NEAR(dp.vector[d], inserted[d], 1e-4f)
+        << "inserted dim " << d;
+  }
+}
+
+TEST_F(ScannOpsTest, GetDatapointUnchangedForL2) {
+  constexpr int kSmallN = 50;
+  constexpr int kDim = 8;
+  auto small_dataset = RandomDataset(kSmallN, kDim, 302);
+
+  auto rl = RandomLabels(kSmallN);
+  ScannWrapper scann;
+  ASSERT_OK(scann.Initialize(
+      small_dataset, kSmallN,
+      ScannBruteForceConfig(5, kDim, /*fixed_point=*/false, "SquaredL2Distance"),
+      1, rl.slices));
+
+  // For SquaredL2Distance, no normalization; GetDatapoint returns raw vectors.
+  for (int i = 0; i < kSmallN; ++i) {
+    auto dp = ASSERT_RESULT(scann.GetDatapoint(i));
+    ASSERT_EQ(dp.vector.size(), kDim);
+    for (int d = 0; d < kDim; ++d) {
+      EXPECT_NEAR(dp.vector[d], small_dataset[i * kDim + d], 1e-5f)
+          << "datapoint " << i << " dim " << d;
+    }
+  }
+}
+
+TEST_F(ScannOpsTest, GetDatapointDenormalizesAfterSerializeLoad) {
+  constexpr int kSmallN = 50;
+  constexpr int kDim = 8;
+  auto small_dataset = RandomDataset(kSmallN, kDim, 303);
+
+  auto rl = RandomLabels(kSmallN);
+  ScannWrapper scann1;
+  ASSERT_OK(scann1.Initialize(
+      small_dataset, kSmallN,
+      ScannBruteForceConfig(5, kDim, /*fixed_point=*/false, "CosineDistance"),
+      1, rl.slices));
+
+  auto tmpdir = std::filesystem::temp_directory_path() / "scann_denorm_test_303";
+  std::filesystem::create_directories(tmpdir);
+  ASSERT_OK(scann1.Serialize(tmpdir.string()));
+
+  // Verify that scann_norms.bin was written.
+  EXPECT_TRUE(std::filesystem::exists(tmpdir / "scann_norms.bin"));
+
+  ScannWrapper scann2;
+  ASSERT_OK(scann2.LoadFromDisk(tmpdir.string()));
+
+  // After load, GetDatapoint should still return denormalized vectors.
+  for (int i = 0; i < kSmallN; ++i) {
+    auto dp = ASSERT_RESULT(scann2.GetDatapoint(i));
+    ASSERT_EQ(dp.vector.size(), kDim);
+    for (int d = 0; d < kDim; ++d) {
+      EXPECT_NEAR(dp.vector[d], small_dataset[i * kDim + d], 1e-4f)
+          << "datapoint " << i << " dim " << d;
+    }
+  }
+
+  std::filesystem::remove_all(tmpdir);
+}
+
+TEST_F(ScannOpsTest, GetDatapointUnchangedForDotProduct) {
+  constexpr int kSmallN = 50;
+  constexpr int kDim = 8;
+  auto small_dataset = RandomDataset(kSmallN, kDim, 304);
+
+  auto rl = RandomLabels(kSmallN);
+  ScannWrapper scann;
+  ASSERT_OK(scann.Initialize(
+      small_dataset, kSmallN,
+      ScannBruteForceConfig(5, kDim, /*fixed_point=*/false, "DotProductDistance"),
+      1, rl.slices));
+
+  // DotProductDistance: ScaNN does NOT normalise during Initialize, so
+  // GetDatapoint should return the original vectors unchanged.
+  for (int i = 0; i < kSmallN; ++i) {
+    auto dp = ASSERT_RESULT(scann.GetDatapoint(i));
+    ASSERT_EQ(dp.vector.size(), kDim);
+    for (int d = 0; d < kDim; ++d) {
+      EXPECT_NEAR(dp.vector[d], small_dataset[i * kDim + d], 1e-4f)
+          << "datapoint " << i << " dim " << d;
+    }
+  }
+}
+
+TEST_F(ScannOpsTest, RebuildNormalizesInternally) {
+  // Verify that Rebuild() (without explicit normalize param) correctly
+  // normalizes for non-L2 distances and that GetDatapoint still returns
+  // the original vectors afterwards.
+  constexpr int kSmallN = 50;
+  constexpr int kDim = 8;
+  auto small_dataset = RandomDataset(kSmallN, kDim, 305);
+
+  auto rl = RandomLabels(kSmallN);
+  ScannWrapper scann;
+  ASSERT_OK(scann.Initialize(
+      small_dataset, kSmallN,
+      ScannBruteForceConfig(5, kDim, /*fixed_point=*/false, "CosineDistance"),
+      1, rl.slices));
+
+  // Rebuild with the same brute-force config (exercises the normalize path).
+  auto new_config = ScannBruteForceConfig(5, kDim, /*fixed_point=*/false, "CosineDistance");
+  ASSERT_OK(scann.Rebuild(new_config, 1));
+
+  // After rebuild, GetDatapoint should still return denormalized vectors.
+  for (int i = 0; i < kSmallN; ++i) {
+    auto dp = ASSERT_RESULT(scann.GetDatapoint(i));
+    ASSERT_EQ(dp.vector.size(), kDim);
+    for (int d = 0; d < kDim; ++d) {
+      EXPECT_NEAR(dp.vector[d], small_dataset[i * kDim + d], 1e-4f)
+          << "datapoint " << i << " dim " << d;
+    }
+  }
+}
+
 }  // namespace
 }  // namespace yb::scann

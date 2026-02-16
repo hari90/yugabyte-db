@@ -18,6 +18,7 @@
 #include "scann/scann_wrapper.h"
 
 #include <cmath>
+#include <fstream>
 
 #include "yb/util/monotime.h"
 #include "yb/util/result.h"
@@ -68,24 +69,41 @@ class Timer {
   MonoTime start_;
 };
 
+// Compute the L2 norm of a single vector.
+float ComputeL2Norm(const float* v, size_t dim) {
+  float norm_sq = 0.0f;
+  for (size_t d = 0; d < dim; ++d) {
+    norm_sq += v[d] * v[d];
+  }
+  return (norm_sq > 0.0f) ? std::sqrt(norm_sq) : 0.0f;
+}
+
 // L2-normalise every vector in a flat row-major dataset in-place.
 // Each vector of `dim` floats is divided by its L2 norm.
 // Zero vectors are left unchanged.
-void L2NormalizeDataset(float* data, uint32_t n, uint32_t dim) {
+// If `norms_out` is non-null, it is resized to `n` and filled with the
+// original L2 norms (before normalisation).
+void L2NormalizeDataset(float* data, uint32_t n, uint32_t dim,
+                        std::vector<float>* norms_out = nullptr) {
+  if (norms_out) {
+    norms_out->resize(n);
+  }
   for (uint32_t i = 0; i < n; ++i) {
     float* v = data + static_cast<size_t>(i) * dim;
-    float norm_sq = 0.0f;
-    for (uint32_t d = 0; d < dim; ++d) {
-      norm_sq += v[d] * v[d];
+    float norm = ComputeL2Norm(v, dim);
+    if (norms_out) {
+      (*norms_out)[i] = norm;
     }
-    if (norm_sq > 0.0f) {
-      float inv_norm = 1.0f / std::sqrt(norm_sq);
+    if (norm > 0.0f) {
+      float inv_norm = 1.0f / norm;
       for (uint32_t d = 0; d < dim; ++d) {
         v[d] *= inv_norm;
       }
     }
   }
 }
+
+static const char* kNormsFileName = "scann_norms.bin";
 
 }  // namespace
 
@@ -106,6 +124,10 @@ ScannWrapper::~ScannWrapper() = default;
 ScannWrapper::ScannWrapper(ScannWrapper&&) noexcept = default;
 ScannWrapper& ScannWrapper::operator=(ScannWrapper&&) noexcept = default;
 
+bool ScannWrapper::NeedsNormalization() const {
+  return normalized_;
+}
+
 // -- Index construction -------------------------------------------------------
 
 Status ScannWrapper::Initialize(const std::vector<float>& dataset,
@@ -115,6 +137,19 @@ Status ScannWrapper::Initialize(const std::vector<float>& dataset,
                                 const std::vector<Slice>& labels) {
   if (!labels.empty()) {
     SCHECK_EQ(labels.size(), n_points, InvalidArgument, "labels size must equal n_points");
+  }
+
+  const auto distance_measure = scann_internal::ImplGetDistanceMeasure(*config);
+
+  // ScaNN normalises vectors during Initialize only for CosineDistance.
+  // Compute and store original L2 norms so GetDatapoint() can denormalise.
+  if (scann_internal::ScannNormalizesVectors(distance_measure) && n_points > 0) {
+    const auto dim = dataset.size() / n_points;
+    norms_.resize(n_points);
+    for (uint32_t i = 0; i < n_points; ++i) {
+      norms_[i] = ComputeL2Norm(dataset.data() + static_cast<size_t>(i) * dim, dim);
+    }
+    normalized_ = true;
   }
 
   Timer timer("Initialize");
@@ -130,9 +165,36 @@ Status ScannWrapper::LoadFromDisk(const std::string& artifacts_dir,
                                   const std::string& scann_assets_pbtxt) {
   Timer timer("LoadFromDisk");
   RETURN_IMPL_STATUS_NOT_OK(
-      scann_internal::ImplLoadFromDisk(impl_.get(), artifacts_dir, scann_assets_pbtxt));
+      scann_internal::ImplLoadFromDisk(
+          impl_.get(), artifacts_dir, scann_assets_pbtxt));
 
-  return labels_.Load(artifacts_dir);
+  RETURN_NOT_OK(labels_.Load(artifacts_dir));
+
+  // Load norms from disk (if they exist).
+  {
+    std::string path = artifacts_dir + "/" + kNormsFileName;
+    std::ifstream in(path, std::ios::binary);
+    if (in) {
+      uint32_t count = 0;
+      in.read(reinterpret_cast<char*>(&count), sizeof(count));
+      if (in) {
+        norms_.resize(count);
+        if (count > 0) {
+          in.read(reinterpret_cast<char*>(norms_.data()),
+                  static_cast<std::streamsize>(count * sizeof(float)));
+        }
+        if (!in) {
+          norms_.clear();
+          return Status(Status::kInternalError, __FILE__, __LINE__,
+                        "Truncated norms data in " + path);
+        }
+      }
+    } else {
+      norms_.clear();
+    }
+  }
+  normalized_ = !norms_.empty();
+  return Status();
 }
 
 // -- Mutation -----------------------------------------------------------------
@@ -141,12 +203,29 @@ Result<int32_t> ScannWrapper::Insert(const std::vector<float>& datapoint,
                                      const std::string& docid,
                                      Slice label) {
   Timer timer("Insert");
+
+  // ScaNN's mutator auto-normalises inserted vectors when the dataset has
+  // the UNITL2NORM tag (set during Initialize for CosineDistance).
+  // Store the original norm so GetDatapoint() can denormalise.
+  float norm = 0.0f;
+  if (normalized_) {
+    norm = ComputeL2Norm(datapoint.data(), datapoint.size());
+  }
+
   int32_t assigned_index;
   RETURN_IMPL_STATUS_NOT_OK(
       scann_internal::ImplInsert(
           impl_.get(), datapoint.data(), datapoint.size(), docid, &assigned_index));
 
   labels_.Put(assigned_index, label);
+
+  if (normalized_) {
+    auto idx = static_cast<size_t>(assigned_index);
+    if (idx >= norms_.size()) {
+      norms_.resize(idx + 1, 0.0f);
+    }
+    norms_[idx] = norm;
+  }
 
   // RETURN_NOT_OK(RunMaintenance());
   return assigned_index;
@@ -251,14 +330,36 @@ Status ScannWrapper::Serialize(const std::string& path) {
   Timer timer("Serialize");
   RETURN_IMPL_STATUS_NOT_OK(scann_internal::ImplSerialize(impl_.get(), path));
 
-  return labels_.Serialize(path);
+  RETURN_NOT_OK(labels_.Serialize(path));
+
+  // Write norms alongside the other artifacts.
+  if (!norms_.empty()) {
+    std::string norms_path = path + "/" + kNormsFileName;
+    std::ofstream out(norms_path, std::ios::binary);
+    if (!out) {
+      return Status(Status::kInternalError, __FILE__, __LINE__,
+                    "Failed to open " + norms_path + " for writing");
+    }
+    auto count = static_cast<uint32_t>(norms_.size());
+    out.write(reinterpret_cast<const char*>(&count), sizeof(count));
+    out.write(reinterpret_cast<const char*>(norms_.data()),
+              static_cast<std::streamsize>(count * sizeof(float)));
+    if (!out) {
+      return Status(Status::kInternalError, __FILE__, __LINE__,
+                    "Failed writing norms data to " + norms_path);
+    }
+  }
+
+  return Status();
 }
 
 Status ScannWrapper::Rebuild(
-    const scann_internal::ScannConfigPtr& config, int training_threads, bool normalize) {
+    const scann_internal::ScannConfigPtr& config, int training_threads) {
   Timer timer("Rebuild");
   const auto n = static_cast<uint32_t>(n_points());
   const auto dim = dimensionality();
+  const bool normalize = scann_internal::NeedsNormalization(
+      scann_internal::ImplGetDistanceMeasure(*config));
 
   LOG(INFO) << "scann: Rebuild [vectors: " << n << ", dimensions: " << dim
             << ", normalize: " << (normalize ? "true" : "false") << "]";
@@ -274,16 +375,30 @@ Status ScannWrapper::Rebuild(
   }
 
   if (normalize) {
-    L2NormalizeDataset(dataset.data(), n, dim);
+    if (norms_.empty()) {
+      // Norms not yet stored (e.g. DotProductDistance where ScaNN did not
+      // normalise on initial Initialize).  Compute and store norms from the
+      // current (un-normalised) vectors before normalising in-place.
+      L2NormalizeDataset(dataset.data(), n, dim, &norms_);
+    } else {
+      // Norms already stored (e.g. CosineDistance where ScaNN normalised
+      // during Initialize).  The vectors read from the index are already
+      // normalised, so a second normalisation is a no-op — but we call it
+      // for consistency.
+      L2NormalizeDataset(dataset.data(), n, dim);
+    }
   }
 
   // Re-initialize this wrapper's impl_ with the new config.
-  // Labels are already correct and don't need updating.
+  // Labels and norms are already correct and don't need updating.
   auto new_impl = scann_internal::CreateScannImpl();
   RETURN_IMPL_STATUS_NOT_OK(
       scann_internal::ImplInitialize(
           new_impl.get(), dataset.data(), dataset.size(), n, *config, training_threads));
   impl_.swap(new_impl);
+  if (normalize) {
+    normalized_ = true;
+  }
   return Status::OK();
 }
 
@@ -294,6 +409,19 @@ Result<ScannWrapper::Datapoint> ScannWrapper::GetDatapoint(int32_t index) const 
   RETURN_IMPL_STATUS_NOT_OK(scann_internal::ImplGetDatapoint(impl_.get(), index, &dp.vector));
   auto label_slice = labels_.Get(index);
   dp.label.assign(label_slice.cdata(), label_slice.size());
+
+  // Denormalize: if norms are stored, multiply the (unit) vector by the
+  // original L2 norm to recover the pre-normalisation vector.
+  if (!norms_.empty()) {
+    auto idx = static_cast<size_t>(index);
+    if (idx < norms_.size() && norms_[idx] > 0.0f) {
+      float norm = norms_[idx];
+      for (auto& v : dp.vector) {
+        v *= norm;
+      }
+    }
+  }
+
   return dp;
 }
 
