@@ -36,7 +36,7 @@
 #include "yb/ann_methods/scann_wrapper_adapter.h"
 
 #include <cstring>
-#include <mutex>
+#include <shared_mutex>
 #include <utility>
 #include <vector>
 
@@ -332,7 +332,7 @@ class ScannIndex :
 
   std::vector<VectorWithDistance<DistanceResult>> DoSearch(
       const Vector& query_vector, const SearchOptions& options) const {
-    std::lock_guard lock(mutex_);
+    std::shared_lock lock(mutex_);
     if (!initialized_) {
       return {};
     }
@@ -463,7 +463,7 @@ class ScannIndex :
   // Protects initialized_ and next_docid_ from concurrent access.
   // ScannWrapper has its own internal lock for ScaNN data structures; this
   // mutex ensures the adapter's local bookkeeping stays in sync.
-  mutable std::mutex mutex_;
+  mutable std::shared_mutex mutex_;
 
   // ScaNN is lazily initialized on first DoInsert (or DoLoadFromFile).
   bool initialized_ = false;
