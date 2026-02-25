@@ -1419,6 +1419,30 @@ TEST_F(LogTest, TestReadReplicatesWithOnlyPartialMemory) {
 
 }
 
+// Regression test for GH-30437: max_bytes_to_read=0 must be treated as a real limit,
+// not as kNoSizeLimit. Before the fix, the condition (max_bytes_to_read <= 0) caused 0
+// to bypass the size check entirely, reading all entries without limit.
+TEST_F(LogTest, TestReadReplicatesInRangeWithZeroMaxBytes) {
+  const int kSequenceLength = 10;
+
+  BuildLog();
+  OpIdPB op_id;
+  op_id.set_term(1);
+  op_id.set_index(1);
+  ASSERT_OK(AppendNoOps(&op_id, kSequenceLength));
+
+  auto* reader = log_->GetLogReader();
+  ReplicateMsgs repls;
+  int64_t starting_op_segment_seq_num;
+  ASSERT_OK(reader->ReadReplicatesInRange(
+      1, kSequenceLength, 0, log::ObeyMemoryLimit::kFalse, &repls,
+      &starting_op_segment_seq_num));
+  // The "at least one" guarantee means we always read 1 entry even if the size limit is 0,
+  // but we must not read all entries as the old buggy code did.
+  ASSERT_EQ(1, repls.size());
+  ASSERT_EQ(1, repls[0]->id().index());
+}
+
 TEST_F(LogTest, AllocateSegmentAndRollOver) {
   constexpr auto kNumIters = 10;
 

@@ -291,6 +291,22 @@ TEST_F(LogCacheTest, TestAlwaysYieldsAtLeastOneMessage) {
   ASSERT_EQ(1, read_result.messages.size());
 }
 
+// Regression test for GH-30437: ReadOps must stop when remaining_space reaches 0, not only when
+// it goes negative. Before the fix, remaining_space=0 would cause ReadOps to call
+// ReadReplicatesInRange with 0 bytes, which (due to a companion bug) was treated as unlimited,
+// reading all records from disk.
+TEST_F(LogCacheTest, TestReadOpsWithZeroSizeLimit) {
+  ASSERT_OK(AppendReplicateMessagesToCache(1, kNumMessages));
+  ASSERT_OK(log_->WaitUntilAllFlushed());
+
+  // Evict so messages must be read from disk via ReadReplicatesInRange.
+  cache_->EvictThroughOp(kNumMessages + 10);
+
+  // With max_size_bytes=0 the loop should terminate immediately.
+  auto read_result = ASSERT_RESULT(cache_->ReadOps(0, 0, log::ObeyMemoryLimit::kFalse));
+  ASSERT_EQ(0, read_result.messages.size());
+}
+
 class LogCacheLimitTest : public LogCacheTest {
  protected:
   int64_t GetReadWalMemoryLimit() override { return 1_MB; }
