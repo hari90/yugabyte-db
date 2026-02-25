@@ -420,7 +420,7 @@ Result<ReadOpsResult> LogCache::ReadOps(
   bool hit_memory_limit = false;
   int64_t remaining_space = max_size_bytes;
   while (fetch_single_entry ? next_index == to_index : next_index < to_index) {
-    if (hit_memory_limit || remaining_space < 0) {
+    if (hit_memory_limit || remaining_space <= 0) {
       break;
     }
     // Stop reading if a deadline was specified and the deadline has been exceeded.
