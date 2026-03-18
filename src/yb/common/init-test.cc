@@ -39,43 +39,38 @@ TEST_F(InitTest, DisableTransparentHugepagesFlagDefaultIsFalse) {
 
 TEST_F(InitTest, PrctlDisablesTHP) {
   // Save original THP state so we can restore it.
-  int original_state = 0;
-  ASSERT_EQ(0, prctl(PR_GET_THP_DISABLE, &original_state, 0, 0, 0))
-      << "Failed to get initial THP state";
+  // PR_GET_THP_DISABLE returns 1 (disabled) or 0 (enabled) directly as return value.
+  int original_state = prctl(PR_GET_THP_DISABLE, 0, 0, 0, 0);
+  ASSERT_GE(original_state, 0) << "Failed to get initial THP state";
 
   // Disable THP for this process.
   ASSERT_EQ(0, prctl(PR_SET_THP_DISABLE, 1, 0, 0, 0))
       << "prctl(PR_SET_THP_DISABLE, 1) failed";
 
   // Verify THP is disabled.
-  int thp_disabled = 0;
-  ASSERT_EQ(0, prctl(PR_GET_THP_DISABLE, &thp_disabled, 0, 0, 0))
-      << "Failed to get THP state after disable";
-  ASSERT_TRUE(thp_disabled) << "THP should be disabled after prctl(PR_SET_THP_DISABLE, 1)";
+  int thp_disabled = prctl(PR_GET_THP_DISABLE, 0, 0, 0, 0);
+  ASSERT_EQ(1, thp_disabled) << "THP should be disabled after prctl(PR_SET_THP_DISABLE, 1)";
 
-  // Re-enable THP (restore original state).
+  // Restore original state.
   ASSERT_EQ(0, prctl(PR_SET_THP_DISABLE, original_state, 0, 0, 0))
       << "Failed to restore original THP state";
 
   // Verify restoration.
-  int restored_state = -1;
-  ASSERT_EQ(0, prctl(PR_GET_THP_DISABLE, &restored_state, 0, 0, 0))
-      << "Failed to get THP state after restore";
+  int restored_state = prctl(PR_GET_THP_DISABLE, 0, 0, 0, 0);
   ASSERT_EQ(original_state, restored_state) << "THP state should be restored to original";
 }
 
 TEST_F(InitTest, PrctlEnablesTHP) {
   // Save original state.
-  int original_state = 0;
-  ASSERT_EQ(0, prctl(PR_GET_THP_DISABLE, &original_state, 0, 0, 0));
+  int original_state = prctl(PR_GET_THP_DISABLE, 0, 0, 0, 0);
+  ASSERT_GE(original_state, 0);
 
   // Explicitly enable THP (set disable=0).
   ASSERT_EQ(0, prctl(PR_SET_THP_DISABLE, 0, 0, 0, 0))
       << "prctl(PR_SET_THP_DISABLE, 0) failed";
 
-  int thp_disabled = 1;
-  ASSERT_EQ(0, prctl(PR_GET_THP_DISABLE, &thp_disabled, 0, 0, 0));
-  ASSERT_FALSE(thp_disabled) << "THP should be enabled after prctl(PR_SET_THP_DISABLE, 0)";
+  int thp_disabled = prctl(PR_GET_THP_DISABLE, 0, 0, 0, 0);
+  ASSERT_EQ(0, thp_disabled) << "THP should be enabled after prctl(PR_SET_THP_DISABLE, 0)";
 
   // Restore original state.
   prctl(PR_SET_THP_DISABLE, original_state, 0, 0, 0);
@@ -83,24 +78,20 @@ TEST_F(InitTest, PrctlEnablesTHP) {
 
 TEST_F(InitTest, PrctlTHPToggle) {
   // Save original state.
-  int original_state = 0;
-  ASSERT_EQ(0, prctl(PR_GET_THP_DISABLE, &original_state, 0, 0, 0));
+  int original_state = prctl(PR_GET_THP_DISABLE, 0, 0, 0, 0);
+  ASSERT_GE(original_state, 0);
 
   // Disable THP.
   ASSERT_EQ(0, prctl(PR_SET_THP_DISABLE, 1, 0, 0, 0));
-  int state = 0;
-  ASSERT_EQ(0, prctl(PR_GET_THP_DISABLE, &state, 0, 0, 0));
-  ASSERT_TRUE(state);
+  ASSERT_EQ(1, prctl(PR_GET_THP_DISABLE, 0, 0, 0, 0));
 
   // Re-enable THP.
   ASSERT_EQ(0, prctl(PR_SET_THP_DISABLE, 0, 0, 0, 0));
-  ASSERT_EQ(0, prctl(PR_GET_THP_DISABLE, &state, 0, 0, 0));
-  ASSERT_FALSE(state);
+  ASSERT_EQ(0, prctl(PR_GET_THP_DISABLE, 0, 0, 0, 0));
 
   // Disable again to confirm toggling works repeatedly.
   ASSERT_EQ(0, prctl(PR_SET_THP_DISABLE, 1, 0, 0, 0));
-  ASSERT_EQ(0, prctl(PR_GET_THP_DISABLE, &state, 0, 0, 0));
-  ASSERT_TRUE(state);
+  ASSERT_EQ(1, prctl(PR_GET_THP_DISABLE, 0, 0, 0, 0));
 
   // Restore original state.
   prctl(PR_SET_THP_DISABLE, original_state, 0, 0, 0);
