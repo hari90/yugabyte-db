@@ -175,8 +175,8 @@ Status InitYB(const std::string &server_type, const char* argv0) {
       return STATUS(RuntimeError, "Failed to disable Transparent Huge Pages via prctl",
                     ErrnoToString(errno));
     }
-    int thp_status = 0;
-    if (prctl(PR_GET_THP_DISABLE, &thp_status, 0, 0, 0) == 0) {
+    int thp_status = prctl(PR_GET_THP_DISABLE, 0, 0, 0, 0);
+    if (thp_status >= 0) {
       LOG(INFO) << "Transparent Huge Pages disabled for this process: "
                 << (thp_status ? "yes" : "no");
     }
