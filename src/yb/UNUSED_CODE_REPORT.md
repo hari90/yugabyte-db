@@ -8,8 +8,9 @@ categories: unbuilt `.cc` files, unreferenced `.h` files, and unused functions.
 ## 1. `.cc` Files Not Referenced in Any CMakeLists.txt (Not Being Built)
 
 The YugabyteDB build system uses explicit source file lists in CMakeLists.txt
-(via `ADD_YB_LIBRARY`, `ADD_YB_TEST`, `add_executable`, etc.). The following `.cc`
-files exist on disk but are not referenced by any build target.
+(via `ADD_YB_LIBRARY`, `ADD_YB_TEST`, `ADD_YB_CQL_TEST`, `ADD_YB_PG_TEST`,
+`ADD_YB_ROCKSDB_TOOL`, `ADD_YB_FUZZ_TARGET`, `add_executable`, etc.). The following
+`.cc` files exist on disk but are not referenced by any build target.
 
 ### 1a. Production Code (non-test, non-example)
 
@@ -19,26 +20,7 @@ files exist on disk but are not referenced by any build target.
 | `src/yb/rocksdb/port/win/port_win.cc` | Windows port — not built on Linux/macOS |
 | `src/yb/rocksdb/port/win/win_logger.cc` | Windows port — not built on Linux/macOS |
 
-### 1b. Integration Tests Not Wired Into Build
-
-| File |
-|------|
-| `src/yb/integration-tests/async_writes-test.cc` |
-| `src/yb/integration-tests/cql-index-test.cc` |
-| `src/yb/integration-tests/cql-packed-row-test.cc` |
-| `src/yb/integration-tests/cql-tablet-split-test.cc` |
-| `src/yb/integration-tests/cql-test.cc` |
-| `src/yb/integration-tests/cql_geo_transactions-test.cc` |
-| `src/yb/integration-tests/disk_full-test.cc` |
-| `src/yb/integration-tests/documentdb/documentdb_test.cc` |
-| `src/yb/integration-tests/external_mini_cluster_secure_test.cc` |
-| `src/yb/integration-tests/minicluster-snapshot-test.cc` |
-| `src/yb/integration-tests/sequence_utility-itest.cc` |
-| `src/yb/integration-tests/tablet_limits_integration_test.cc` |
-| `src/yb/integration-tests/upgrade-tests/ysql_ddl_whitelist-test.cc` |
-| `src/yb/integration-tests/upgrade-tests/ysql_major_upgrade_role_profiles-test.cc` |
-
-### 1c. RocksDB Tests/Benchmarks/Tools Not Wired Into Build
+### 1b. RocksDB Tests/Benchmarks Not Wired Into Build
 
 | File |
 |------|
@@ -48,16 +30,12 @@ files exist on disk but are not referenced by any build target.
 | `src/yb/rocksdb/db/memtablerep_bench.cc` |
 | `src/yb/rocksdb/db/merge_helper_test.cc` |
 | `src/yb/rocksdb/table/table_reader_bench.cc` |
-| `src/yb/rocksdb/tools/db_repl_stress.cc` |
-| `src/yb/rocksdb/tools/db_sanity_test.cc` |
-| `src/yb/rocksdb/tools/db_stress.cc` |
-| `src/yb/rocksdb/tools/write_stress.cc` |
 | `src/yb/rocksdb/util/cache_bench.cc` |
 | `src/yb/rocksdb/util/log_write_bench.cc` |
 | `src/yb/rocksdb/utilities/env_mirror_test.cc` |
 | `src/yb/rocksdb/utilities/merge_operators/string_append/stringappend_test.cc` |
 
-### 1d. RocksDB Examples
+### 1c. RocksDB Examples
 
 | File |
 |------|
@@ -67,15 +45,7 @@ files exist on disk but are not referenced by any build target.
 | `src/yb/rocksdb/examples/options_file_example.cc` |
 | `src/yb/rocksdb/examples/simple_example.cc` |
 
-### 1e. Fuzz Targets
-
-| File |
-|------|
-| `src/yb/docdb/fuzz-targets/doc_key-fuzz_target.cc` |
-| `src/yb/docdb/fuzz-targets/subdoc_key-fuzz_target.cc` |
-| `src/yb/rocksdb/util/fuzz-targets/coding_fuzz_target.cc` |
-
-**Total: 39 unbuilt `.cc` files**
+**Total: 18 unbuilt `.cc` files**
 
 ---
 
@@ -354,7 +324,7 @@ to avoid false positives from dynamic dispatch.
 | `integration-tests/xcluster/xcluster_test_base.cc` | 1059 | `XClusterTestBase::GetProducerMasterProxy()` |
 | `integration-tests/yb_table_test_base.cc` | 91 | `YBTableTestBase::need_redis_table()` |
 | `integration-tests/yb_table_test_base.cc` | 346 | `YBTableTestBase::FetchTSMetricsPage()` |
-| `integration-tests/rpc-test-base.cc` | 227 | `GenericCalculatorService::DoRepeatedEcho()` |
+| `rpc/rpc-test-base.cc` | 227 | `GenericCalculatorService::DoRepeatedEcho()` |
 | `rocksdb/db/db_test_util.cc` | 847 | `DBHolder::DumpFileCounts()` |
 | `rocksdb/db/db_test_util.cc` | 859 | `DBHolder::DumpSSTableList()` |
 | `tserver/tablet_server-test-base.cc` | 178 | `TabletServerTestBase::UpdateTestRowRemote()` |
@@ -380,14 +350,15 @@ to avoid false positives from dynamic dispatch.
 
 | Category | Count |
 |----------|-------|
-| Unbuilt `.cc` files | 39 |
+| Unbuilt `.cc` files | 18 |
 | Unreferenced `.h` files | 29 (excl. `*_pch.h`) |
 | Unused functions | 167 |
 
 ### Methodology
 
 - **Unbuilt `.cc` files**: All CMakeLists.txt files under `src/yb/` were parsed for
-  references to `.cc` files via `ADD_YB_LIBRARY`, `ADD_YB_TEST`, `add_executable`, and
+  references to `.cc` files via `ADD_YB_LIBRARY`, `ADD_YB_TEST`, `ADD_YB_CQL_TEST`,
+  `ADD_YB_PG_TEST`, `ADD_YB_ROCKSDB_TOOL`, `ADD_YB_FUZZ_TARGET`, `add_executable`, and
   `add_library` directives. Files on disk not referenced by any target were flagged.
 
 - **Unreferenced `.h` files**: All `#include` directives across `src/yb/` and
@@ -407,6 +378,4 @@ to avoid false positives from dynamic dispatch.
   simple text matching.
 - Platform-specific files (Windows, ARM) are reported but may be intentionally unbuilt
   on the current platform.
-- Integration test `.cc` files may be intentionally excluded from the build if they
-  require special infrastructure.
 - The CQL scanner functions may be used by generated parser code not analyzed here.
