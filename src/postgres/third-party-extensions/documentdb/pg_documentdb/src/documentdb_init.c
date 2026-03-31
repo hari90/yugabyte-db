@@ -109,6 +109,9 @@ InstallDocumentDBApiPostgresHooks(void)
 	RegisterExplainScanNodes();
 
 	/* Load the rum routine in the shared_preload_libraries to avoid LoadLibrary calls all the time */
+	/* YB: RUM is now supported. Previously guarded by:
+	if (!YBIsEnabledInPostgresEnvVar())
+	*/
 	LoadRumRoutine();
 
 	SetupCursorStorage();
