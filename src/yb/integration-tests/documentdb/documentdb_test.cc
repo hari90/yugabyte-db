@@ -38,6 +38,108 @@ class DocumentDBTest : public pgwrapper::PgMiniTestBase {
   std::unique_ptr<pgwrapper::PGConn> conn_;
 };
 
+TEST_F(DocumentDBTest, RumAccessMethodRegistered) {
+  // Verify that the documentdb_rum access method is registered in pg_am.
+  auto am_count = ASSERT_RESULT(conn_->FetchRow<int64_t>(
+      "SELECT count(*) FROM pg_am WHERE amname = 'documentdb_rum'"));
+  ASSERT_EQ(am_count, 1);
+}
+
+TEST_F(DocumentDBTest, RumOperatorClassesExist) {
+  // Verify that RUM-backed operator classes are registered.
+  // These were previously commented out as "YB: rum is not supported."
+
+  // Single-path operator class (in documentdb_api_catalog schema).
+  auto single_path = ASSERT_RESULT(conn_->FetchRow<int64_t>(
+      "SELECT count(*) FROM pg_opclass opc "
+      "JOIN pg_am am ON opc.opcmethod = am.oid "
+      "WHERE am.amname = 'documentdb_rum' "
+      "AND opc.opcname = 'bson_rum_single_path_ops'"));
+  ASSERT_EQ(single_path, 1);
+
+  // Text path operator class.
+  auto text_path = ASSERT_RESULT(conn_->FetchRow<int64_t>(
+      "SELECT count(*) FROM pg_opclass opc "
+      "JOIN pg_am am ON opc.opcmethod = am.oid "
+      "WHERE am.amname = 'documentdb_rum' "
+      "AND opc.opcname = 'bson_rum_text_path_ops'"));
+  ASSERT_EQ(text_path, 1);
+
+  // Wildcard project path operator class.
+  auto wildcard_path = ASSERT_RESULT(conn_->FetchRow<int64_t>(
+      "SELECT count(*) FROM pg_opclass opc "
+      "JOIN pg_am am ON opc.opcmethod = am.oid "
+      "WHERE am.amname = 'documentdb_rum' "
+      "AND opc.opcname = 'bson_rum_wildcard_project_path_ops'"));
+  ASSERT_EQ(wildcard_path, 1);
+
+  // Hash operator class.
+  auto hash_ops = ASSERT_RESULT(conn_->FetchRow<int64_t>(
+      "SELECT count(*) FROM pg_opclass opc "
+      "JOIN pg_am am ON opc.opcmethod = am.oid "
+      "WHERE am.amname = 'documentdb_rum' "
+      "AND opc.opcname = 'documentdb_rum_hashed_ops'"));
+  ASSERT_EQ(hash_ops, 1);
+
+  // Exclusion operator class.
+  auto exclusion_ops = ASSERT_RESULT(conn_->FetchRow<int64_t>(
+      "SELECT count(*) FROM pg_opclass opc "
+      "JOIN pg_am am ON opc.opcmethod = am.oid "
+      "WHERE am.amname = 'documentdb_rum' "
+      "AND opc.opcname = 'bson_rum_exclusion_ops'"));
+  ASSERT_EQ(exclusion_ops, 1);
+}
+
+TEST_F(DocumentDBTest, RumExtensibilityFunctionsExist) {
+  // Verify that RUM extensibility functions are available in the catalog.
+
+  // RUM handler function (documentdb_rumhandler in documentdb_api_catalog schema).
+  auto handler = ASSERT_RESULT(conn_->FetchRow<int64_t>(
+      "SELECT count(*) FROM pg_proc p "
+      "JOIN pg_namespace n ON p.pronamespace = n.oid "
+      "WHERE p.proname = 'documentdbrumhandler' "
+      "AND n.nspname = 'documentdb_api_catalog'"));
+  ASSERT_EQ(handler, 1);
+
+  // RUM text search adapter functions (in documentdb_api_internal schema).
+  auto text_funcs = ASSERT_RESULT(conn_->FetchRow<int64_t>(
+      "SELECT count(*) FROM pg_proc p "
+      "JOIN pg_namespace n ON p.pronamespace = n.oid "
+      "WHERE p.proname IN ('rum_extract_tsquery', 'rum_tsquery_consistent', "
+      "'rum_tsvector_config', 'rum_tsquery_pre_consistent', "
+      "'rum_tsquery_distance', 'rum_ts_join_pos') "
+      "AND n.nspname = 'documentdb_api_internal'"));
+  ASSERT_EQ(text_funcs, 6);
+}
+
+TEST_F(DocumentDBTest, RumIndexOnTempTable) {
+  // Verify that RUM indexes can be created and used on non-YB (temporary) tables.
+  // Temp tables use vanilla postgres storage, so RUM works on them directly.
+  ASSERT_OK(conn_->Execute(
+      "CREATE TEMP TABLE rum_test_docs (id serial, document documentdb_core.bson)"));
+
+  ASSERT_OK(conn_->Execute(
+      "INSERT INTO rum_test_docs (document) VALUES "
+      "('{ \"a\": 1, \"b\": \"hello\" }'::documentdb_core.bson), "
+      "('{ \"a\": 2, \"b\": \"world\" }'::documentdb_core.bson), "
+      "('{ \"a\": 3, \"b\": \"foo\" }'::documentdb_core.bson)"));
+
+  // Create a RUM index using the single-path operator class on the temp table.
+  ASSERT_OK(conn_->Execute(
+      "CREATE INDEX rum_test_idx ON rum_test_docs USING documentdb_rum "
+      "(document documentdb_api_catalog.bson_rum_single_path_ops)"));
+
+  // Verify the index was created.
+  auto idx_count = ASSERT_RESULT(conn_->FetchRow<int64_t>(
+      "SELECT count(*) FROM pg_indexes WHERE indexname = 'rum_test_idx'"));
+  ASSERT_EQ(idx_count, 1);
+
+  // Verify data is still accessible.
+  auto row_count = ASSERT_RESULT(conn_->FetchRow<int64_t>(
+      "SELECT count(*) FROM rum_test_docs"));
+  ASSERT_EQ(row_count, 3);
+}
+
 TEST_F(DocumentDBTest, SimpleCollection) {
   const auto db_name = "documentdb";
   const auto collection_name = "patient";
