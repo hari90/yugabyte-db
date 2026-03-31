@@ -205,4 +205,99 @@ TEST_F(DocumentDBTest, PrimaryKeyRangeQuery) {
   EXPECT_EQ(count_matching(R"({"_id": {"$lt": -10}})"), 0);
 }
 
+// Validates that cross-type comparisons on _id work correctly with $gt/$lt.
+// BSON comparison must handle type coercion: int32, int64, and double values
+// with the same numeric value should compare as equal, and range queries across
+// types must return correct results. Binary comparison would fail because:
+// - int32(42) = 0x2A000000 (4 bytes) vs int64(42) = 0x2A00000000000000 (8 bytes)
+//   have different binary representations
+// - double(-1.5) = 0x000000000000F8BF vs int32(0) = 0x00000000 have incompatible
+//   binary layouts
+// - Different BSON type codes (0x10 for int32, 0x12 for int64, 0x01 for double)
+//   would sort by type code byte-wise rather than by numeric value
+TEST_F(DocumentDBTest, CrossTypePrimaryKeyComparison) {
+  const auto db_name = "crosstype";
+  const auto collection_name = "mixed";
+
+  // Insert documents with mixed numeric _id types.
+  // Note: DocumentDB/MongoDB infers the type from the JSON representation.
+  // Integers without decimals become int32/int64, values with decimals become double.
+  // We use $numberInt, $numberLong, $numberDouble for explicit types via EJSON.
+  ASSERT_OK(conn_->FetchFormat(
+      R"(
+  SELECT documentdb_api.insert('$0', '{"insert":"$1", "documents":[
+    { "_id": {"$$numberDouble": "-1.5"}, "label": "double_neg" },
+    { "_id": {"$$numberInt": "-1"},      "label": "int32_neg" },
+    { "_id": {"$$numberInt": "0"},       "label": "int32_zero" },
+    { "_id": {"$$numberLong": "1"},      "label": "int64_one" },
+    { "_id": {"$$numberDouble": "2.5"},  "label": "double_pos" },
+    { "_id": {"$$numberInt": "10"},      "label": "int32_ten" },
+    { "_id": {"$$numberLong": "100"},    "label": "int64_hundred" }]}');
+  )",
+      db_name, collection_name));
+
+  auto get_label = [&](const std::string& filter) {
+    return CHECK_RESULT(conn_->FetchRow<std::string>(Format(
+        R"(
+      SELECT (((cursorpage->>'cursor')::bson->>'firstBatch')::bson->>'0')::bson->>'label'
+        FROM documentdb_api.find_cursor_first_page('$0',
+          '{ "find": "$1", "filter": $2 }');
+      )",
+        db_name, collection_name, filter)));
+  };
+
+  auto count_matching = [&](const std::string& filter) {
+    auto n_str = CHECK_RESULT(conn_->FetchRow<std::string>(Format(
+        R"(
+      SELECT document->>'n'
+        FROM documentdb_api.count_query('$0',
+          '{ "count": "$1", "query": $2 }');
+      )",
+        db_name, collection_name, filter)));
+    return std::stol(n_str);
+  };
+
+  // Verify total count.
+  ASSERT_EQ(
+      ASSERT_RESULT(conn_->FetchRow<int64_t>(Format(
+          "SELECT count(*) FROM documentdb_api.collection('$0','$1')", db_name, collection_name))),
+      7);
+
+  // Exact match using the same type as stored.
+  EXPECT_EQ(get_label(R"({"_id": {"$numberLong": "1"}})"), "int64_one");
+  EXPECT_EQ(get_label(R"({"_id": {"$numberInt": "10"}})"), "int32_ten");
+
+  // $gt with double boundary across int types:
+  // _id > 0.5 should return int64(1), double(2.5), int32(10), int64(100) = 4 docs.
+  EXPECT_EQ(count_matching(R"({"_id": {"$gt": 0.5}})"), 4);
+
+  // $lt with negative double boundary:
+  // _id < -1.0 should return double(-1.5) = 1 doc.
+  // Binary comparison would fail: double(-1.5) bytes > int32(-1) bytes.
+  EXPECT_EQ(count_matching(R"({"_id": {"$lt": -1.0}})"), 1);
+
+  // $gt with int boundary should include double values:
+  // _id > 2 should return double(2.5), int32(10), int64(100) = 3 docs.
+  EXPECT_EQ(count_matching(R"({"_id": {"$gt": 2}})"), 3);
+
+  // $lt with int boundary should include double values:
+  // _id < 1 should return double(-1.5), int32(-1), int32(0) = 3 docs.
+  EXPECT_EQ(count_matching(R"({"_id": {"$lt": 1}})"), 3);
+
+  // Range query spanning mixed types:
+  // -1 < _id < 10 should return int32(0), int64(1), double(2.5) = 3 docs.
+  EXPECT_EQ(count_matching(R"({"_id": {"$gt": -1, "$lt": 10}})"), 3);
+
+  // $gte/$lte with exact type boundaries:
+  // -1.5 <= _id <= 2.5 should return double(-1.5), int32(-1), int32(0), int64(1), double(2.5)
+  // = 5 docs.
+  EXPECT_EQ(count_matching(R"({"_id": {"$gte": -1.5, "$lte": 2.5}})"), 5);
+
+  // All negative: _id < 0 should return double(-1.5), int32(-1) = 2 docs.
+  EXPECT_EQ(count_matching(R"({"_id": {"$lt": 0}})"), 2);
+
+  // All positive: _id > 0 should return int64(1), double(2.5), int32(10), int64(100) = 4 docs.
+  EXPECT_EQ(count_matching(R"({"_id": {"$gt": 0}})"), 4);
+}
+
 }  // namespace yb
