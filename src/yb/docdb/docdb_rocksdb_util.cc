@@ -21,6 +21,7 @@
 #include "yb/common/transaction.h"
 
 #include "yb/dockv/doc_key.h"
+#include "yb/dockv/docdb_key_comparator.h"
 #include "yb/dockv/value_type.h"
 
 #include "yb/docdb/bounded_rocksdb_iterator.h"
@@ -151,6 +152,12 @@ DEFINE_NON_RUNTIME_uint64(db_max_flushing_bytes, 250_MB,
 
 DEFINE_UNKNOWN_bool(use_docdb_aware_bloom_filter, true,
     "Whether to use the DocDbAwareFilterPolicy for both bloom storage and seeks.");
+
+DEFINE_UNKNOWN_bool(use_docdb_key_comparator, false,
+    "Whether to use the DocDB-aware key comparator that handles BSON comparison "
+    "correctly. Must be set consistently for the lifetime of a database. When enabled, "
+    "BSON key entries are compared using BSON-specific comparison rules instead of "
+    "byte-wise ordering.");
 
 DEFINE_UNKNOWN_bool(use_multi_level_index, true, "Whether to use multi-level data index.");
 
@@ -660,6 +667,10 @@ void InitRocksDBBaseOptions(
   AutoInitFromRocksDBFlags(options);
   options->tablet_id = tablet_id;
   options->create_if_missing = true;
+
+  if (FLAGS_use_docdb_key_comparator) {
+    options->comparator = dockv::DocDBKeyComparatorInstance();
+  }
   // We should always sync data to ensure we can recover rocksdb from crash.
   options->disableDataSync = false;
   options->info_log_level = YBRocksDBLogger::ConvertToRocksDBLogLevel(FLAGS_minloglevel);
