@@ -3,6 +3,7 @@
 #include "udfs/commands_diagnostic/kill_op--0.109-0.sql"
 #include "udfs/aggregation/group_aggregates_support--0.109-0.sql"
 #include "udfs/aggregation/group_aggregates--0.109-0.sql"
+/* YB: rum is now supported. Previously this block was commented out. */
 #include "udfs/rum/bson_rum_shard_exclusion_functions--0.109-0.sql"
 #include "schema/unique_shard_path_operator_class--0.109-0.sql"
 #include "udfs/aggregation/bson_aggregation_getmore--0.109-0.sql"
