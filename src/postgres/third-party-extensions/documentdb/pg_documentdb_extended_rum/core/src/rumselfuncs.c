@@ -24,6 +24,7 @@
 #include "math.h"
 
 #include "pg_documentdb_rum.h"
+#include "pg_yb_utils.h"
 
 #define DEFAULT_PAGE_CPU_MULTIPLIER 50.0
 
@@ -118,8 +119,9 @@ RumCostEstimateCore(PlannerInfo *root, IndexPath *path, double loop_count,
 	/*
 	 * Obtain statistical information from the meta page, if possible.  Else
 	 * set ginStats to zeroes, and we'll cope below.
+	 * YB: Skip for YB-backed relations since the meta page is not in local storage.
 	 */
-	if (!index->hypothetical)
+	if (!index->hypothetical && !IsYBRelationById(index->indexoid))
 	{
 		/* Lock should have already been obtained in plancat.c */
 		indexRel = index_open(index->indexoid, NoLock);

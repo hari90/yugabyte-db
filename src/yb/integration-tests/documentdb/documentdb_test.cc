@@ -149,6 +149,18 @@ TEST_F(DocumentDBTest, RumIndexOnYBCollection) {
       db_name, coll_name)));
   ASSERT_EQ(count, 5);
 
+  // Query with filter through the DocumentDB find API - this exercises the
+  // RUM index scan path on YB.
+  auto first_doc = ASSERT_RESULT(conn_->FetchRow<std::string>(Format(
+      R"(
+    SELECT (((cursorpage->>'cursor')::bson->>'firstBatch')::bson->>'0')::bson->>'a'
+      FROM documentdb_api.find_cursor_first_page('$0',
+        '{"find":"$1", "filter":{"a":{"$$lte":10}}, "sort":{"a":1}, "limit":1}')
+    )",
+      db_name, coll_name)));
+  // Smallest "a" value <= 10 is 1.
+  ASSERT_EQ(first_doc, "1");
+
   // Delete a document and verify count changes.
   ASSERT_OK(conn_->FetchFormat(
       R"(
