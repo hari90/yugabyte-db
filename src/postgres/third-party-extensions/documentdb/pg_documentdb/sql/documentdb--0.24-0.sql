@@ -74,8 +74,6 @@ CREATE SCHEMA documentdb_data;
 #include "operators/bson_dollar_operators--0.16-0.sql"
 #include "operators/bson_dollar_negation_operators--0.16-0.sql"
 
-/*
- * YB: rum is not supported.
 #include "udfs/rum/handler--0.10-0.sql"
 #include "schema/rum_access_method--0.10-0.sql"
 #include "schema/unique_shard_path_operator_class--0.24-0.sql"
@@ -95,7 +93,6 @@ CREATE SCHEMA documentdb_data;
 
 #include "schema/index_operator_classes_negation--0.16-0.sql"
 #include "schema/index_operator_classes_range--0.23-0.sql"
- */
 
 /*
  * Region: Aggregation operators.

@@ -109,9 +109,7 @@ InstallDocumentDBApiPostgresHooks(void)
 	RegisterExplainScanNodes();
 
 	/* Load the rum routine in the shared_preload_libraries to avoid LoadLibrary calls all the time */
-	/* YB: Don't load RUM routine if YugaByte is enabled. */
-	if (!YBIsEnabledInPostgresEnvVar())
-		LoadRumRoutine();
+	LoadRumRoutine();
 
 	SetupCursorStorage();
 }
