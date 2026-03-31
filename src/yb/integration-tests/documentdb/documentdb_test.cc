@@ -148,6 +148,19 @@ TEST_F(DocumentDBTest, RumIndexOnYBCollection) {
       "SELECT count(*) FROM documentdb_api.collection('$0','$1')",
       db_name, coll_name)));
   ASSERT_EQ(count, 5);
+
+  // Delete a document and verify count changes.
+  ASSERT_OK(conn_->FetchFormat(
+      R"(
+    SELECT documentdb_api.delete('$0', '{"delete": "$1",
+      "deletes": [{"q": {"_id": 1}, "limit": 1}]}')
+    )",
+      db_name, coll_name));
+
+  auto new_count = ASSERT_RESULT(conn_->FetchRow<int64_t>(Format(
+      "SELECT count(*) FROM documentdb_api.collection('$0','$1')",
+      db_name, coll_name)));
+  ASSERT_EQ(new_count, 4);
 }
 
 TEST_F(DocumentDBTest, SimpleCollection) {
