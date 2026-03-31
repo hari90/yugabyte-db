@@ -175,6 +175,51 @@ TEST_F(DocumentDBTest, RumIndexOnYBCollection) {
   ASSERT_EQ(new_count, 4);
 }
 
+TEST_F(DocumentDBTest, RumIndexBackwardScan) {
+  const auto db_name = "rumdb";
+  const auto coll_name = "rum_backward";
+
+  // Insert documents.
+  ASSERT_OK(conn_->FetchFormat(
+      R"(
+  SELECT documentdb_api.insert('$0', '{"insert":"$1", "documents":[
+    {"_id": 1, "a": 10},
+    {"_id": 2, "a": 5},
+    {"_id": 3, "a": 20},
+    {"_id": 4, "a": 15},
+    {"_id": 5, "a": 1}]}')
+  )",
+      db_name, coll_name));
+
+  // Create index.
+  ASSERT_OK(conn_->FetchFormat(
+      R"(
+  SELECT documentdb_api_internal.create_indexes_non_concurrently('$0',
+    '{"createIndexes":"$1", "indexes":[{"key":{"a":1}, "name":"a_1"}]}', true)
+  )",
+      db_name, coll_name));
+
+  // Forward scan (sort ascending) - smallest first.
+  auto asc_doc = ASSERT_RESULT(conn_->FetchRow<std::string>(Format(
+      R"(
+    SELECT (((cursorpage->>'cursor')::bson->>'firstBatch')::bson->>'0')::bson->>'a'
+      FROM documentdb_api.find_cursor_first_page('$0',
+        '{"find":"$1", "sort":{"a":1}, "limit":1}')
+    )",
+      db_name, coll_name)));
+  ASSERT_EQ(asc_doc, "1");
+
+  // Backward scan (sort descending) - largest first.
+  auto desc_doc = ASSERT_RESULT(conn_->FetchRow<std::string>(Format(
+      R"(
+    SELECT (((cursorpage->>'cursor')::bson->>'firstBatch')::bson->>'0')::bson->>'a'
+      FROM documentdb_api.find_cursor_first_page('$0',
+        '{"find":"$1", "sort":{"a":-1}, "limit":1}')
+    )",
+      db_name, coll_name)));
+  ASSERT_EQ(desc_doc, "20");
+}
+
 TEST_F(DocumentDBTest, SimpleCollection) {
   const auto db_name = "documentdb";
   const auto collection_name = "patient";
