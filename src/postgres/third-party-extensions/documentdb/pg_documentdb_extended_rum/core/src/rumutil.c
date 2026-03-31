@@ -31,6 +31,39 @@
 #include "commands/vacuum.h"
 
 #include "pg_documentdb_rum.h"
+#include "common/pg_yb_common.h"
+#include "nodes/plannodes.h"
+#include "pg_yb_utils.h"
+
+/* YB-specific RUM write functions (ybrumwrite.c) */
+extern IndexBuildResult *ybrumbuild(Relation heap, Relation index,
+									struct IndexInfo *indexInfo);
+extern void ybrumbuildempty(Relation index);
+extern IndexBulkDeleteResult *ybrumbulkdelete(IndexVacuumInfo *info,
+											  IndexBulkDeleteResult *stats,
+											  IndexBulkDeleteCallback callback,
+											  void *callback_state);
+extern IndexBulkDeleteResult *ybrumvacuumcleanup(IndexVacuumInfo *info,
+												 IndexBulkDeleteResult *stats);
+extern bool ybruminsert(Relation index, Datum *values, bool *isnull,
+						Datum ybctid, Relation heap,
+						IndexUniqueCheck checkUnique,
+						struct IndexInfo *indexInfo, bool shared_insert);
+extern void ybrumdelete(Relation index, Datum *values, bool *isnull,
+						Datum ybctid, Relation heap,
+						struct IndexInfo *indexInfo);
+extern IndexBuildResult *ybrumbackfill(Relation heap, Relation index,
+									   struct IndexInfo *indexInfo,
+									   struct YbBackfillInfo *bfinfo,
+									   struct YbPgExecOutParam *bfresult);
+extern void ybrumbindschema(YbcPgStatement handle,
+							struct IndexInfo *indexInfo,
+							TupleDesc indexTupleDesc,
+							int16 *coloptions, Oid *opclassOids,
+							Datum reloptions);
+extern bool ybrummightrecheck(Scan *scan, Relation heapRelation,
+							  Relation indexRelation, bool xs_want_itup,
+							  ScanKey keys, int nkeys);
 
 PG_MODULE_MAGIC;
 
@@ -188,6 +221,26 @@ documentdb_rumhandler(PG_FUNCTION_ARGS)
 
 	/* Allow operator classes to define custom opclass-options */
 	amroutine->amoptsprocnum = RUM_INDEX_CONFIG_PROC;
+
+	/* YB: Override with YB-specific functions when running on YugabyteDB.
+	 * Use YBIsEnabledInPostgresEnvVar() because this runs during
+	 * shared_preload_libraries init when IsYugaByteEnabled() is not yet true.
+	 */
+	if (YBIsEnabledInPostgresEnvVar())
+	{
+		amroutine->yb_amisforybrelation = true;
+		amroutine->ambuild = ybrumbuild;
+		amroutine->ambuildempty = ybrumbuildempty;
+		amroutine->aminsert = NULL; /* use yb_aminsert below instead */
+		amroutine->ambulkdelete = ybrumbulkdelete;
+		amroutine->amvacuumcleanup = ybrumvacuumcleanup;
+		amroutine->yb_aminsert = ybruminsert;
+		amroutine->yb_amdelete = ybrumdelete;
+		amroutine->yb_amupdate = NULL;
+		amroutine->yb_ambackfill = ybrumbackfill;
+		amroutine->yb_ambindschema = ybrumbindschema;
+		amroutine->yb_ammightrecheck = ybrummightrecheck;
+	}
 
 	PG_RETURN_POINTER(amroutine);
 }

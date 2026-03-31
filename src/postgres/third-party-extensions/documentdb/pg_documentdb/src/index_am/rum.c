@@ -352,6 +352,23 @@ GetRumIndexHandler(PG_FUNCTION_ARGS)
 	indexRoutine->aminsert = extension_ruminsert;
 	indexRoutine->amcanreturn = NULL;
 
+	/*
+	 * YB: If running on YugabyteDB, the yb_amisforybrelation flag and
+	 * YB-specific callbacks (yb_aminsert, yb_amdelete, yb_ambackfill, etc.)
+	 * are already set from the base rum_index_routine loaded from
+	 * documentdb_rumhandler. We keep them so the RUM AM works on YB relations.
+	 * Override ambuild/aminsert to NULL for YB since those use heap access;
+	 * the YB write path goes through yb_aminsert/yb_amdelete instead.
+	 */
+	if (indexRoutine->yb_amisforybrelation)
+	{
+		indexRoutine->ambuild = rum_index_routine.ambuild;
+		indexRoutine->aminsert = NULL;
+		indexRoutine->ambuildempty = rum_index_routine.ambuildempty;
+		indexRoutine->ambulkdelete = rum_index_routine.ambulkdelete;
+		indexRoutine->amvacuumcleanup = rum_index_routine.amvacuumcleanup;
+	}
+
 	return indexRoutine;
 }
 
