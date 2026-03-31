@@ -159,13 +159,12 @@ int MaxAllowedCursorIntermediateFileSizeMB =
 int MaxCursorFileCount = DEFAULT_MAX_CURSOR_FILE_COUNT;
 
 /* YB: Always use documentdb_extended_rum for the rum library.
- * Upstream has the following version-gated default:
- * #if PG_VERSION_NUM >= 180000
- * #define DEFAULT_RUM_LIBRARY_LOAD_OPTION RumLibraryLoadOption_RequireDocumentDBRum
- * #else
- * #define DEFAULT_RUM_LIBRARY_LOAD_OPTION RumLibraryLoadOption_None
- * #endif
- */
+#if PG_VERSION_NUM >= 180000
+#define DEFAULT_RUM_LIBRARY_LOAD_OPTION RumLibraryLoadOption_RequireDocumentDBRum
+#else
+#define DEFAULT_RUM_LIBRARY_LOAD_OPTION RumLibraryLoadOption_None
+#endif
+*/
 #define DEFAULT_RUM_LIBRARY_LOAD_OPTION RumLibraryLoadOption_RequireDocumentDBRum
 
 RumLibraryLoadOptions DocumentDBRumLibraryLoadOption = DEFAULT_RUM_LIBRARY_LOAD_OPTION;
