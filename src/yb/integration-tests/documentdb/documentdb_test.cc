@@ -112,32 +112,42 @@ TEST_F(DocumentDBTest, RumExtensibilityFunctionsExist) {
   ASSERT_EQ(text_funcs, 6);
 }
 
-TEST_F(DocumentDBTest, RumIndexOnTempTable) {
-  // Verify that RUM indexes can be created and used on non-YB (temporary) tables.
-  // Temp tables use vanilla postgres storage, so RUM works on them directly.
-  ASSERT_OK(conn_->Execute(
-      "CREATE TEMP TABLE rum_test_docs (id serial, document documentdb_core.bson)"));
+TEST_F(DocumentDBTest, RumIndexOnYBCollection) {
+  const auto db_name = "rumdb";
+  const auto coll_name = "rum_yb_coll";
 
-  ASSERT_OK(conn_->Execute(
-      "INSERT INTO rum_test_docs (document) VALUES "
-      "('{ \"a\": 1, \"b\": \"hello\" }'::documentdb_core.bson), "
-      "('{ \"a\": 2, \"b\": \"world\" }'::documentdb_core.bson), "
-      "('{ \"a\": 3, \"b\": \"foo\" }'::documentdb_core.bson)"));
+  // Insert documents into a YB-backed collection.
+  ASSERT_OK(conn_->FetchFormat(
+      R"(
+  SELECT documentdb_api.insert('$0', '{"insert":"$1", "documents":[
+    {"_id": 1, "a": 10, "b": "hello"},
+    {"_id": 2, "a": 5, "b": "world"},
+    {"_id": 3, "a": 20, "b": "foo"},
+    {"_id": 4, "a": 15, "b": "bar"},
+    {"_id": 5, "a": 1, "b": "baz"}]}')
+  )",
+      db_name, coll_name));
 
-  // Create a RUM index using the single-path operator class on the temp table.
-  ASSERT_OK(conn_->Execute(
-      "CREATE INDEX rum_test_idx ON rum_test_docs USING documentdb_rum "
-      "(document documentdb_api_catalog.bson_rum_single_path_ops)"));
+  // Create a single-field index via DocumentDB API.
+  // This internally creates a RUM index on the YB table.
+  ASSERT_OK(conn_->FetchFormat(
+      R"(
+  SELECT documentdb_api_internal.create_indexes_non_concurrently('$0',
+    '{"createIndexes":"$1", "indexes":[{"key":{"a":1}, "name":"a_1"}]}', true)
+  )",
+      db_name, coll_name));
 
-  // Verify the index was created.
+  // Verify that the RUM index was created in the catalog.
   auto idx_count = ASSERT_RESULT(conn_->FetchRow<int64_t>(
-      "SELECT count(*) FROM pg_indexes WHERE indexname = 'rum_test_idx'"));
-  ASSERT_EQ(idx_count, 1);
+      "SELECT count(*) FROM pg_indexes "
+      "WHERE indexname LIKE 'documents_rum_index_%'"));
+  ASSERT_GE(idx_count, 1);
 
-  // Verify data is still accessible.
-  auto row_count = ASSERT_RESULT(conn_->FetchRow<int64_t>(
-      "SELECT count(*) FROM rum_test_docs"));
-  ASSERT_EQ(row_count, 3);
+  // Verify data is still accessible after index creation.
+  auto count = ASSERT_RESULT(conn_->FetchRow<int64_t>(Format(
+      "SELECT count(*) FROM documentdb_api.collection('$0','$1')",
+      db_name, coll_name)));
+  ASSERT_EQ(count, 5);
 }
 
 TEST_F(DocumentDBTest, SimpleCollection) {
