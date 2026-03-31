@@ -53,7 +53,7 @@ set(DOCKV_SRCS
     value_packing_v2.cc
     )
 
-set(DOCKV_DEPS dockv_proto rocksdb vector_index yb_common yb_pggate_util yb_util)
+set(DOCKV_DEPS bson dockv_proto rocksdb vector_index yb_common yb_pggate_util yb_util)
 
 ADD_YB_LIBRARY(yb_dockv
         SRCS ${DOCKV_SRCS}

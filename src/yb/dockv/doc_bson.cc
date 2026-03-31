@@ -13,10 +13,9 @@
 
 #include "yb/dockv/doc_bson.h"
 
-#include <string.h>
-
-#include <algorithm>
 #include <cmath>
+
+#include <bson/bson.h>
 
 #include "yb/dockv/doc_kv_util.h"
 #include "yb/util/result.h"
@@ -25,373 +24,270 @@ namespace yb::dockv {
 
 namespace {
 
-// BSON element type constants.
-constexpr uint8_t kBsonTypeDouble = 0x01;
-constexpr uint8_t kBsonTypeString = 0x02;
-constexpr uint8_t kBsonTypeDocument = 0x03;
-constexpr uint8_t kBsonTypeArray = 0x04;
-constexpr uint8_t kBsonTypeBinary = 0x05;
-constexpr uint8_t kBsonTypeUndefined = 0x06;
-constexpr uint8_t kBsonTypeObjectId = 0x07;
-constexpr uint8_t kBsonTypeBoolean = 0x08;
-constexpr uint8_t kBsonTypeDatetime = 0x09;
-constexpr uint8_t kBsonTypeNull = 0x0A;
-constexpr uint8_t kBsonTypeRegex = 0x0B;
-constexpr uint8_t kBsonTypeSymbol = 0x0E;
-constexpr uint8_t kBsonTypeInt32 = 0x10;
-constexpr uint8_t kBsonTypeTimestamp = 0x11;
-constexpr uint8_t kBsonTypeInt64 = 0x12;
-constexpr uint8_t kBsonTypeDecimal128 = 0x13;
-constexpr uint8_t kBsonTypeMinKey = 0xFF;
-constexpr uint8_t kBsonTypeMaxKey = 0x7F;
-
-// Returns the canonical type order for BSON comparison, following MongoDB's ordering:
-// MinKey < Null < Number < String < Object < Array < BinData < ObjectId <
-// Boolean < Date < Timestamp < RegEx < MaxKey
-int BsonTypeOrder(uint8_t bson_type) {
-  switch (bson_type) {
-    case kBsonTypeMinKey:     return -1;
-    case kBsonTypeNull:       return 1;
-    case kBsonTypeUndefined:  return 1;  // Deprecated, treated as null.
-    case kBsonTypeDouble:     return 2;
-    case kBsonTypeInt32:      return 2;
-    case kBsonTypeInt64:      return 2;
-    case kBsonTypeDecimal128: return 2;
-    case kBsonTypeString:     return 3;
-    case kBsonTypeSymbol:     return 3;  // Deprecated, treated as string.
-    case kBsonTypeDocument:   return 4;
-    case kBsonTypeArray:      return 5;
-    case kBsonTypeBinary:     return 6;
-    case kBsonTypeObjectId:   return 7;
-    case kBsonTypeBoolean:    return 8;
-    case kBsonTypeDatetime:   return 9;
-    case kBsonTypeTimestamp:  return 10;
-    case kBsonTypeRegex:      return 11;
-    case kBsonTypeMaxKey:     return 12;
-    default:                  return 100;
-  }
-}
-
-int32_t ReadLittleEndian32(const uint8_t* p) {
-  int32_t result;
-  memcpy(&result, p, sizeof(result));
-#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-  result = __builtin_bswap32(result);
-#endif
-  return result;
-}
-
-int64_t ReadLittleEndian64(const uint8_t* p) {
-  int64_t result;
-  memcpy(&result, p, sizeof(result));
-#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-  result = __builtin_bswap64(result);
-#endif
-  return result;
-}
-
-uint32_t ReadLittleEndianU32(const uint8_t* p) {
-  uint32_t result;
-  memcpy(&result, p, sizeof(result));
-#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-  result = __builtin_bswap32(result);
-#endif
-  return result;
-}
-
-double ReadLittleEndianDouble(const uint8_t* p) {
-  double result;
-  memcpy(&result, p, sizeof(result));
-  return result;
-}
-
-// Returns the size in bytes of a BSON element's value (not including type byte and field name).
-size_t BsonElementValueSize(uint8_t type, const uint8_t* data, const uint8_t* end) {
+// Returns the canonical sort order for a BSON type, following MongoDB's ordering:
+// MinKey < Null/Undefined < Number < String/Symbol < Document < Array < Binary <
+// ObjectId < Boolean < DateTime < Timestamp < Regex < ... < MaxKey
+//
+// This matches the ordering used by the DocumentDB extension's GetSortOrderType().
+int GetSortOrderType(bson_type_t type) {
   switch (type) {
-    case kBsonTypeDouble:
-      return 8;
-    case kBsonTypeString:
-    case kBsonTypeSymbol:
-      // int32 string_length + string bytes (including null terminator).
-      if (data + 4 <= end) {
-        return 4 + static_cast<size_t>(ReadLittleEndian32(data));
-      }
-      return end - data;
-    case kBsonTypeDocument:
-    case kBsonTypeArray:
-      // Document size includes the size field itself.
-      if (data + 4 <= end) {
-        return static_cast<size_t>(ReadLittleEndian32(data));
-      }
-      return end - data;
-    case kBsonTypeBinary:
-      // int32 length + subtype byte + binary data.
-      if (data + 4 <= end) {
-        return 5 + static_cast<size_t>(ReadLittleEndian32(data));
-      }
-      return end - data;
-    case kBsonTypeObjectId:
-      return 12;
-    case kBsonTypeBoolean:
-      return 1;
-    case kBsonTypeDatetime:
-      return 8;
-    case kBsonTypeNull:
-    case kBsonTypeUndefined:
-    case kBsonTypeMinKey:
-    case kBsonTypeMaxKey:
-      return 0;
-    case kBsonTypeRegex: {
-      // Two C strings (pattern + options).
-      const uint8_t* p = data;
-      while (p < end && *p) p++;
-      if (p < end) p++;  // Skip null terminator of pattern.
-      while (p < end && *p) p++;
-      if (p < end) p++;  // Skip null terminator of options.
-      return p - data;
-    }
-    case kBsonTypeInt32:
-      return 4;
-    case kBsonTypeTimestamp:
-      return 8;
-    case kBsonTypeInt64:
-      return 8;
-    case kBsonTypeDecimal128:
-      return 16;
+    case BSON_TYPE_EOD:
+    case BSON_TYPE_MINKEY:
+      return 0x0;
+    case BSON_TYPE_UNDEFINED:
+    case BSON_TYPE_NULL:
+      return 0x1;
+    case BSON_TYPE_DOUBLE:
+    case BSON_TYPE_INT32:
+    case BSON_TYPE_INT64:
+    case BSON_TYPE_DECIMAL128:
+      return 0x2;
+    case BSON_TYPE_BOOL:
+      return 0x8;
+    case BSON_TYPE_UTF8:
+    case BSON_TYPE_SYMBOL:
+      return 0x3;
+    case BSON_TYPE_DOCUMENT:
+      return 0x4;
+    case BSON_TYPE_ARRAY:
+      return 0x5;
+    case BSON_TYPE_BINARY:
+      return 0x6;
+    case BSON_TYPE_OID:
+      return 0x7;
+    case BSON_TYPE_DATE_TIME:
+      return 0x9;
+    case BSON_TYPE_TIMESTAMP:
+      return 0xA;
+    case BSON_TYPE_REGEX:
+      return 0xB;
+    case BSON_TYPE_DBPOINTER:
+      return 0xC;
+    case BSON_TYPE_CODE:
+      return 0xD;
+    case BSON_TYPE_CODEWSCOPE:
+      return 0xE;
+    case BSON_TYPE_MAXKEY:
+      return 0xF;
     default:
-      return end - data;
+      return 0xFF;
   }
 }
 
-// Compares two BSON numeric values, handling cross-type comparison.
-int CompareNumbers(uint8_t type_a, const uint8_t* data_a,
-                   uint8_t type_b, const uint8_t* data_b) {
-  // Same-type comparison for exact precision.
-  if (type_a == type_b) {
-    switch (type_a) {
-      case kBsonTypeInt32: {
-        int32_t a = ReadLittleEndian32(data_a);
-        int32_t b = ReadLittleEndian32(data_b);
-        return (a < b) ? -1 : (a > b) ? 1 : 0;
-      }
-      case kBsonTypeInt64: {
-        int64_t a = ReadLittleEndian64(data_a);
-        int64_t b = ReadLittleEndian64(data_b);
-        return (a < b) ? -1 : (a > b) ? 1 : 0;
-      }
-      case kBsonTypeDouble: {
-        double a = ReadLittleEndianDouble(data_a);
-        double b = ReadLittleEndianDouble(data_b);
-        // NaN handling: NaN is considered equal to NaN and less than all other numbers.
-        if (std::isnan(a) && std::isnan(b)) return 0;
-        if (std::isnan(a)) return -1;
-        if (std::isnan(b)) return 1;
-        return (a < b) ? -1 : (a > b) ? 1 : 0;
-      }
-      default:
-        break;
-    }
+int CompareSortOrderType(bson_type_t left, bson_type_t right) {
+  return GetSortOrderType(left) - GetSortOrderType(right);
+}
+
+// Converts a bson_value_t number to long double for cross-type comparison.
+long double BsonNumberAsLongDouble(const bson_value_t* value) {
+  switch (value->value_type) {
+    case BSON_TYPE_DOUBLE:
+      return static_cast<long double>(value->value.v_double);
+    case BSON_TYPE_INT32:
+      return static_cast<long double>(value->value.v_int32);
+    case BSON_TYPE_INT64:
+      return static_cast<long double>(value->value.v_int64);
+    case BSON_TYPE_BOOL:
+      return value->value.v_bool ? 1.0L : 0.0L;
+    default:
+      return 0.0L;
+  }
+}
+
+// Converts a bson_value_t number to int64_t.
+int64_t BsonNumberAsInt64(const bson_value_t* value) {
+  switch (value->value_type) {
+    case BSON_TYPE_INT64:
+      return value->value.v_int64;
+    case BSON_TYPE_INT32:
+      return static_cast<int64_t>(value->value.v_int32);
+    case BSON_TYPE_DOUBLE:
+      return static_cast<int64_t>(value->value.v_double);
+    case BSON_TYPE_BOOL:
+      return value->value.v_bool ? 1 : 0;
+    default:
+      return 0;
+  }
+}
+
+// Compares two BSON numeric values with cross-type promotion.
+// Follows the same logic as DocumentDB's CompareNumbers.
+int CompareNumbers(const bson_value_t* left, const bson_value_t* right) {
+  // If either is double, compare as long double for precision.
+  if (left->value_type == BSON_TYPE_DOUBLE || right->value_type == BSON_TYPE_DOUBLE) {
+    long double left_val = BsonNumberAsLongDouble(left);
+    long double right_val = BsonNumberAsLongDouble(right);
+
+    if (std::isnan(left_val) && std::isnan(right_val)) return 0;
+    if (std::isnan(left_val)) return -1;
+    if (std::isnan(right_val)) return 1;
+
+    return (left_val > right_val) ? 1 : (left_val < right_val) ? -1 : 0;
   }
 
-  // Cross-type numeric comparison.
-  // For int64 vs int32, compare as int64.
-  if ((type_a == kBsonTypeInt64 || type_a == kBsonTypeInt32) &&
-      (type_b == kBsonTypeInt64 || type_b == kBsonTypeInt32)) {
-    int64_t a = (type_a == kBsonTypeInt64) ? ReadLittleEndian64(data_a)
-                                           : static_cast<int64_t>(ReadLittleEndian32(data_a));
-    int64_t b = (type_b == kBsonTypeInt64) ? ReadLittleEndian64(data_b)
-                                           : static_cast<int64_t>(ReadLittleEndian32(data_b));
-    return (a < b) ? -1 : (a > b) ? 1 : 0;
-  }
+  // Both are integer types (int32, int64, bool) - compare as int64.
+  int64_t left_val = BsonNumberAsInt64(left);
+  int64_t right_val = BsonNumberAsInt64(right);
+  return (left_val > right_val) ? 1 : (left_val < right_val) ? -1 : 0;
+}
 
-  // For comparisons involving double, use double.
-  // Note: this may lose precision for very large int64 values, matching MongoDB behavior.
-  auto to_double = [](uint8_t type, const uint8_t* data) -> double {
-    switch (type) {
-      case kBsonTypeDouble: return ReadLittleEndianDouble(data);
-      case kBsonTypeInt32: return static_cast<double>(ReadLittleEndian32(data));
-      case kBsonTypeInt64: return static_cast<double>(ReadLittleEndian64(data));
-      default: return 0.0;
-    }
-  };
-
-  double a = to_double(type_a, data_a);
-  double b = to_double(type_b, data_b);
-  if (std::isnan(a) && std::isnan(b)) return 0;
-  if (std::isnan(a)) return -1;
-  if (std::isnan(b)) return 1;
-  return (a < b) ? -1 : (a > b) ? 1 : 0;
+int CompareStrings(const char* left, uint32_t left_len,
+                   const char* right, uint32_t right_len) {
+  uint32_t min_len = std::min(left_len, right_len);
+  int cmp = memcmp(left, right, min_len);
+  if (cmp != 0) return (cmp < 0) ? -1 : 1;
+  return (left_len < right_len) ? -1 : (left_len > right_len) ? 1 : 0;
 }
 
 // Forward declaration for recursive comparison.
-int CompareBsonDocuments(const uint8_t* a_data, const uint8_t* a_end,
-                         const uint8_t* b_data, const uint8_t* b_end);
+int CompareBsonIter(bson_iter_t* left, bson_iter_t* right, bool compare_fields);
 
-// Compares two BSON element values given their types and value data pointers.
-int CompareBsonElementValues(uint8_t type_a, const uint8_t* data_a, const uint8_t* end_a,
-                             uint8_t type_b, const uint8_t* data_b, const uint8_t* end_b) {
-  int order_a = BsonTypeOrder(type_a);
-  int order_b = BsonTypeOrder(type_b);
-
-  if (order_a != order_b) {
-    return (order_a < order_b) ? -1 : 1;
-  }
-
-  // Same canonical type - compare values.
-  if (order_a == 2) {
-    // Numeric types - use cross-type numeric comparison.
-    return CompareNumbers(type_a, data_a, type_b, data_b);
-  }
-
-  // Use type_a for switch since both have the same canonical order.
-  switch (order_a) {
-    case -1:  // MinKey
-    case 12:  // MaxKey
-    case 1:   // Null/Undefined
+// Compares two bson_value_t values that have the same sort order type.
+int CompareBsonValues(const bson_value_t* left, const bson_value_t* right) {
+  switch (left->value_type) {
+    case BSON_TYPE_EOD:
+    case BSON_TYPE_MINKEY:
+    case BSON_TYPE_UNDEFINED:
+    case BSON_TYPE_NULL:
+    case BSON_TYPE_MAXKEY:
       return 0;
 
-    case 3: {  // String/Symbol
-      int32_t len_a = ReadLittleEndian32(data_a);
-      int32_t len_b = ReadLittleEndian32(data_b);
-      // Length includes the null terminator. Compare the string content.
-      int32_t min_content_len = std::min(len_a, len_b) - 1;
-      if (min_content_len > 0) {
-        int cmp = memcmp(data_a + 4, data_b + 4, min_content_len);
-        if (cmp != 0) return (cmp < 0) ? -1 : 1;
+    case BSON_TYPE_DOUBLE:
+    case BSON_TYPE_INT32:
+    case BSON_TYPE_INT64:
+    case BSON_TYPE_BOOL:
+      return CompareNumbers(left, right);
+
+    case BSON_TYPE_UTF8:
+      return CompareStrings(
+          left->value.v_utf8.str, left->value.v_utf8.len,
+          right->value.v_utf8.str, right->value.v_utf8.len);
+
+    case BSON_TYPE_SYMBOL:
+      return CompareStrings(
+          left->value.v_symbol.symbol, left->value.v_symbol.len,
+          right->value.v_symbol.symbol, right->value.v_symbol.len);
+
+    case BSON_TYPE_DOCUMENT:
+    case BSON_TYPE_ARRAY: {
+      bson_iter_t left_inner, right_inner;
+      if (!bson_iter_init_from_data(
+              &left_inner, left->value.v_doc.data, left->value.v_doc.data_len) ||
+          !bson_iter_init_from_data(
+              &right_inner, right->value.v_doc.data, right->value.v_doc.data_len)) {
+        return 0;
       }
-      return (len_a < len_b) ? -1 : (len_a > len_b) ? 1 : 0;
+      return CompareBsonIter(&left_inner, &right_inner, /*compare_fields=*/true);
     }
 
-    case 4:   // Document
-    case 5: {  // Array (compared as document)
-      int32_t size_a = ReadLittleEndian32(data_a);
-      int32_t size_b = ReadLittleEndian32(data_b);
-      return CompareBsonDocuments(data_a, data_a + size_a, data_b, data_b + size_b);
-    }
-
-    case 6: {  // Binary
-      int32_t len_a = ReadLittleEndian32(data_a);
-      int32_t len_b = ReadLittleEndian32(data_b);
-      // Compare length first.
-      if (len_a != len_b) return (len_a < len_b) ? -1 : 1;
-      // Compare subtype.
-      if (data_a[4] != data_b[4]) return (data_a[4] < data_b[4]) ? -1 : 1;
-      // Compare binary data.
-      if (len_a > 0) {
-        int cmp = memcmp(data_a + 5, data_b + 5, len_a);
+    case BSON_TYPE_BINARY: {
+      uint32_t left_len = left->value.v_binary.data_len;
+      uint32_t right_len = right->value.v_binary.data_len;
+      if (left_len != right_len) {
+        return (left_len < right_len) ? -1 : 1;
+      }
+      if (left->value.v_binary.subtype != right->value.v_binary.subtype) {
+        return (left->value.v_binary.subtype < right->value.v_binary.subtype) ? -1 : 1;
+      }
+      if (left_len > 0) {
+        int cmp = memcmp(left->value.v_binary.data, right->value.v_binary.data, left_len);
         if (cmp != 0) return (cmp < 0) ? -1 : 1;
       }
       return 0;
     }
 
-    case 7: {  // ObjectId (12 bytes, big-endian comparison).
-      int cmp = memcmp(data_a, data_b, 12);
-      return (cmp < 0) ? -1 : (cmp > 0) ? 1 : 0;
+    case BSON_TYPE_OID:
+      return bson_oid_compare(&left->value.v_oid, &right->value.v_oid);
+
+    case BSON_TYPE_DATE_TIME: {
+      int64_t l = left->value.v_datetime;
+      int64_t r = right->value.v_datetime;
+      return (l > r) ? 1 : (l < r) ? -1 : 0;
     }
 
-    case 8: {  // Boolean
-      return (data_a[0] < data_b[0]) ? -1 : (data_a[0] > data_b[0]) ? 1 : 0;
+    case BSON_TYPE_TIMESTAMP: {
+      // Compare seconds first, then increment.
+      if (left->value.v_timestamp.timestamp != right->value.v_timestamp.timestamp) {
+        return (left->value.v_timestamp.timestamp > right->value.v_timestamp.timestamp)
+            ? 1 : -1;
+      }
+      if (left->value.v_timestamp.increment != right->value.v_timestamp.increment) {
+        return (left->value.v_timestamp.increment > right->value.v_timestamp.increment)
+            ? 1 : -1;
+      }
+      return 0;
     }
 
-    case 9: {  // DateTime (signed int64 milliseconds since epoch).
-      int64_t a = ReadLittleEndian64(data_a);
-      int64_t b = ReadLittleEndian64(data_b);
-      return (a < b) ? -1 : (a > b) ? 1 : 0;
-    }
-
-    case 10: {  // Timestamp (uint64: increment in low 32 bits, seconds in high 32 bits).
-      // Compare seconds first (high 32 bits), then increment (low 32 bits).
-      uint32_t a_secs = ReadLittleEndianU32(data_a + 4);
-      uint32_t b_secs = ReadLittleEndianU32(data_b + 4);
-      if (a_secs != b_secs) return (a_secs < b_secs) ? -1 : 1;
-      uint32_t a_inc = ReadLittleEndianU32(data_a);
-      uint32_t b_inc = ReadLittleEndianU32(data_b);
-      return (a_inc < b_inc) ? -1 : (a_inc > b_inc) ? 1 : 0;
-    }
-
-    case 11: {  // Regex (two C strings: pattern + options).
-      int cmp = strcmp(reinterpret_cast<const char*>(data_a),
-                       reinterpret_cast<const char*>(data_b));
+    case BSON_TYPE_REGEX: {
+      if (!left->value.v_regex.regex || !right->value.v_regex.regex) {
+        return (left->value.v_regex.regex != nullptr) ? 1 : -1;
+      }
+      int cmp = strcmp(left->value.v_regex.regex, right->value.v_regex.regex);
       if (cmp != 0) return (cmp < 0) ? -1 : 1;
-      const char* opts_a = reinterpret_cast<const char*>(data_a) +
-                           strlen(reinterpret_cast<const char*>(data_a)) + 1;
-      const char* opts_b = reinterpret_cast<const char*>(data_b) +
-                           strlen(reinterpret_cast<const char*>(data_b)) + 1;
-      cmp = strcmp(opts_a, opts_b);
+      if (!left->value.v_regex.options || !right->value.v_regex.options) {
+        return (left->value.v_regex.options != nullptr) ? 1 : -1;
+      }
+      cmp = strcmp(left->value.v_regex.options, right->value.v_regex.options);
       return (cmp < 0) ? -1 : (cmp > 0) ? 1 : 0;
     }
+
+    case BSON_TYPE_CODE:
+      return CompareStrings(
+          left->value.v_code.code, left->value.v_code.code_len,
+          right->value.v_code.code, right->value.v_code.code_len);
 
     default:
-      break;
+      return 0;
   }
-
-  return 0;
 }
 
-// Compares two BSON documents element by element.
-int CompareBsonDocuments(const uint8_t* a_data, const uint8_t* a_end,
-                         const uint8_t* b_data, const uint8_t* b_end) {
-  // Skip the 4-byte document size.
-  const uint8_t* ap = a_data + 4;
-  const uint8_t* bp = b_data + 4;
+// Compares two BSON iterators element by element. This follows the same logic
+// as the DocumentDB extension's CompareBsonIter.
+int CompareBsonIter(bson_iter_t* left, bson_iter_t* right, bool compare_fields) {
+  while (true) {
+    bool left_next = bson_iter_next(left);
+    bool right_next = bson_iter_next(right);
 
-  while (ap < a_end && bp < b_end) {
-    // Check for document terminator (0x00).
-    if (*ap == 0x00 && *bp == 0x00) return 0;
-    if (*ap == 0x00) return -1;
-    if (*bp == 0x00) return 1;
+    if (!left_next && !right_next) return 0;
+    if (!left_next || !right_next) return left_next ? 1 : -1;
 
-    // Read element types.
-    uint8_t a_type = *ap++;
-    uint8_t b_type = *bp++;
+    const bson_value_t* left_value = bson_iter_value(left);
+    const bson_value_t* right_value = bson_iter_value(right);
 
-    // Read and compare field names (C strings).
-    int name_cmp = strcmp(reinterpret_cast<const char*>(ap),
-                          reinterpret_cast<const char*>(bp));
-
-    // Skip past field names.
-    while (ap < a_end && *ap) ap++;
-    if (ap < a_end) ap++;
-    while (bp < b_end && *bp) bp++;
-    if (bp < b_end) bp++;
-
-    // If field names differ, return the field name comparison.
-    if (name_cmp != 0) {
-      return (name_cmp < 0) ? -1 : 1;
-    }
-
-    // Compare element values.
-    int cmp = CompareBsonElementValues(a_type, ap, a_end, b_type, bp, b_end);
+    // Compare type sort order.
+    int cmp = CompareSortOrderType(left_value->value_type, right_value->value_type);
     if (cmp != 0) return cmp;
 
-    // Advance past values.
-    ap += BsonElementValueSize(a_type, ap, a_end);
-    bp += BsonElementValueSize(b_type, bp, b_end);
-  }
+    // Compare field names if requested.
+    if (compare_fields) {
+      const char* left_key = bson_iter_key(left);
+      uint32_t left_key_len = bson_iter_key_len(left);
+      const char* right_key = bson_iter_key(right);
+      uint32_t right_key_len = bson_iter_key_len(right);
+      cmp = CompareStrings(left_key, left_key_len, right_key, right_key_len);
+      if (cmp != 0) return cmp;
+    }
 
-  // Both exhausted = equal; otherwise, shorter document is less.
-  if (ap >= a_end && bp >= b_end) return 0;
-  return (ap >= a_end) ? -1 : 1;
+    // Compare values.
+    cmp = CompareBsonValues(left_value, right_value);
+    if (cmp != 0) return cmp;
+  }
 }
 
 }  // namespace
 
 int CompareBson(Slice a, Slice b) {
-  // Minimum valid BSON document is 5 bytes: int32 size + 0x00 terminator.
-  if (a.size() < 5 || b.size() < 5) {
+  bson_iter_t left_iter, right_iter;
+
+  if (!bson_iter_init_from_data(
+          &left_iter, reinterpret_cast<const uint8_t*>(a.data()), a.size()) ||
+      !bson_iter_init_from_data(
+          &right_iter, reinterpret_cast<const uint8_t*>(b.data()), b.size())) {
+    // Invalid BSON data, fall back to byte-wise comparison.
     return a.compare(b);
   }
 
-  const auto* a_data = reinterpret_cast<const uint8_t*>(a.data());
-  const auto* b_data = reinterpret_cast<const uint8_t*>(b.data());
-
-  int32_t a_size = ReadLittleEndian32(a_data);
-  int32_t b_size = ReadLittleEndian32(b_data);
-
-  const uint8_t* a_end = a_data + std::min(static_cast<int32_t>(a.size()), a_size);
-  const uint8_t* b_end = b_data + std::min(static_cast<int32_t>(b.size()), b_size);
-
-  return CompareBsonDocuments(a_data, a_end, b_data, b_end);
+  return CompareBsonIter(&left_iter, &right_iter, /*compare_fields=*/true);
 }
 
 // YB_TODO: Currently mapping BSON keys to string encoding, which is not correct. These functions
