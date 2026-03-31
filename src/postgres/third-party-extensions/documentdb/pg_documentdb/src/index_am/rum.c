@@ -367,6 +367,11 @@ GetRumIndexHandler(PG_FUNCTION_ARGS)
 		indexRoutine->ambuildempty = rum_index_routine.ambuildempty;
 		indexRoutine->ambulkdelete = rum_index_routine.ambulkdelete;
 		indexRoutine->amvacuumcleanup = rum_index_routine.amvacuumcleanup;
+		indexRoutine->ambeginscan = rum_index_routine.ambeginscan;
+		indexRoutine->amrescan = rum_index_routine.amrescan;
+		indexRoutine->amgettuple = rum_index_routine.amgettuple;
+		indexRoutine->amendscan = rum_index_routine.amendscan;
+		indexRoutine->amgetbitmap = NULL;
 	}
 
 	return indexRoutine;

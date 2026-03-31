@@ -65,6 +65,13 @@ extern bool ybrummightrecheck(Scan *scan, Relation heapRelation,
 							  Relation indexRelation, bool xs_want_itup,
 							  ScanKey keys, int nkeys);
 
+/* YB-specific RUM scan functions (ybrumscan.c) */
+extern IndexScanDesc ybrumbeginscan(Relation rel, int nkeys, int norderbys);
+extern void ybrumrescan(IndexScanDesc scan, ScanKey scankey, int nscankeys,
+						ScanKey orderbys, int norderbys);
+extern bool ybrumgettuple(IndexScanDesc scan, ScanDirection dir);
+extern void ybrumendscan(IndexScanDesc scan);
+
 PG_MODULE_MAGIC;
 
 void _PG_init(void);
@@ -240,6 +247,13 @@ documentdb_rumhandler(PG_FUNCTION_ARGS)
 		amroutine->yb_ambackfill = ybrumbackfill;
 		amroutine->yb_ambindschema = ybrumbindschema;
 		amroutine->yb_ammightrecheck = ybrummightrecheck;
+
+		/* YB scan functions */
+		amroutine->ambeginscan = ybrumbeginscan;
+		amroutine->amrescan = ybrumrescan;
+		amroutine->amgettuple = ybrumgettuple;
+		amroutine->amendscan = ybrumendscan;
+		amroutine->amgetbitmap = NULL;
 	}
 
 	PG_RETURN_POINTER(amroutine);
