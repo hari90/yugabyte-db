@@ -158,12 +158,8 @@ int MaxAllowedCursorIntermediateFileSizeMB =
 #define DEFAULT_MAX_CURSOR_FILE_COUNT 5000
 int MaxCursorFileCount = DEFAULT_MAX_CURSOR_FILE_COUNT;
 
-/* Starting pg18 use documentdb_extended_rum for the rum library */
-#if PG_VERSION_NUM >= 180000
+/* Use documentdb_extended_rum for the rum library */
 #define DEFAULT_RUM_LIBRARY_LOAD_OPTION RumLibraryLoadOption_RequireDocumentDBRum
-#else
-#define DEFAULT_RUM_LIBRARY_LOAD_OPTION RumLibraryLoadOption_None
-#endif
 
 RumLibraryLoadOptions DocumentDBRumLibraryLoadOption = DEFAULT_RUM_LIBRARY_LOAD_OPTION;
 
