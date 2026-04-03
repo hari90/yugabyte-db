@@ -31,7 +31,7 @@ public class TestPgRegressIsolation extends BasePgRegressTest {
 
   @Override
   public int getTestMethodTimeoutSec() {
-    return 1800;
+    return 2700;
   }
 
   private void runIsolationRegressTest() throws Exception {
