@@ -38,62 +38,23 @@ class DocumentDBTest : public pgwrapper::PgMiniTestBase {
   std::unique_ptr<pgwrapper::PGConn> conn_;
 };
 
-TEST_F(DocumentDBTest, RumAccessMethodRegistered) {
+TEST_F(DocumentDBTest, RumIndexOnYBCollection) {
   // Verify that the documentdb_rum access method is registered in pg_am.
   auto am_count = ASSERT_RESULT(conn_->FetchRow<int64_t>(
       "SELECT count(*) FROM pg_am WHERE amname = 'documentdb_rum'"));
   ASSERT_EQ(am_count, 1);
-}
 
-TEST_F(DocumentDBTest, RumOperatorClassesExist) {
   // Verify that RUM-backed operator classes are registered.
-  // These were previously commented out as "YB: rum is not supported."
-
-  // Single-path operator class (in documentdb_api_catalog schema).
-  auto single_path = ASSERT_RESULT(conn_->FetchRow<int64_t>(
+  auto opclass_count = ASSERT_RESULT(conn_->FetchRow<int64_t>(
       "SELECT count(*) FROM pg_opclass opc "
       "JOIN pg_am am ON opc.opcmethod = am.oid "
       "WHERE am.amname = 'documentdb_rum' "
-      "AND opc.opcname = 'bson_rum_single_path_ops'"));
-  ASSERT_EQ(single_path, 1);
+      "AND opc.opcname IN ('bson_rum_single_path_ops', 'bson_rum_text_path_ops', "
+      "'bson_rum_wildcard_project_path_ops', 'documentdb_rum_hashed_ops', "
+      "'bson_rum_exclusion_ops')"));
+  ASSERT_EQ(opclass_count, 5);
 
-  // Text path operator class.
-  auto text_path = ASSERT_RESULT(conn_->FetchRow<int64_t>(
-      "SELECT count(*) FROM pg_opclass opc "
-      "JOIN pg_am am ON opc.opcmethod = am.oid "
-      "WHERE am.amname = 'documentdb_rum' "
-      "AND opc.opcname = 'bson_rum_text_path_ops'"));
-  ASSERT_EQ(text_path, 1);
-
-  // Wildcard project path operator class.
-  auto wildcard_path = ASSERT_RESULT(conn_->FetchRow<int64_t>(
-      "SELECT count(*) FROM pg_opclass opc "
-      "JOIN pg_am am ON opc.opcmethod = am.oid "
-      "WHERE am.amname = 'documentdb_rum' "
-      "AND opc.opcname = 'bson_rum_wildcard_project_path_ops'"));
-  ASSERT_EQ(wildcard_path, 1);
-
-  // Hash operator class.
-  auto hash_ops = ASSERT_RESULT(conn_->FetchRow<int64_t>(
-      "SELECT count(*) FROM pg_opclass opc "
-      "JOIN pg_am am ON opc.opcmethod = am.oid "
-      "WHERE am.amname = 'documentdb_rum' "
-      "AND opc.opcname = 'documentdb_rum_hashed_ops'"));
-  ASSERT_EQ(hash_ops, 1);
-
-  // Exclusion operator class.
-  auto exclusion_ops = ASSERT_RESULT(conn_->FetchRow<int64_t>(
-      "SELECT count(*) FROM pg_opclass opc "
-      "JOIN pg_am am ON opc.opcmethod = am.oid "
-      "WHERE am.amname = 'documentdb_rum' "
-      "AND opc.opcname = 'bson_rum_exclusion_ops'"));
-  ASSERT_EQ(exclusion_ops, 1);
-}
-
-TEST_F(DocumentDBTest, RumExtensibilityFunctionsExist) {
-  // Verify that RUM extensibility functions are available in the catalog.
-
-  // RUM handler function (documentdb_rumhandler in documentdb_api_catalog schema).
+  // Verify RUM handler and text search adapter functions exist.
   auto handler = ASSERT_RESULT(conn_->FetchRow<int64_t>(
       "SELECT count(*) FROM pg_proc p "
       "JOIN pg_namespace n ON p.pronamespace = n.oid "
@@ -101,7 +62,6 @@ TEST_F(DocumentDBTest, RumExtensibilityFunctionsExist) {
       "AND n.nspname = 'documentdb_api_catalog'"));
   ASSERT_EQ(handler, 1);
 
-  // RUM text search adapter functions (in documentdb_api_internal schema).
   auto text_funcs = ASSERT_RESULT(conn_->FetchRow<int64_t>(
       "SELECT count(*) FROM pg_proc p "
       "JOIN pg_namespace n ON p.pronamespace = n.oid "
@@ -110,9 +70,7 @@ TEST_F(DocumentDBTest, RumExtensibilityFunctionsExist) {
       "'rum_tsquery_distance', 'rum_ts_join_pos') "
       "AND n.nspname = 'documentdb_api_internal'"));
   ASSERT_EQ(text_funcs, 6);
-}
 
-TEST_F(DocumentDBTest, RumIndexOnYBCollection) {
   const auto db_name = "rumdb";
   const auto coll_name = "rum_yb_coll";
 
@@ -149,8 +107,16 @@ TEST_F(DocumentDBTest, RumIndexOnYBCollection) {
       db_name, coll_name)));
   ASSERT_EQ(count, 5);
 
-  // Query with filter through the DocumentDB find API - this exercises the
-  // RUM index scan path on YB.
+  // Validate that the query plan uses the RUM index (forward scan).
+  auto fwd_plan = ASSERT_RESULT(conn_->FetchAllAsString(Format(
+      "EXPLAIN (COSTS OFF) SELECT document FROM "
+      "documentdb_api_catalog.bson_aggregation_find('$0', "
+      "'{ \"find\": \"$1\", \"filter\": {\"a\": {\"$$lte\": 10}}, "
+      "\"sort\": {\"a\": 1}, \"limit\": 1}')",
+      db_name, coll_name)));
+  ASSERT_STR_CONTAINS(fwd_plan, "Index Scan");
+
+  // Forward scan query - smallest "a" value <= 10 is 1.
   auto first_doc = ASSERT_RESULT(conn_->FetchRow<std::string>(Format(
       R"(
     SELECT (((cursorpage->>'cursor')::bson->>'firstBatch')::bson->>'0')::bson->>'a'
@@ -158,8 +124,17 @@ TEST_F(DocumentDBTest, RumIndexOnYBCollection) {
         '{"find":"$1", "filter":{"a":{"$$lte":10}}, "sort":{"a":1}, "limit":1}')
     )",
       db_name, coll_name)));
-  // Smallest "a" value <= 10 is 1.
   ASSERT_EQ(first_doc, "1");
+
+  // Backward scan query - largest "a" value is 20.
+  auto desc_doc = ASSERT_RESULT(conn_->FetchRow<std::string>(Format(
+      R"(
+    SELECT (((cursorpage->>'cursor')::bson->>'firstBatch')::bson->>'0')::bson->>'a'
+      FROM documentdb_api.find_cursor_first_page('$0',
+        '{"find":"$1", "sort":{"a":-1}, "limit":1}')
+    )",
+      db_name, coll_name)));
+  ASSERT_EQ(desc_doc, "20");
 
   // Delete a document and verify count changes.
   ASSERT_OK(conn_->FetchFormat(
@@ -173,51 +148,6 @@ TEST_F(DocumentDBTest, RumIndexOnYBCollection) {
       "SELECT count(*) FROM documentdb_api.collection('$0','$1')",
       db_name, coll_name)));
   ASSERT_EQ(new_count, 4);
-}
-
-TEST_F(DocumentDBTest, RumIndexBackwardScan) {
-  const auto db_name = "rumdb";
-  const auto coll_name = "rum_backward";
-
-  // Insert documents.
-  ASSERT_OK(conn_->FetchFormat(
-      R"(
-  SELECT documentdb_api.insert('$0', '{"insert":"$1", "documents":[
-    {"_id": 1, "a": 10},
-    {"_id": 2, "a": 5},
-    {"_id": 3, "a": 20},
-    {"_id": 4, "a": 15},
-    {"_id": 5, "a": 1}]}')
-  )",
-      db_name, coll_name));
-
-  // Create index.
-  ASSERT_OK(conn_->FetchFormat(
-      R"(
-  SELECT documentdb_api_internal.create_indexes_non_concurrently('$0',
-    '{"createIndexes":"$1", "indexes":[{"key":{"a":1}, "name":"a_1"}]}', true)
-  )",
-      db_name, coll_name));
-
-  // Forward scan (sort ascending) - smallest first.
-  auto asc_doc = ASSERT_RESULT(conn_->FetchRow<std::string>(Format(
-      R"(
-    SELECT (((cursorpage->>'cursor')::bson->>'firstBatch')::bson->>'0')::bson->>'a'
-      FROM documentdb_api.find_cursor_first_page('$0',
-        '{"find":"$1", "sort":{"a":1}, "limit":1}')
-    )",
-      db_name, coll_name)));
-  ASSERT_EQ(asc_doc, "1");
-
-  // Backward scan (sort descending) - largest first.
-  auto desc_doc = ASSERT_RESULT(conn_->FetchRow<std::string>(Format(
-      R"(
-    SELECT (((cursorpage->>'cursor')::bson->>'firstBatch')::bson->>'0')::bson->>'a'
-      FROM documentdb_api.find_cursor_first_page('$0',
-        '{"find":"$1", "sort":{"a":-1}, "limit":1}')
-    )",
-      db_name, coll_name)));
-  ASSERT_EQ(desc_doc, "20");
 }
 
 TEST_F(DocumentDBTest, SimpleCollection) {

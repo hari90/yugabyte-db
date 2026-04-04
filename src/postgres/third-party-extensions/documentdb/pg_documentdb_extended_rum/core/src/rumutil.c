@@ -31,11 +31,13 @@
 #include "commands/vacuum.h"
 
 #include "pg_documentdb_rum.h"
+
+/* YB: Headers for YugabyteDB storage integration. */
 #include "common/pg_yb_common.h"
 #include "nodes/plannodes.h"
 #include "pg_yb_utils.h"
 
-/* YB-specific RUM write functions (ybrumwrite.c) */
+/* YB: YB-specific RUM write functions (ybrumwrite.c). */
 extern IndexBuildResult *ybrumbuild(Relation heap, Relation index,
 									struct IndexInfo *indexInfo);
 extern void ybrumbuildempty(Relation index);
@@ -65,7 +67,7 @@ extern bool ybrummightrecheck(Scan *scan, Relation heapRelation,
 							  Relation indexRelation, bool xs_want_itup,
 							  ScanKey keys, int nkeys);
 
-/* YB-specific RUM scan functions (ybrumscan.c) */
+/* YB: YB-specific RUM scan functions (ybrumscan.c). */
 extern IndexScanDesc ybrumbeginscan(Relation rel, int nkeys, int norderbys);
 extern void ybrumrescan(IndexScanDesc scan, ScanKey scankey, int nscankeys,
 						ScanKey orderbys, int norderbys);
