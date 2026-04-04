@@ -31,7 +31,7 @@ public class TestPgRegressIsolation extends BasePgRegressTest {
 
   @Override
   public int getTestMethodTimeoutSec() {
-    return 2700;
+    return 1800;
   }
 
   private void runIsolationRegressTest() throws Exception {
@@ -56,7 +56,7 @@ public class TestPgRegressIsolation extends BasePgRegressTest {
     // we inject a sleep before applying intents.
     restartClusterWithFlags(Collections.emptyMap(),
                             Collections.singletonMap("TEST_inject_sleep_before_applying_intents_ms",
-                                                     "100"));
+                                                     "20"));
     runIsolationRegressTest();
   }
 }
