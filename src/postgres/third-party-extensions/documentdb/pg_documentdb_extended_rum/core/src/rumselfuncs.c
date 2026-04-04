@@ -24,6 +24,8 @@
 #include "math.h"
 
 #include "pg_documentdb_rum.h"
+
+/* YB: Required for IsYBRelationById() to skip rumGetStats on YB relations. */
 #include "pg_yb_utils.h"
 
 #define DEFAULT_PAGE_CPU_MULTIPLIER 50.0
