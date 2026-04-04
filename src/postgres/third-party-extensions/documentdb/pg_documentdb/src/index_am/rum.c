@@ -544,6 +544,14 @@ LoadRumRoutine(void)
 	if (scanOrderedFunc != NULL)
 	{
 		rum_index_scan_ordered = scanOrderedFunc;
+
+		/* YB: Enable backward scan so the DocumentDB planner knows the
+		 * RUM index can handle descending sorts.  Note: is_order_by_supported
+		 * remains false because enabling it requires additional operator family
+		 * setup for ORDER BY pushdown.  Descending sorts still work correctly
+		 * but go through SeqScan + Sort rather than an index scan.
+		 */
+		RumIndexAmEntry.is_backwards_scan_supported = true;
 	}
 
 	void (*setRumUnredactedLogEmitHookFunc)(format_log_hook hook) = NULL;
