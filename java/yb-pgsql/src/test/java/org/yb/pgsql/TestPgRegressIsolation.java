@@ -18,6 +18,7 @@ import java.util.Map;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.yb.util.BuildTypeUtil;
 import org.yb.util.YBTestRunnerNonTsanOnly;
 
 @RunWith(value=YBTestRunnerNonTsanOnly.class)
@@ -54,9 +55,12 @@ public class TestPgRegressIsolation extends BasePgRegressTest {
     // transactions (that are not yet applied), is not exercised. To ensure we exercise this rare
     // code path of performing conflict resolution with committed but not yet applied transactions,
     // we inject a sleep before applying intents.
+    // Use a smaller sleep on ASAN builds to avoid test timeout due to cumulative overhead
+    // of sleeping on every ApplyIntents call across the full isolation regression suite.
+    String sleepMs = BuildTypeUtil.isASAN() ? "20" : "100";
     restartClusterWithFlags(Collections.emptyMap(),
                             Collections.singletonMap("TEST_inject_sleep_before_applying_intents_ms",
-                                                     "20"));
+                                                     sleepMs));
     runIsolationRegressTest();
   }
 }
