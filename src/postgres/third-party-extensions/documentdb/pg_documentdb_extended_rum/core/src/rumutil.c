@@ -32,7 +32,7 @@
 
 #include "pg_documentdb_rum.h"
 
-/* YB: Headers for YugabyteDB storage integration. */
+/* YB includes */
 #include "common/pg_yb_common.h"
 #include "nodes/plannodes.h"
 #include "pg_yb_utils.h"
