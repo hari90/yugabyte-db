@@ -545,13 +545,6 @@ LoadRumRoutine(void)
 	{
 		rum_index_scan_ordered = scanOrderedFunc;
 
-		/* YB: Enable backward scan so the DocumentDB planner knows the
-		 * RUM index can handle descending sorts.  Note: is_order_by_supported
-		 * remains false because enabling it requires additional operator family
-		 * setup for ORDER BY pushdown.  Descending sorts still work correctly
-		 * but go through SeqScan + Sort rather than an index scan.
-		 */
-		RumIndexAmEntry.is_backwards_scan_supported = true;
 	}
 
 	void (*setRumUnredactedLogEmitHookFunc)(format_log_hook hook) = NULL;
@@ -1226,7 +1219,6 @@ extension_rumgettuple_core(IndexScanDesc scan, ScanDirection direction,
 		 * since PG always uses ForwardScanDirection in cases where we do
 		 * amcanorderbyop. For the inner scan, we would need to pass the
 		 * scanDirection as determined in amrescan from the index state.
-		 * YB: Allow NoMovementScanDirection which YB may pass.
 		 */
 		if (unlikely(ScanDirectionIsBackward(direction)))
 		{
