@@ -352,6 +352,30 @@ GetRumIndexHandler(PG_FUNCTION_ARGS)
 	indexRoutine->aminsert = extension_ruminsert;
 	indexRoutine->amcanreturn = NULL;
 
+	/*
+	 * YB: If running on YugabyteDB, the yb_amisforybrelation flag and
+	 * YB-specific callbacks (yb_aminsert, yb_amdelete, yb_ambackfill, etc.)
+	 * are already set from the base rum_index_routine loaded from
+	 * documentdb_rumhandler. We keep them so the RUM AM works on YB relations.
+	 * Override ambuild/aminsert with the YB versions from rum_index_routine;
+	 * the YB write path goes through yb_aminsert/yb_amdelete instead of
+	 * aminsert.
+	 *
+	 * Keep the extension_rum* scan wrappers (set above) rather than
+	 * overriding with rum_index_routine scan functions.  The extension
+	 * wrappers handle DocumentDB-specific composite index logic and
+	 * internally delegate to rum_index_routine.ambeginscan etc., which
+	 * are the YB-aware versions (ybrumbeginscan, etc.).
+	 */
+	if (indexRoutine->yb_amisforybrelation)
+	{
+		indexRoutine->ambuild = rum_index_routine.ambuild;
+		indexRoutine->aminsert = NULL;
+		indexRoutine->ambuildempty = rum_index_routine.ambuildempty;
+		indexRoutine->ambulkdelete = rum_index_routine.ambulkdelete;
+		indexRoutine->amvacuumcleanup = rum_index_routine.amvacuumcleanup;
+	}
+
 	return indexRoutine;
 }
 
@@ -520,6 +544,7 @@ LoadRumRoutine(void)
 	if (scanOrderedFunc != NULL)
 	{
 		rum_index_scan_ordered = scanOrderedFunc;
+
 	}
 
 	void (*setRumUnredactedLogEmitHookFunc)(format_log_hook hook) = NULL;
@@ -1069,8 +1094,14 @@ extension_rumrescan_core(IndexScanDesc scan, ScanKey scankey, int nscankeys,
 																 nInnerScanKeys,
 																 nInnerorderbys);
 
+			/* YB: Propagate heapRelation and YB pushdown state to the inner
+			 * scan so that the YB RUM scan handler can create a DocDB select. */
+			outerScanState->innerScan->heapRelation = scan->heapRelation;
 			outerScanState->innerScan->xs_want_itup = scan->xs_want_itup;
 			outerScanState->innerScan->parallel_scan = scan->parallel_scan;
+			outerScanState->innerScan->yb_rel_pushdown = scan->yb_rel_pushdown;
+			outerScanState->innerScan->yb_idx_pushdown = scan->yb_idx_pushdown;
+			outerScanState->innerScan->yb_aggrefs = scan->yb_aggrefs;
 		}
 
 		outerScanState->innerScan->ignore_killed_tuples = scan->ignore_killed_tuples;
@@ -1165,6 +1196,10 @@ GetOneTupleCore(DocumentDBRumIndexState *outerScanState,
 
 		scan->xs_itup = outerScanState->innerScan->xs_itup;
 		scan->xs_itupdesc = outerScanState->innerScan->xs_itupdesc;
+
+		/* YB: Propagate heap tuple returned by the YB scan path. */
+		scan->xs_hitup = outerScanState->innerScan->xs_hitup;
+		scan->xs_hitupdesc = outerScanState->innerScan->xs_hitupdesc;
 	}
 
 	return result;
@@ -1185,7 +1220,7 @@ extension_rumgettuple_core(IndexScanDesc scan, ScanDirection direction,
 		 * amcanorderbyop. For the inner scan, we would need to pass the
 		 * scanDirection as determined in amrescan from the index state.
 		 */
-		if (unlikely(direction != ForwardScanDirection))
+		if (unlikely(ScanDirectionIsBackward(direction)))
 		{
 			ereport(ERROR, (errmsg("rumgettuple only supports forward scans")));
 		}

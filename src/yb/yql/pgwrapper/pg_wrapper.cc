@@ -690,6 +690,7 @@ Result<string> WritePostgresConfig(const PgProcessConf& conf) {
   }
 
   if (FLAGS_ysql_enable_documentdb) {
+    metricsLibs.push_back("pg_documentdb_extended_rum");
     metricsLibs.push_back("pg_documentdb_core");
     metricsLibs.push_back("pg_documentdb");
   }
