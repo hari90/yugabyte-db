@@ -32,6 +32,7 @@
 
 #include "yb/common/init.h"
 
+#include <cerrno>
 #include <csignal>
 #include <string>
 
@@ -43,6 +44,7 @@
 
 #include "yb/util/env.h"
 #include "yb/util/env_util.h"
+#include "yb/util/errno.h"
 #include "yb/util/flags.h"
 #include "yb/util/logging.h"
 #include "yb/util/path_util.h"
@@ -50,6 +52,12 @@
 
 #if defined(__linux__)
 #include <sys/prctl.h>
+#ifndef PR_SET_THP_DISABLE
+#define PR_SET_THP_DISABLE 41
+#endif
+#ifndef PR_GET_THP_DISABLE
+#define PR_GET_THP_DISABLE 42
+#endif
 #endif
 
 using std::string;
@@ -62,6 +70,13 @@ TAG_FLAG(fs_data_dirs, stable);
 DEFINE_NON_RUNTIME_bool(stop_on_parent_termination, false,
     "When specified, this process will terminate when parent process terminates."
     "Linux-only.");
+
+DEFINE_NON_RUNTIME_bool(disable_transparent_hugepages, false,
+    "When set, disables Transparent Huge Pages (THP) for this process via prctl. "
+    "Useful in environments where system-level THP configuration is not possible, "
+    "such as Kubernetes or shared infrastructure without root access. "
+    "May cause a minor performance regression but avoids memory bloat from THP "
+    "with incorrect system parameters. Linux-only.");
 
 DECLARE_bool(version);
 TAG_FLAG(version, stable);
@@ -153,6 +168,18 @@ Status InitYB(const std::string &server_type, const char* argv0) {
 #if defined(__linux__)
   if (FLAGS_stop_on_parent_termination) {
     prctl(PR_SET_PDEATHSIG, SIGTERM);
+  }
+
+  if (FLAGS_disable_transparent_hugepages) {
+    if (prctl(PR_SET_THP_DISABLE, 1, 0, 0, 0) != 0) {
+      return STATUS(RuntimeError, "Failed to disable Transparent Huge Pages via prctl",
+                    ErrnoToString(errno));
+    }
+    int thp_status = prctl(PR_GET_THP_DISABLE, 0, 0, 0, 0);
+    if (thp_status >= 0) {
+      LOG(INFO) << "Transparent Huge Pages disabled for this process: "
+                << (thp_status ? "yes" : "no");
+    }
   }
 #endif
   RETURN_NOT_OK(CheckCPUFlags());
