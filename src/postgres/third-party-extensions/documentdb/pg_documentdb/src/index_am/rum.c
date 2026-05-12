@@ -1219,6 +1219,8 @@ extension_rumgettuple_core(IndexScanDesc scan, ScanDirection direction,
 		 * since PG always uses ForwardScanDirection in cases where we do
 		 * amcanorderbyop. For the inner scan, we would need to pass the
 		 * scanDirection as determined in amrescan from the index state.
+		 * YB: Allow NoMovementScanDirection which YB passes in normal flows;
+		 * only forbid backward scans.
 		 */
 		if (unlikely(ScanDirectionIsBackward(direction)))
 		{
