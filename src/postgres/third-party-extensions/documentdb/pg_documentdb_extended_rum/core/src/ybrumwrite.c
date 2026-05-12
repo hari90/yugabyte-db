@@ -128,17 +128,18 @@ ybrumTupleWrite(RumState *rumstate, OffsetNumber attnum,
 							   &nentries, &categories,
 							   &addInfo, &addInfoIsNull);
 
+	/*
+	 * Build the index tuple values. For a single-column RUM index, the
+	 * tuple has: [key_value]. For multi-column: [attnum, key_value].
+	 * natts is constant for the index, so allocate the buffers once and
+	 * reuse across entries.
+	 */
+	int			natts = RelationGetNumberOfAttributes(index);
+	Datum	   *idx_values = palloc0(sizeof(Datum) * natts);
+	bool	   *idx_isnull = palloc0(sizeof(bool) * natts);
+
 	for (i = 0; i < nentries; i++)
 	{
-		/*
-		 * Build the index tuple values. For a single-column RUM index, the
-		 * tuple has: [key_value]. For multi-column: [attnum, key_value].
-		 * We build based on the index tuple descriptor.
-		 */
-		int			natts = RelationGetNumberOfAttributes(index);
-		Datum	   *idx_values = palloc0(sizeof(Datum) * natts);
-		bool	   *idx_isnull = palloc0(sizeof(bool) * natts);
-
 		if (rumstate->oneCol)
 		{
 			/* Single-column index: first att is the key */
@@ -161,10 +162,10 @@ ybrumTupleWrite(RumState *rumstate, OffsetNumber attnum,
 		else
 			YBCExecuteDeleteIndex(index, idx_values, idx_isnull, ybctid,
 								  doBindsForRumDelete, (void *) rumstate);
-
-		pfree(idx_values);
-		pfree(idx_isnull);
 	}
+
+	pfree(idx_values);
+	pfree(idx_isnull);
 }
 
 
