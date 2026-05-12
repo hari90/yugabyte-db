@@ -35,21 +35,29 @@ import org.slf4j.LoggerFactory;
 import org.yb.client.TestUtils;
 
 /**
- * Base class for DocumentDB Gateway tests. Handles cluster setup with documentdb flags,
- * extension creation, gateway worker restart, SSL context, and MongoClient lifecycle.
- *
- * Subclasses can override {@link #GATEWAY_PORT}, {@link #isAuthEnabled()},
- * and {@link #getAdditionalTServerFlags()} to customize behavior.
+ * Base class for DocumentDB tests. Handles cluster setup with documentdb flags and
+ * extension creation. Subclasses that need the MongoDB protocol gateway should leave
+ * {@link #useGateway()} returning {@code true} (the default) — this triggers the
+ * gateway worker restart, SSL context, and MongoClient lifecycle. YSQL-only tests
+ * should override {@link #useGateway()} to {@code false} to skip the gateway-specific
+ * setup.
  */
-public abstract class BaseDocumentDBGatewayTest extends BasePgSQLTest {
-  private static final Logger LOG = LoggerFactory.getLogger(BaseDocumentDBGatewayTest.class);
+public abstract class BaseDocumentDBTest extends BasePgSQLTest {
+  private static final Logger LOG = LoggerFactory.getLogger(BaseDocumentDBTest.class);
 
   protected static final String TEST_DB = "testdb";
   protected static final int GATEWAY_PORT = 27017;
 
   protected MongoClient mongoClient;
 
-  private static boolean gatewayInitialized = false;
+  /**
+   * Returns {@code true} if this test needs the MongoDB protocol gateway (and a
+   * {@link #mongoClient}). Override to {@code false} for YSQL-only documentdb tests
+   * to skip the cluster restart and MongoClient setup.
+   */
+  protected boolean useGateway() {
+    return true;
+  }
 
   /** Additional tserver flags beyond the common documentdb ones. */
   protected Map<String, String> getAdditionalTServerFlags() {
@@ -78,27 +86,22 @@ public abstract class BaseDocumentDBGatewayTest extends BasePgSQLTest {
 
   @Before
   public void setUp() throws Exception {
+    // BasePgSQLTest's @After marks the cluster for recreation, so the documentdb extension
+    // (and gateway state) must be re-established before every test method.
     String host = getPgHost(0);
 
-    if (!gatewayInitialized) {
-      // Create the documentdb extension via YSQL.
-      try (Statement statement = connection.createStatement()) {
-        statement.execute("CREATE EXTENSION IF NOT EXISTS documentdb CASCADE");
-      }
-
-      // TODO(#31353) The gateway background worker starts with PostgreSQL but cannot serve requests
-      // until the extension schemas exist. Restart the cluster so the gateway initializes
-      // with the schemas already in place.
-      restartForGateway();
-
-      // Wait for the gateway to start accepting connections (first tserver).
-      waitForGateway(host);
-
-      gatewayInitialized = true;
+    try (Statement statement = connection.createStatement()) {
+      statement.execute("CREATE EXTENSION IF NOT EXISTS documentdb CASCADE");
     }
 
-    // mongoClient is recreated per test (tearDown closes and nulls it).
-    mongoClient = createMongoClient(host);
+    if (useGateway()) {
+      // TODO(#31353) The gateway background worker starts with PostgreSQL but cannot serve
+      // requests until the extension schemas exist. Restart the cluster so the gateway
+      // initializes with the schemas already in place.
+      restartForGateway();
+      waitForGateway(host);
+      mongoClient = createMongoClient(host);
+    }
   }
 
   @After

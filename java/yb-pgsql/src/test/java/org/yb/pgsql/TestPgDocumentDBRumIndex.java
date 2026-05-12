@@ -17,8 +17,6 @@ import static org.yb.AssertionWrappers.assertTrue;
 
 import java.sql.ResultSet;
 import java.sql.Statement;
-import java.util.HashMap;
-import java.util.Map;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -30,37 +28,22 @@ import org.yb.util.YBTestRunnerNonSanOrAArch64Mac;
  *
  * Mirrors the C++ test {@code DocumentDBTest.RumIndexOnYBCollection} in
  * {@code src/yb/integration-tests/documentdb/documentdb_test.cc} but exercised
- * through the YSQL JDBC client.
+ * through the YSQL JDBC client. The MongoDB protocol gateway is not required.
  */
 @RunWith(value = YBTestRunnerNonSanOrAArch64Mac.class)
-public class TestPgDocumentDBRumIndex extends BasePgSQLTest {
+public class TestPgDocumentDBRumIndex extends BaseDocumentDBTest {
 
   private static final String DB_NAME = "rumdb";
   private static final String COLL_NAME = "rum_yb_coll";
 
   @Override
-  protected Map<String, String> getMasterFlags() {
-    Map<String, String> flagMap = super.getMasterFlags();
-    flagMap.put("enable_pg_cron", "true");
-    flagMap.put("allowed_preview_flags_csv", "ysql_enable_documentdb");
-    flagMap.put("ysql_enable_documentdb", "true");
-    return flagMap;
-  }
-
-  @Override
-  protected Map<String, String> getTServerFlags() {
-    Map<String, String> flagMap = super.getTServerFlags();
-    flagMap.put("enable_pg_cron", "true");
-    flagMap.put("allowed_preview_flags_csv", "ysql_enable_documentdb");
-    flagMap.put("ysql_enable_documentdb", "true");
-    flagMap.put("ysql_suppress_unsafe_alter_notice", "true");
-    return flagMap;
+  protected boolean useGateway() {
+    return false;
   }
 
   @Before
-  public void setUpExtension() throws Exception {
+  public void setSearchPath() throws Exception {
     try (Statement stmt = connection.createStatement()) {
-      stmt.execute("CREATE EXTENSION IF NOT EXISTS documentdb CASCADE");
       stmt.execute("SET search_path TO documentdb_api, documentdb_core");
       stmt.execute("SET documentdb_core.bsonUseEJson TO TRUE");
     }

@@ -43,7 +43,7 @@ import org.yb.util.YBTestRunnerNonSanOrAArch64Mac;
  * replace, drop collection, and drop database in a single scenario.
  */
 @RunWith(value = YBTestRunnerNonSanOrAArch64Mac.class)
-public class BasicDocumentDBTests extends BaseDocumentDBGatewayTest {
+public class BasicDocumentDBTests extends BaseDocumentDBTest {
 
   @Test
   public void testBasicOperations() throws Exception {
