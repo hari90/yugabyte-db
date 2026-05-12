@@ -13,53 +13,50 @@
 package org.yb.pgsql;
 
 import static org.yb.AssertionWrappers.assertEquals;
+import static org.yb.AssertionWrappers.assertNotNull;
 import static org.yb.AssertionWrappers.assertTrue;
+
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Indexes;
+import com.mongodb.client.model.Sorts;
+import com.mongodb.client.result.DeleteResult;
+import com.mongodb.client.result.InsertManyResult;
 
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.Arrays;
+import java.util.List;
 
-import org.junit.Before;
+import org.bson.Document;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.yb.util.YBTestRunnerNonSanOrAArch64Mac;
 
 /**
- * RUM index integration tests for the DocumentDB extension on YugabyteDB.
+ * RUM index integration test for the DocumentDB extension on YugabyteDB.
  *
- * Mirrors the C++ test {@code DocumentDBTest.RumIndexOnYBCollection} in
- * {@code src/yb/integration-tests/documentdb/documentdb_test.cc} but exercised
- * through the YSQL JDBC client. The MongoDB protocol gateway is not required.
+ * Drives the data path through the MongoDB protocol gateway (insertMany,
+ * createIndex, find, deleteOne) and uses the inherited YSQL connection for
+ * the catalog-level RUM assertions (AM/opclass/function registration, index
+ * presence, plan validation) that the MongoDB API does not expose.
  */
 @RunWith(value = YBTestRunnerNonSanOrAArch64Mac.class)
 public class TestPgDocumentDBRumIndex extends BaseDocumentDBTest {
 
-  private static final String DB_NAME = "rumdb";
-  private static final String COLL_NAME = "rum_yb_coll";
-
-  @Override
-  protected boolean useGateway() {
-    return false;
-  }
-
-  @Before
-  public void setSearchPath() throws Exception {
-    try (Statement stmt = connection.createStatement()) {
-      stmt.execute("SET search_path TO documentdb_api, documentdb_core");
-      stmt.execute("SET documentdb_core.bsonUseEJson TO TRUE");
-    }
-  }
-
   @Test
-  public void testRumAccessMethodAndOpClasses() throws Exception {
+  public void testRumIndexOnYBCollection() throws Exception {
+    // Catalog-level checks: the RUM AM, opclasses, handler, and text-search
+    // adapter functions should be registered as soon as the extension is
+    // created.
     try (Statement stmt = connection.createStatement()) {
-      // documentdb_rum AM is registered.
       try (ResultSet rs = stmt.executeQuery(
           "SELECT count(*) FROM pg_am WHERE amname = 'documentdb_rum'")) {
         assertTrue(rs.next());
         assertEquals(1L, rs.getLong(1));
       }
 
-      // RUM-backed opclasses are registered.
       try (ResultSet rs = stmt.executeQuery(
           "SELECT count(*) FROM pg_opclass opc " +
           "JOIN pg_am am ON opc.opcmethod = am.oid " +
@@ -71,7 +68,6 @@ public class TestPgDocumentDBRumIndex extends BaseDocumentDBTest {
         assertEquals(5L, rs.getLong(1));
       }
 
-      // RUM handler function in documentdb_api_catalog.
       try (ResultSet rs = stmt.executeQuery(
           "SELECT count(*) FROM pg_proc p " +
           "JOIN pg_namespace n ON p.pronamespace = n.oid " +
@@ -81,7 +77,6 @@ public class TestPgDocumentDBRumIndex extends BaseDocumentDBTest {
         assertEquals(1L, rs.getLong(1));
       }
 
-      // RUM text search adapter functions in documentdb_api_internal.
       try (ResultSet rs = stmt.executeQuery(
           "SELECT count(*) FROM pg_proc p " +
           "JOIN pg_namespace n ON p.pronamespace = n.oid " +
@@ -93,87 +88,68 @@ public class TestPgDocumentDBRumIndex extends BaseDocumentDBTest {
         assertEquals(6L, rs.getLong(1));
       }
     }
-  }
 
-  @Test
-  public void testRumIndexOnYBCollection() throws Exception {
-    try (Statement stmt = connection.createStatement()) {
-      // Insert documents into a YB-backed collection.
-      stmt.execute(String.format(
-          "SELECT documentdb_api.insert('%s', '{\"insert\":\"%s\", \"documents\":[" +
-          "{\"_id\": 1, \"a\": 10, \"b\": \"hello\"}," +
-          "{\"_id\": 2, \"a\": 5, \"b\": \"world\"}," +
-          "{\"_id\": 3, \"a\": 20, \"b\": \"foo\"}," +
-          "{\"_id\": 4, \"a\": 15, \"b\": \"bar\"}," +
-          "{\"_id\": 5, \"a\": 1, \"b\": \"baz\"}]}')",
-          DB_NAME, COLL_NAME));
+    // Data path: drive everything through the MongoDB protocol gateway.
+    String collName = "rum_yb_coll";
+    MongoDatabase db = mongoClient.getDatabase(TEST_DB);
+    MongoCollection<Document> collection = db.getCollection(collName);
 
-      // Create a single-field RUM index via DocumentDB API.
-      stmt.execute(String.format(
-          "SELECT documentdb_api_internal.create_indexes_non_concurrently('%s', " +
-          "'{\"createIndexes\":\"%s\", \"indexes\":[{\"key\":{\"a\":1}, \"name\":\"a_1\"}]}', " +
-          "true)",
-          DB_NAME, COLL_NAME));
+    List<Document> docs = Arrays.asList(
+        new Document("_id", 1).append("a", 10).append("b", "hello"),
+        new Document("_id", 2).append("a", 5).append("b", "world"),
+        new Document("_id", 3).append("a", 20).append("b", "foo"),
+        new Document("_id", 4).append("a", 15).append("b", "bar"),
+        new Document("_id", 5).append("a", 1).append("b", "baz"));
+    InsertManyResult insertResult = collection.insertMany(docs);
+    assertEquals(5, insertResult.getInsertedIds().size());
 
-      // Verify a RUM index was created in the catalog.
-      try (ResultSet rs = stmt.executeQuery(
-          "SELECT count(*) FROM pg_indexes " +
-          "WHERE indexname LIKE 'documents_rum_index_%'")) {
-        assertTrue(rs.next());
-        assertTrue("expected at least one RUM index, got " + rs.getLong(1), rs.getLong(1) >= 1);
-      }
+    // Creating a single-field index goes through DocumentDB's createIndexes
+    // path which materializes a RUM index on the YB-backed table.
+    collection.createIndex(Indexes.ascending("a"));
 
-      // Verify data is still accessible after index creation.
-      try (ResultSet rs = stmt.executeQuery(String.format(
-          "SELECT count(*) FROM documentdb_api.collection('%s','%s')",
-          DB_NAME, COLL_NAME))) {
-        assertTrue(rs.next());
-        assertEquals(5L, rs.getLong(1));
-      }
-
-      // Validate that the query plan uses the RUM index (forward scan).
-      String fwdPlan = explainAsString(stmt, String.format(
-          "EXPLAIN (COSTS OFF) SELECT document FROM " +
-          "documentdb_api_catalog.bson_aggregation_find('%s', " +
-          "'{ \"find\": \"%s\", \"filter\": {\"a\": {\"$lte\": 10}}, " +
-          "\"sort\": {\"a\": 1}, \"limit\": 1}')",
-          DB_NAME, COLL_NAME));
-      assertTrue("expected Index Scan in plan, got: " + fwdPlan, fwdPlan.contains("Index Scan"));
-
-      // Forward sort query - smallest "a" value <= 10 is 1.
-      try (ResultSet rs = stmt.executeQuery(String.format(
-          "SELECT (((cursorpage->>'cursor')::bson->>'firstBatch')::bson->>'0')::bson->>'a' " +
-          "FROM documentdb_api.find_cursor_first_page('%s', " +
-          "'{\"find\":\"%s\", \"filter\":{\"a\":{\"$lte\":10}}, \"sort\":{\"a\":1}, " +
-          "\"limit\":1}')",
-          DB_NAME, COLL_NAME))) {
-        assertTrue(rs.next());
-        assertEquals("1", rs.getString(1));
-      }
-
-      // Backward sort query - largest "a" value is 20.
-      try (ResultSet rs = stmt.executeQuery(String.format(
-          "SELECT (((cursorpage->>'cursor')::bson->>'firstBatch')::bson->>'0')::bson->>'a' " +
-          "FROM documentdb_api.find_cursor_first_page('%s', " +
-          "'{\"find\":\"%s\", \"sort\":{\"a\":-1}, \"limit\":1}')",
-          DB_NAME, COLL_NAME))) {
-        assertTrue(rs.next());
-        assertEquals("20", rs.getString(1));
-      }
-
-      // Delete a document and verify count.
-      stmt.execute(String.format(
-          "SELECT documentdb_api.delete('%s', '{\"delete\": \"%s\", " +
-          "\"deletes\": [{\"q\": {\"_id\": 1}, \"limit\": 1}]}')",
-          DB_NAME, COLL_NAME));
-
-      try (ResultSet rs = stmt.executeQuery(String.format(
-          "SELECT count(*) FROM documentdb_api.collection('%s','%s')",
-          DB_NAME, COLL_NAME))) {
-        assertTrue(rs.next());
-        assertEquals(4L, rs.getLong(1));
-      }
+    // RUM index is present in the catalog.
+    try (Statement stmt = connection.createStatement();
+         ResultSet rs = stmt.executeQuery(
+             "SELECT count(*) FROM pg_indexes " +
+             "WHERE indexname LIKE 'documents_rum_index_%'")) {
+      assertTrue(rs.next());
+      assertTrue("expected at least one RUM index, got " + rs.getLong(1), rs.getLong(1) >= 1);
     }
+
+    assertEquals(5, collection.countDocuments());
+
+    // Forward sort with a filter goes through the RUM index scan path.
+    // Smallest "a" value <= 10 is 1.
+    Document firstAsc = collection.find(Filters.lte("a", 10))
+        .sort(Sorts.ascending("a"))
+        .limit(1)
+        .first();
+    assertNotNull(firstAsc);
+    assertEquals(1, firstAsc.getInteger("a").intValue());
+
+    // Backward sort - largest "a" value is 20.
+    Document firstDesc = collection.find()
+        .sort(Sorts.descending("a"))
+        .limit(1)
+        .first();
+    assertNotNull(firstDesc);
+    assertEquals(20, firstDesc.getInteger("a").intValue());
+
+    // Plan validation for the forward-sort query: the planner should pick
+    // an Index Scan over the RUM index.
+    try (Statement stmt = connection.createStatement()) {
+      String plan = explainAsString(stmt,
+          "EXPLAIN (COSTS OFF) SELECT document FROM " +
+          "documentdb_api_catalog.bson_aggregation_find('" + TEST_DB + "', " +
+          "'{ \"find\": \"" + collName + "\", \"filter\": {\"a\": {\"$lte\": 10}}, " +
+          "\"sort\": {\"a\": 1}, \"limit\": 1}')");
+      assertTrue("expected Index Scan in plan, got: " + plan, plan.contains("Index Scan"));
+    }
+
+    // Delete one document and verify count.
+    DeleteResult deleteResult = collection.deleteOne(Filters.eq("_id", 1));
+    assertEquals(1, deleteResult.getDeletedCount());
+    assertEquals(4, collection.countDocuments());
   }
 
   private static String explainAsString(Statement stmt, String query) throws Exception {
