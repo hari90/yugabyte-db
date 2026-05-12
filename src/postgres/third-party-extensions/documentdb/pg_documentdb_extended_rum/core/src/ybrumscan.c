@@ -246,7 +246,8 @@ ybrumFetchNextHeapTuple(IndexScanDesc scan)
  *
  * If the YB handle was not set (e.g. during cost estimation when
  * RumGetMultiKeyStatusSlow calls the scan path without a heap relation),
- * fall back to the vanilla rumgettuple.
+ * return false to indicate no tuples - this is conservative but safe, and
+ * just means multi-key optimizations are skipped for that path.
  */
 PGDLLEXPORT bool
 ybrumgettuple(IndexScanDesc scan, ScanDirection dir)
