@@ -544,7 +544,6 @@ LoadRumRoutine(void)
 	if (scanOrderedFunc != NULL)
 	{
 		rum_index_scan_ordered = scanOrderedFunc;
-
 	}
 
 	void (*setRumUnredactedLogEmitHookFunc)(format_log_hook hook) = NULL;
@@ -1222,7 +1221,7 @@ extension_rumgettuple_core(IndexScanDesc scan, ScanDirection direction,
 		 * YB: Allow NoMovementScanDirection which YB passes in normal flows;
 		 * only forbid backward scans.
 		 */
-		if (unlikely(ScanDirectionIsBackward(direction)))
+		if (unlikely(ScanDirectionIsBackward(direction)))  /* YB */
 		{
 			ereport(ERROR, (errmsg("rumgettuple only supports forward scans")));
 		}

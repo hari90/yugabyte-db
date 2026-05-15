@@ -2851,7 +2851,7 @@ PgVectorIvfFlatIndexAmId(void)
 			ereport(NOTICE,
 					(errmsg(
 						 "Access method \"ivfflat\" not supported.")));
-			return InvalidOid;
+			return InvalidOid;  /* YB */
 		}
 		Form_pg_am accessMethodForm = (Form_pg_am) GETSTRUCT(tuple);
 		Cache.PgVectorIvfFlatIndexAmId = accessMethodForm->oid;
@@ -2877,7 +2877,7 @@ PgVectorHNSWIndexAmId(void)
 			ereport(NOTICE,
 					(errmsg(
 						 "Access method \"hnsw\" not supported.")));
-			return InvalidOid;
+			return InvalidOid;  /* YB */
 		}
 		Form_pg_am accessMethodForm = (Form_pg_am) GETSTRUCT(tuple);
 		Cache.PgVectorHNSWIndexAmId = accessMethodForm->oid;

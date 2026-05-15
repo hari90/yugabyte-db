@@ -167,6 +167,8 @@ int MaxCursorFileCount = DEFAULT_MAX_CURSOR_FILE_COUNT;
 #define DEFAULT_RUM_LIBRARY_LOAD_OPTION RumLibraryLoadOption_None
 #endif
 */
+/* YB: replaces the conditional define above; documentdb_extended_rum is
+ * required on YB regardless of PG version. */
 #define DEFAULT_RUM_LIBRARY_LOAD_OPTION RumLibraryLoadOption_RequireDocumentDBRum
 
 RumLibraryLoadOptions DocumentDBRumLibraryLoadOption = DEFAULT_RUM_LIBRARY_LOAD_OPTION;

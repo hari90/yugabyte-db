@@ -23,13 +23,12 @@
 
 #include "postgres.h"
 
-#include "pg_documentdb_rum.h"
-
 #include "access/genam.h"
 #include "access/relscan.h"
 #include "access/sysattr.h"
 #include "access/yb_scan.h"
 #include "miscadmin.h"
+#include "pg_documentdb_rum.h"
 #include "pg_yb_utils.h"
 #include "utils/memutils.h"
 #include "utils/rel.h"

@@ -23,8 +23,6 @@
 
 #include "postgres.h"
 
-#include "pg_documentdb_rum.h"
-
 #include "access/genam.h"
 #include "access/sysattr.h"
 #include "access/yb_scan.h"
@@ -34,6 +32,7 @@
 #include "commands/yb_cmds.h"
 #include "executor/ybModifyTable.h"
 #include "nodes/plannodes.h"
+#include "pg_documentdb_rum.h"
 #include "pg_yb_utils.h"
 #include "utils/memutils.h"
 #include "utils/rel.h"
