@@ -155,6 +155,7 @@ ADD_YB_TEST_LIBRARY(yb_common_test_util
 set(YB_TEST_LINK_LIBS yb_common yb_common_test_util ${YB_MIN_TEST_LIBS})
 ADD_YB_TEST(common_net-test)
 ADD_YB_TEST(id_mapping-test)
+ADD_YB_TEST(init-test)
 ADD_YB_TEST(jsonb-test)
 ADD_YB_TEST(schema-test)
 ADD_YB_TEST(subtxn_set_and_pb-test)
