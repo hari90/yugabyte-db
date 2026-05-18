@@ -38,6 +38,118 @@ class DocumentDBTest : public pgwrapper::PgMiniTestBase {
   std::unique_ptr<pgwrapper::PGConn> conn_;
 };
 
+TEST_F(DocumentDBTest, RumIndexOnYBCollection) {
+  // Verify that the documentdb_rum access method is registered in pg_am.
+  auto am_count = ASSERT_RESULT(conn_->FetchRow<int64_t>(
+      "SELECT count(*) FROM pg_am WHERE amname = 'documentdb_rum'"));
+  ASSERT_EQ(am_count, 1);
+
+  // Verify that RUM-backed operator classes are registered.
+  auto opclass_count = ASSERT_RESULT(conn_->FetchRow<int64_t>(
+      "SELECT count(*) FROM pg_opclass opc "
+      "JOIN pg_am am ON opc.opcmethod = am.oid "
+      "WHERE am.amname = 'documentdb_rum' "
+      "AND opc.opcname IN ('bson_rum_single_path_ops', 'bson_rum_text_path_ops', "
+      "'bson_rum_wildcard_project_path_ops', 'documentdb_rum_hashed_ops', "
+      "'bson_rum_exclusion_ops')"));
+  ASSERT_EQ(opclass_count, 5);
+
+  // Verify RUM handler and text search adapter functions exist.
+  auto handler = ASSERT_RESULT(conn_->FetchRow<int64_t>(
+      "SELECT count(*) FROM pg_proc p "
+      "JOIN pg_namespace n ON p.pronamespace = n.oid "
+      "WHERE p.proname = 'documentdbrumhandler' "
+      "AND n.nspname = 'documentdb_api_catalog'"));
+  ASSERT_EQ(handler, 1);
+
+  auto text_funcs = ASSERT_RESULT(conn_->FetchRow<int64_t>(
+      "SELECT count(*) FROM pg_proc p "
+      "JOIN pg_namespace n ON p.pronamespace = n.oid "
+      "WHERE p.proname IN ('rum_extract_tsquery', 'rum_tsquery_consistent', "
+      "'rum_tsvector_config', 'rum_tsquery_pre_consistent', "
+      "'rum_tsquery_distance', 'rum_ts_join_pos') "
+      "AND n.nspname = 'documentdb_api_internal'"));
+  ASSERT_EQ(text_funcs, 6);
+
+  const auto db_name = "rumdb";
+  const auto coll_name = "rum_yb_coll";
+
+  // Insert documents into a YB-backed collection.
+  ASSERT_OK(conn_->FetchFormat(
+      R"(
+  SELECT documentdb_api.insert('$0', '{"insert":"$1", "documents":[
+    {"_id": 1, "a": 10, "b": "hello"},
+    {"_id": 2, "a": 5, "b": "world"},
+    {"_id": 3, "a": 20, "b": "foo"},
+    {"_id": 4, "a": 15, "b": "bar"},
+    {"_id": 5, "a": 1, "b": "baz"}]}')
+  )",
+      db_name, coll_name));
+
+  // Create a single-field index via DocumentDB API.
+  // This internally creates a RUM index on the YB table.
+  ASSERT_OK(conn_->FetchFormat(
+      R"(
+  SELECT documentdb_api_internal.create_indexes_non_concurrently('$0',
+    '{"createIndexes":"$1", "indexes":[{"key":{"a":1}, "name":"a_1"}]}', true)
+  )",
+      db_name, coll_name));
+
+  // Verify that the RUM index was created in the catalog.
+  auto idx_count = ASSERT_RESULT(conn_->FetchRow<int64_t>(
+      "SELECT count(*) FROM pg_indexes "
+      "WHERE indexname LIKE 'documents_rum_index_%'"));
+  ASSERT_GE(idx_count, 1);
+
+  // Verify data is still accessible after index creation.
+  auto count = ASSERT_RESULT(conn_->FetchRow<int64_t>(Format(
+      "SELECT count(*) FROM documentdb_api.collection('$0','$1')",
+      db_name, coll_name)));
+  ASSERT_EQ(count, 5);
+
+  // Validate that the query plan uses the RUM index (forward scan).
+  auto fwd_plan = ASSERT_RESULT(conn_->FetchAllAsString(Format(
+      "EXPLAIN (COSTS OFF) SELECT document FROM "
+      "documentdb_api_catalog.bson_aggregation_find('$0', "
+      "'{ \"find\": \"$1\", \"filter\": {\"a\": {\"$$lte\": 10}}, "
+      "\"sort\": {\"a\": 1}, \"limit\": 1}')",
+      db_name, coll_name)));
+  ASSERT_STR_CONTAINS(fwd_plan, "Index Scan");
+
+  // Forward scan query - smallest "a" value <= 10 is 1.
+  auto first_doc = ASSERT_RESULT(conn_->FetchRow<std::string>(Format(
+      R"(
+    SELECT (((cursorpage->>'cursor')::bson->>'firstBatch')::bson->>'0')::bson->>'a'
+      FROM documentdb_api.find_cursor_first_page('$0',
+        '{"find":"$1", "filter":{"a":{"$$lte":10}}, "sort":{"a":1}, "limit":1}')
+    )",
+      db_name, coll_name)));
+  ASSERT_EQ(first_doc, "1");
+
+  // Backward scan query - largest "a" value is 20.
+  auto desc_doc = ASSERT_RESULT(conn_->FetchRow<std::string>(Format(
+      R"(
+    SELECT (((cursorpage->>'cursor')::bson->>'firstBatch')::bson->>'0')::bson->>'a'
+      FROM documentdb_api.find_cursor_first_page('$0',
+        '{"find":"$1", "sort":{"a":-1}, "limit":1}')
+    )",
+      db_name, coll_name)));
+  ASSERT_EQ(desc_doc, "20");
+
+  // Delete a document and verify count changes.
+  ASSERT_OK(conn_->FetchFormat(
+      R"(
+    SELECT documentdb_api.delete('$0', '{"delete": "$1",
+      "deletes": [{"q": {"_id": 1}, "limit": 1}]}')
+    )",
+      db_name, coll_name));
+
+  auto new_count = ASSERT_RESULT(conn_->FetchRow<int64_t>(Format(
+      "SELECT count(*) FROM documentdb_api.collection('$0','$1')",
+      db_name, coll_name)));
+  ASSERT_EQ(new_count, 4);
+}
+
 TEST_F(DocumentDBTest, SimpleCollection) {
   const auto db_name = "documentdb";
   const auto collection_name = "patient";

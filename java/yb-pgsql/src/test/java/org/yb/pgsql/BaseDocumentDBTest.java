@@ -35,14 +35,14 @@ import org.slf4j.LoggerFactory;
 import org.yb.client.TestUtils;
 
 /**
- * Base class for DocumentDB Gateway tests. Handles cluster setup with documentdb flags,
+ * Base class for DocumentDB tests. Handles cluster setup with documentdb flags,
  * extension creation, gateway worker restart, SSL context, and MongoClient lifecycle.
  *
- * Subclasses can override {@link #GATEWAY_PORT}, {@link #isAuthEnabled()},
- * and {@link #getAdditionalTServerFlags()} to customize behavior.
+ * Subclasses can override {@link #GATEWAY_PORT} and
+ * {@link #getAdditionalTServerFlags()} to customize behavior.
  */
-public abstract class BaseDocumentDBGatewayTest extends BasePgSQLTest {
-  private static final Logger LOG = LoggerFactory.getLogger(BaseDocumentDBGatewayTest.class);
+public abstract class BaseDocumentDBTest extends BasePgSQLTest {
+  private static final Logger LOG = LoggerFactory.getLogger(BaseDocumentDBTest.class);
 
   protected static final String TEST_DB = "testdb";
   protected static final int GATEWAY_PORT = 27017;
