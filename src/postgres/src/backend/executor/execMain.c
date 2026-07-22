@@ -2034,12 +2034,19 @@ ExecConstraints(ResultRelInfo *resultRelInfo,
 				att->attnum - YBGetFirstLowInvalidAttributeNumber(rel),
 				modifiedCols);
 
-			if (mtstate && !mtstate->yb_fetch_target_tuple && !att_in_modified_cols)
+			if (mtstate &&
+				(mtstate->operation == CMD_UPDATE ||
+				 mtstate->operation == CMD_DELETE) &&
+				!mtstate->yb_fetch_target_tuple &&
+				!att_in_modified_cols)
 			{
 				/*
 				 * Without a target tuple, we only know the values of the
 				 * modified columns. But in this case it is safe to skip the
-				 * unmodified columns anyway.
+				 * unmodified columns anyway.  Skip only for UPDATE and
+				 * DELETE: an INSERT has no target tuple to fetch, and the
+				 * inserted tuple is always complete.  Any future operation
+				 * (e.g. MERGE) must opt in deliberately.
 				 */
 				bms_free(modifiedCols);
 				continue;
