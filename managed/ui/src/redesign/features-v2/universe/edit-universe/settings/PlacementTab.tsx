@@ -3,8 +3,14 @@ import { toast } from 'react-toastify';
 import { mui } from '@yugabyte-ui-library/core';
 import { useToggle } from 'react-use';
 import { useTranslation } from 'react-i18next';
-import { ClusterType } from '@app/redesign/helpers/dtos';
-import { getClusterByType, useEditUniverseContext, useIsUniverseReady } from '../EditUniverseUtils';
+import { CloudType, ClusterType } from '@app/redesign/helpers/dtos';
+import {
+  getClusterByType,
+  getPlacementSpecForCluster,
+  isKubernetesCluster,
+  useEditUniverseContext,
+  useIsUniverseReady
+} from '../EditUniverseUtils';
 import { useEditUniverseTaskHandler } from '../hooks/useEditUniverseTaskHandler';
 import { useApplyMasterAllocation } from '../hooks/useApplyMasterAllocation';
 import { useEditUniverse } from '@app/v2/api/universe/universe';
@@ -28,6 +34,7 @@ import { getNodeCount } from '../../create-universe/CreateUniverseUtils';
 import { PlacementActionsMenu } from '../edit-placement/PlacementActionsMenu';
 import { YBLoadingCircleIcon } from '@app/components/common/indicators';
 import { ClusterPlacementSpec } from '@app/v2/api/yugabyteDBAnywhereV2APIs.schemas';
+import { ResilienceFormMode } from '../../create-universe/steps/resilence-regions/dtos';
 
 const EditPlacement = lazy(() =>
   import('../edit-placement/EditPlacement').then((module) => ({
@@ -54,6 +61,8 @@ export const PlacementTab = () => {
   const isUniverseReady = useIsUniverseReady();
 
   const [showDeleteReadReplicaModal, setShowDeleteReadReplicaModal] = useState(false);
+
+  const isK8s = isKubernetesCluster(primaryCluster);
 
   const readReplicaPlacementEntries = useMemo(() => {
     const rr = readReplicaCluster;
@@ -102,24 +111,24 @@ export const PlacementTab = () => {
     ];
   }, [isUniverseReady, readReplicaCluster?.uuid, t, universeUuid]);
 
-  const [showEditResilienceAndRegionsModal, setShowEditResilienceAndRegionsModal] = useToggle(
-    false
-  );
+  const [showEditResilienceAndRegionsModal, setShowEditResilienceAndRegionsModal] =
+    useToggle(false);
 
   const [skipResilienceAndRegionsStep, setSkipResilienceAndRegionsStep] = useToggle(false);
-  const [showMasterServerNodeAllocationModal, setShowMasterServerNodeAllocationModal] = useToggle(
-    false
-  );
+  const [showMasterServerNodeAllocationModal, setShowMasterServerNodeAllocationModal] =
+    useToggle(false);
 
   const editUniverse = useEditUniverse();
   const handleEditUniverseSuccess = useEditUniverseTaskHandler(universeUUID);
 
-  const { applyMasterAllocation, isSubmitting: isMasterAllocSubmitting } = useApplyMasterAllocation({
-    universeData,
-    providerRegions,
-    selectedPartitionUUID: singlePrimaryGeoPartition?.uuid,
-    onAfterApplied: () => setShowMasterServerNodeAllocationModal(false)
-  });
+  const { applyMasterAllocation, isSubmitting: isMasterAllocSubmitting } = useApplyMasterAllocation(
+    {
+      universeData,
+      providerRegions,
+      selectedPartitionUUID: singlePrimaryGeoPartition?.uuid,
+      onAfterApplied: () => setShowMasterServerNodeAllocationModal(false)
+    }
+  );
 
   const editPlacement = (context: EditPlacementContextProps, onSuccess?: () => void) => {
     if (!context.resilience) {
@@ -170,7 +179,12 @@ export const PlacementTab = () => {
         uniUUID: universeData!.info!.universe_uuid!,
         data: {
           expected_universe_version: -1,
-          clusters: [clusterPayload]
+          clusters: [clusterPayload],
+          universe_settings: {
+            expert_mode: skipResilienceAndRegionsStep
+              ? universeData?.spec?.universe_settings?.expert_mode
+              : context.resilience.resilienceFormMode === ResilienceFormMode.EXPERT_MODE
+          }
         }
       },
       {
@@ -192,12 +206,15 @@ export const PlacementTab = () => {
   }
 
   return (
-    <Box>
+    <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
       <Box sx={{ justifyContent: 'flex-end', display: 'flex' }}>
         <PlacementActionsMenu
           universeUuid={universeUUID}
-          onEditMasterAllocationClick={() => setShowMasterServerNodeAllocationModal(true)}
+          onEditMasterAllocationClick={
+            isK8s ? undefined : () => setShowMasterServerNodeAllocationModal(true)
+          }
           showAddGeoPartition={false}
+          readReplicaAlreadyPresent={readReplicaPlacementEntries.length > 0}
         />
       </Box>
       <ClusterInstanceCard
@@ -209,9 +226,13 @@ export const PlacementTab = () => {
         }
         parition={singlePrimaryGeoPartition}
         placement={singlePrimaryGeoPartition?.placement ?? primaryCluster!.placement_spec!}
-        editMasterServerNodeAllocationClicked={() => {
-          setShowMasterServerNodeAllocationModal(true);
-        }}
+        editMasterServerNodeAllocationClicked={
+          isK8s
+            ? undefined
+            : () => {
+                setShowMasterServerNodeAllocationModal(true);
+              }
+        }
         editPlacementClicked={() => {
           setSkipResilienceAndRegionsStep(true);
           setShowEditResilienceAndRegionsModal(true);

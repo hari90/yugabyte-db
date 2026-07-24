@@ -33,6 +33,7 @@
 #include "yb/util/scope_exit.h"
 #include "yb/util/size_literals.h"
 #include "yb/util/shared_lock.h"
+#include "yb/util/status_format.h"
 #include "yb/util/sync_point.h"
 #include "yb/util/tsan_util.h"
 #include "yb/util/unique_lock.h"
@@ -902,6 +903,7 @@ class VectorLSM<Vector, DistanceResult>::CompactionTask : public PriorityThreadP
       LOG_WITH_PREFIX(INFO) << "Done: " << status;
     } else {
       LOG_WITH_PREFIX(DFATAL) << "Failed: " << status;
+      lsm_.CheckFailure(status);
     }
     Completed(status, last_serial_no);
 
@@ -1616,6 +1618,8 @@ Status VectorLSM<Vector, DistanceResult>::DoSaveChunk(const ImmutableChunkPtr& c
     }
   }
 
+  TEST_SYNC_POINT("VectorLSM::DoSaveChunk:BeforeManifestCheck");
+
   WritableFile* manifest_file = nullptr;
   ImmutableChunkPtr writing_chunk;
   const bool stopping = !shutdown_controller_.IsRunning();
@@ -1634,6 +1638,7 @@ Status VectorLSM<Vector, DistanceResult>::DoSaveChunk(const ImmutableChunkPtr& c
     }
 
     if (writing_manifest_) {
+      TEST_SYNC_POINT("VectorLSM::DoSaveChunk:ManifestWriteSkipped");
       return Status::OK();
     }
 
@@ -1664,7 +1669,7 @@ Status VectorLSM<Vector, DistanceResult>::DoSaveChunk(const ImmutableChunkPtr& c
     writing_chunk = updates_queue_.begin()->second;
   }
 
-  return UpdateManifest(*manifest_file, std::move(writing_chunk));
+  return UpdateManifest(*manifest_file, std::move(writing_chunk), /* schedule_compaction = */ true);
 }
 
 template<IndexableVectorType Vector, ValidDistanceResultType DistanceResult>
@@ -1686,10 +1691,18 @@ Status VectorLSM<Vector, DistanceResult>::AddChunkToManifest(
 
 template<IndexableVectorType Vector, ValidDistanceResultType DistanceResult>
 Status VectorLSM<Vector, DistanceResult>::UpdateManifest(
-    WritableFile& manifest_file, ImmutableChunkPtr chunk) {
+    WritableFile& manifest_file, ImmutableChunkPtr chunk, bool schedule_compaction) {
   while (chunk) {
     DCHECK_ONLY_NOTNULL(chunk.get());
-    RETURN_NOT_OK(AddChunkToManifest(manifest_file, *chunk));
+    auto status = AddChunkToManifest(manifest_file, *chunk);
+    if (!status.ok()) {
+      // Manifest stays acquired on failure, so queued chunks would never flush.
+      std::lock_guard lock(mutex_);
+      for (auto& [_, queued_chunk] : updates_queue_) {
+        queued_chunk->Flushed(status);
+      }
+      return status;
+    }
 
     // Update chunks state and move to the next chunk in the flushing queue if any.
     {
@@ -1712,9 +1725,10 @@ Status VectorLSM<Vector, DistanceResult>::UpdateManifest(
     }
   }
 
-  // Scheduling a background compaction after the loop to maybe pick all flushed chunks,
-  // rather than trying to schedule after each chunk got manifested.
-  ScheduleBackgroundCompaction(/* finished_task= */ nullptr);
+  if (schedule_compaction) {
+    // Scheduled once after the loop so the compaction could pick all flushed chunks.
+    ScheduleBackgroundCompaction(/* finished_task= */ nullptr);
+  }
 
   return Status::OK();
 }
@@ -1864,19 +1878,61 @@ Status VectorLSM<Vector, DistanceResult>::Flush(bool wait) {
 }
 
 template<IndexableVectorType Vector, ValidDistanceResultType DistanceResult>
-storage::UserFrontierPtr VectorLSM<Vector, DistanceResult>::GetFlushedFrontier() {
-  storage::UserFrontierPtr result;
+storage::FrontierInfo VectorLSM<Vector, DistanceResult>::GetFrontiers(
+    storage::FrontierKinds kinds) {
+  const bool need_flushed = kinds.Test(storage::FrontierKind::kFlushed);
+  const bool need_in_memory_smallest = kinds.Test(storage::FrontierKind::kInMemorySmallest);
+  const bool need_in_memory_largest = kinds.Test(storage::FrontierKind::kInMemoryLargest);
+  const bool need_in_memory = need_in_memory_smallest || need_in_memory_largest;
+
+  storage::FrontierInfo result;
+  auto update = [](const storage::UserFrontiersPtr& user_frontiers,
+                   storage::UpdateUserValueType type, storage::UserFrontierPtr* out) {
+    if (!user_frontiers) {
+      return;
+    }
+    const auto& frontier =
+        type == storage::UpdateUserValueType::kSmallest
+            ? user_frontiers->Smallest() : user_frontiers->Largest();
+    storage::UserFrontier::Update(&frontier, type, out);
+  };
+  auto update_in_memory = [&](const storage::UserFrontiersPtr& user_frontiers) {
+    if (need_in_memory_smallest) {
+      update(user_frontiers, storage::UpdateUserValueType::kSmallest, &result.in_memory.smallest);
+    }
+    if (need_in_memory_largest) {
+      update(user_frontiers, storage::UpdateUserValueType::kLargest, &result.in_memory.largest);
+    }
+  };
+
   std::lock_guard lock(mutex_);
   VLOG_WITH_PREFIX_AND_FUNC(5) << "immutable_chunks: " << AsString(immutable_chunks_);
 
   for (const auto& chunk : immutable_chunks_) {
-    if (!chunk->IsInManifest()) {
-      continue;
+    if (chunk->IsInManifest()) {
+      if (need_flushed) {
+        update(chunk->user_frontiers, storage::UpdateUserValueType::kLargest, &result.flushed);
+      }
+    } else if (need_in_memory) {
+      update_in_memory(chunk->user_frontiers);
     }
-    storage::UserFrontier::Update(
-        &chunk->user_frontiers->Largest(), storage::UpdateUserValueType::kLargest, &result);
+  }
+  if (need_in_memory && mutable_chunk_ && mutable_chunk_->num_entries) {
+    update_in_memory(mutable_chunk_->user_frontiers);
   }
   return result;
+}
+
+template<IndexableVectorType Vector, ValidDistanceResultType DistanceResult>
+storage::UserFrontierPtr VectorLSM<Vector, DistanceResult>::GetFlushedFrontier() {
+  return GetFrontiers(storage::FrontierKinds{storage::FrontierKind::kFlushed}).flushed;
+}
+
+template<IndexableVectorType Vector, ValidDistanceResultType DistanceResult>
+storage::UserFrontierRange VectorLSM<Vector, DistanceResult>::GetInMemoryFrontiers() {
+  return GetFrontiers(storage::FrontierKinds{
+      storage::FrontierKind::kInMemorySmallest,
+      storage::FrontierKind::kInMemoryLargest}).in_memory;
 }
 
 template<IndexableVectorType Vector, ValidDistanceResultType DistanceResult>
@@ -2004,7 +2060,7 @@ template<IndexableVectorType Vector, ValidDistanceResultType DistanceResult>
 void VectorLSM<Vector, DistanceResult>::DeleteObsoleteChunks() {
   CHECK(obsolete_files_cleanup_in_progress_);
 
-  // TODO(vector-index): move this paradigm into a separate utility class (already have the same
+  // TODO(vector_index): move this paradigm into a separate utility class (already have the same
   // approach somewhere, it is good to combine them).
   for (;;) {
     DoDeleteObsoleteChunks();
@@ -2741,21 +2797,23 @@ Status VectorLSM<Vector, DistanceResult>::DoCompact(
 
   // Lock manifest file for writes to be able to not miss any upcoming chunk.
   AcquireManifest();
+  TEST_SYNC_POINT("VectorLSM::DoCompact:ManifestAcquired");
+  // Prepare manifest file update taking into account specified policy.
+  VectorLSMUpdatePB update;
+  for (const auto& chunk : merged_chunks) {
+    chunk->AddToUpdate(update);
+  }
+  const bool full_update = context.GetManifestUpdateType() == ManifestUpdateType::kFull;
+  if (full_update) {
+    update.set_reset(true);
+  } else {
+    scope.AddToUpdate(update);
+  }
+
+  WritableFile* manifest_file = nullptr;
   {
-    // Allow manifest writes on scope exit -- once it got updated or error happened.
-    ScopeExit scope_exit([this]{ ReleaseManifest(); });
-
-    // Prepare manifest file update taking into account specified policy.
-    VectorLSMUpdatePB update;
-    for (const auto& chunk : merged_chunks) {
-      chunk->AddToUpdate(update);
-    }
-    if (context.GetManifestUpdateType() == ManifestUpdateType::kActual) {
-      scope.AddToUpdate(update);
-    } else {
-      update.set_reset(true); // Full update.
-
-      SharedLock lock(mutex_);
+    std::lock_guard lock(mutex_);
+    if (full_update) {
       for (size_t i = 0; i < immutable_chunks_.size(); ++i) {
         const auto& chunk = immutable_chunks_[i];
         if (!chunk->IsInManifest() || scope.contains(i)) {
@@ -2766,21 +2824,19 @@ Status VectorLSM<Vector, DistanceResult>::DoCompact(
     }
 
     // Update manifest file in accordance with the policy.
-    WritableFile* manifest_file = nullptr;
-    {
-      std::lock_guard lock(mutex_);
-      manifest_file = manifest_file_.get();
-      if (!manifest_file || context.ForceManifestRoll()) {
-        manifest_file = VERIFY_RESULT(RollManifest());
-        VLOG_WITH_PREFIX_AND_FUNC(1) << "new manifest " << manifest_file->filename();
-      }
+    manifest_file = manifest_file_.get();
+    if (!manifest_file || context.ForceManifestRoll()) {
+      manifest_file = VERIFY_RESULT(RollManifest());
+      VLOG_WITH_PREFIX_AND_FUNC(1) << "new manifest " << manifest_file->filename();
     }
-
-    VLOG_WITH_PREFIX_AND_FUNC(3) << update.ShortDebugString();
-    RETURN_NOT_OK(VectorLSMMetadataAppendUpdate(*manifest_file, update));
   }
 
+  VLOG_WITH_PREFIX_AND_FUNC(3) << update.ShortDebugString();
+  TEST_SYNC_POINT("VectorLSM::DoCompact:BeforeManifestUpdate");
+  RETURN_NOT_OK(VectorLSMMetadataAppendUpdate(*manifest_file, update));
+
   // Update in-memory structure.
+  ImmutableChunkPtr writing_chunk;
   {
     std::lock_guard lock(mutex_);
     auto compacted_begin = immutable_chunks_.begin() + scope.index();
@@ -2790,6 +2846,17 @@ Status VectorLSM<Vector, DistanceResult>::DoCompact(
     }
     auto insert_pos = immutable_chunks_.erase(compacted_begin, compacted_end);
     immutable_chunks_.insert(insert_pos, merged_chunks.begin(), merged_chunks.end());
+    if (!updates_queue_.empty() && updates_queue_.begin()->second->IsOnDisk()) {
+      writing_chunk = updates_queue_.begin()->second;
+      // Manifest will be released by UpdateManifest
+    } else {
+      ReleaseManifestUnlocked();
+    }
+  }
+
+  if (writing_chunk) {
+    RETURN_NOT_OK(UpdateManifest(
+        *manifest_file, std::move(writing_chunk), /* schedule_compaction = */ false));
   }
 
   // TODO(vector_index): merge the cleanup logic with the same from CreateCheckpoint().
@@ -3030,7 +3097,7 @@ void VectorLSM<Vector, DistanceResult>::RemoveTaskUnlocked(CompactionTask& task)
 
 template<IndexableVectorType Vector, ValidDistanceResultType DistanceResult>
 Status VectorLSM<Vector, DistanceResult>::SubmitTask(CompactionTaskPtr task) {
-  // TODO(vector-index): specify disk_group_no during submitting.
+  // TODO(vector_index): specify disk_group_no during submitting.
   auto submitted = options_.compaction_token->Submit(&task);
   if (!submitted.ok()) {
     LOG_WITH_PREFIX(ERROR) << "Failed to submit task " << task->ToString()

@@ -29,6 +29,8 @@
 
 #include "yb/util/decimal.h"
 #include "yb/util/fast_varint.h"
+#include "yb/util/status_format.h"
+#include "yb/util/status_log.h"
 
 #include "yb/yql/pggate/util/pg_doc_data.h"
 
@@ -954,6 +956,9 @@ Status PgTableRow::SetValue(ColumnId column_id, const LWQLValuePB& value) {
 }
 
 Status PgTableRow::SetValueByColumnIdx(size_t idx, const QLValuePB& value) {
+  if (projection_->columns[idx].data_type == DataType::VECTOR) {
+    return DoSetValueByColumnIdx(idx, VERIFY_RESULT(DecodeVectorSchemaMissingValueForPgRow(value)));
+  }
   return DoSetValueByColumnIdx(idx, value);
 }
 

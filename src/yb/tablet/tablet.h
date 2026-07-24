@@ -1009,10 +1009,18 @@ class Tablet : public AbstractTablet,
   // `max_num_ranges` and adds to `keys_buffer` a list of these ranges boundary keys (depending on
   // is_forward).
   //
-  // It is guaranteed that returned keys are at most max_key_length bytes.
-  // Both lower_bound_key and upper_bound_key are exclusive. They are adjusted by this function
-  // to be within tablet boundaries (key_bounds_ if set or based on metadata()->partition() if
-  // key_bounds_ is not set) and to be no longer than max_key_length.
+  // It is guaranteed that returned keys are:
+  // - valid encoded DocKeys or encoded partition keys (see GetEncodedPartitionKey in
+  //   dockv/partition.h).
+  // - at most max_key_length bytes.
+  //
+  // Both lower_bound_key and upper_bound_key are exclusive and should be valid encoded DocKeys or
+  // encoded partition keys (see GetEncodedPartitionKey in dockv/partition.h).
+  // They are adjusted by this function to be within the following boundaries:
+  // - For a colocated table: the colocated_table_id key prefix
+  // - For non-colocated: tablet partition bounds.
+  // Note: the max_key_length cap above applies to the full encoded DocKeys retrieved from the data;
+  // the terminating tablet boundary key is returned as-is and is not length-capped.
   //
   // If `is_forward` is set, list will consist of:
   // - 1st_range_boundary_key \in (adjusted_lower_bound_key, adjusted_upper_bound_key)
@@ -1061,6 +1069,10 @@ class Tablet : public AbstractTablet,
 
   void TEST_SleepBeforeDeleteIntentsFile(MonoDelta value) {
     TEST_sleep_before_delete_intents_file_ = value;
+  }
+
+  void TEST_SetDisableFlushOnShutdown(bool value) {
+    TEST_disable_flush_on_shutdown_ = value;
   }
 
   // Reads the current value of FLAGS_rocksdb_compact_flush_rate_limit_bytes_per_sec and
@@ -1466,6 +1478,7 @@ class Tablet : public AbstractTablet,
 
   MonoDelta TEST_sleep_before_apply_intents_;
   MonoDelta TEST_sleep_before_delete_intents_file_;
+  std::atomic<bool> TEST_disable_flush_on_shutdown_{false};
 
   DISALLOW_COPY_AND_ASSIGN(Tablet);
 };

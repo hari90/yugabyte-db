@@ -16,6 +16,7 @@
 #include "yb/master/master_ddl.pb.h"
 #include "yb/master/master_ddl.proxy.h"
 #include "yb/util/backoff_waiter.h"
+#include "yb/util/status_format.h"
 #include "yb/util/test_macros.h"
 #include "yb/yql/pgwrapper/libpq_test_base.h"
 #include "yb/yql/pgwrapper/libpq_utils.h"
@@ -717,11 +718,28 @@ TEST_F(ColocationConcurrencyTest, TxnsOnSeparateTables) {
 
     // Insert 50 rows in t1 on a separate thread.
     std::thread insert_thread([&conn2, &done, &counter] {
-      ASSERT_OK(conn2.Execute("BEGIN"));
+      // The previous iteration's TRUNCATE TABLE t2 is a table rewrite that drops the old DocDB
+      // relfilenode and creates a new one. conn2 may still have the old relfilenode cached, so its
+      // first INSERT can fail with OBJECT_NOT_FOUND until conn2's catalog refreshes via heartbeat.
+      // Restart the transaction until the inserts land, resetting counter each attempt since
+      // ROLLBACK discards the inserts of the aborted transaction.
       while (!done) {
-        ASSERT_OK(conn2.ExecuteFormat("INSERT INTO t2 values ($0)", ++counter));
+        ASSERT_OK(conn2.Execute("BEGIN"));
+        counter = 0;
+        Status s;
+        while (!done) {
+          s = conn2.ExecuteFormat("INSERT INTO t2 values ($0)", counter + 1);
+          if (!s.ok()) {
+            break;
+          }
+          ++counter;
+        }
+        if (s.ok()) {
+          ASSERT_OK(conn2.Execute("COMMIT"));
+          return;
+        }
+        ASSERT_OK(conn2.Execute("ROLLBACK"));
       }
-      ASSERT_OK(conn2.Execute("COMMIT"));
     });
 
     ASSERT_OK(conn1.Execute("BEGIN"));

@@ -538,27 +538,22 @@ class CDCServiceImpl::Impl {
   std::optional<int64_t> GetLastActiveTime(const TabletStreamInfo& producer_tablet) {
     SharedLock<rw_spinlock> lock(mutex_);
     auto it = tablet_checkpoints_.find(producer_tablet);
-    if (it != tablet_checkpoints_.end()) {
-      // Use last_active_time from cache only if it is current.
-      if (it->cdc_state_checkpoint.last_active_time > 0) {
-        if (!it->cdc_state_checkpoint.ExpiredAt(
-                FLAGS_cdc_state_checkpoint_update_interval_ms * 1ms, CoarseMonoClock::Now())) {
-          VLOG(2) << "Found recent entry in cache with active time: "
-                  << it->cdc_state_checkpoint.last_active_time
-                  << ", for tablet: " << producer_tablet.tablet_id
-                  << ", and stream: " << producer_tablet.stream_id;
-          return it->cdc_state_checkpoint.last_active_time;
-        } else {
-          VLOG(2) << "Found stale entry in cache with active time: "
-                  << it->cdc_state_checkpoint.last_active_time
-                  << ", for tablet: " << producer_tablet.tablet_id
-                  << ", and stream: " << producer_tablet.stream_id
-                  << ". We will read from the cdc_state table";
-        }
-      }
-    } else {
+    if (it == tablet_checkpoints_.end()) {
       VLOG(1) << "Did not find entry in 'tablet_checkpoints_' cache for tablet: "
               << producer_tablet.tablet_id << ", stream: " << producer_tablet.stream_id;
+      return std::nullopt;
+    }
+
+    // Return whatever the cache holds, without a staleness check. Callers that need the latest
+    // value (e.g. before declaring a tablet expired or not-of-interest) re-read from the cdc_state
+    // table via GetLastActiveTime(..., ignore_cache=true). Rejecting a "stale" cached value here
+    // only forced redundant cdc_state reads.
+    if (it->cdc_state_checkpoint.last_active_time > 0) {
+      VLOG(2) << "Found entry in cache with active time: "
+              << it->cdc_state_checkpoint.last_active_time
+              << ", for tablet: " << producer_tablet.tablet_id
+              << ", and stream: " << producer_tablet.stream_id;
+      return it->cdc_state_checkpoint.last_active_time;
     }
 
     return std::nullopt;
@@ -3327,6 +3322,10 @@ Status CDCServiceImpl::GetTabletIdsToPoll(
           .IncludeCDCSDKSafeTime(),
       &iteration_status));
 
+  // Materialize the stream's rows in a single scan. Iterating the range a second time would issue
+  // another full scan of cdc_state (CDCStateTableRange::begin() starts a fresh table scan), so we
+  // collect the rows once here and reuse them for the selection pass below.
+  std::vector<CDCStateTableEntry> stream_entries;
   for (auto entry_result : entries) {
     if (!entry_result) {
       LOG(WARNING) << "GetTabletIdsToPoll failed to parse row :" << entry_result.status();
@@ -3339,30 +3338,20 @@ Status CDCServiceImpl::GetTabletIdsToPoll(
 
     auto& tablet_id = entry.key.tablet_id;
     auto is_cur_tablet_polled = entry.last_replication_time.has_value();
-    if (!is_cur_tablet_polled) {
-      continue;
+    if (is_cur_tablet_polled) {
+      polled_tablets.insert(tablet_id);
+
+      auto iter = child_to_parent_mapping.find(tablet_id);
+      if (iter != child_to_parent_mapping.end()) {
+        parent_to_polled_child_count[iter->second] += 1;
+      }
     }
 
-    polled_tablets.insert(tablet_id);
-
-    auto iter = child_to_parent_mapping.find(tablet_id);
-    if (iter != child_to_parent_mapping.end()) {
-      parent_to_polled_child_count[iter->second] += 1;
-    }
+    stream_entries.push_back(std::move(entry));
   }
   RETURN_NOT_OK(iteration_status);
 
-  for (const auto& entry_result : entries) {
-    if (!entry_result) {
-      LOG(WARNING) << "GetTabletIdsToPoll failed to parse row :" << entry_result.status();
-      continue;
-    }
-
-    auto& entry = *entry_result;
-    if (entry.key.stream_id != stream_id) {
-      continue;
-    }
-
+  for (const auto& entry : stream_entries) {
     auto& tablet_id = entry.key.tablet_id;
     auto is_active_or_hidden =
         (active_or_hidden_tablets.find(tablet_id) != active_or_hidden_tablets.end());

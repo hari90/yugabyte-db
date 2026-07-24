@@ -83,6 +83,7 @@ import com.yugabyte.yw.common.ShellResponse;
 import com.yugabyte.yw.common.UniverseInProgressException;
 import com.yugabyte.yw.common.Util;
 import com.yugabyte.yw.common.XClusterUniverseService;
+import com.yugabyte.yw.common.audit.otel.OtelCollectorUtil;
 import com.yugabyte.yw.common.backuprestore.BackupUtil;
 import com.yugabyte.yw.common.backuprestore.ybc.YbcBackupNodeRetriever;
 import com.yugabyte.yw.common.backuprestore.ybc.YbcBackupUtil;
@@ -149,6 +150,7 @@ import com.yugabyte.yw.models.helpers.LoadBalancerConfig;
 import com.yugabyte.yw.models.helpers.LoadBalancerPlacement;
 import com.yugabyte.yw.models.helpers.MetricSourceState;
 import com.yugabyte.yw.models.helpers.NodeDetails;
+import com.yugabyte.yw.models.helpers.NodeDetails.MasterState;
 import com.yugabyte.yw.models.helpers.NodeDetails.NodeState;
 import com.yugabyte.yw.models.helpers.NodeStatus;
 import com.yugabyte.yw.models.helpers.PlacementInfo;
@@ -251,7 +253,8 @@ public abstract class UniverseTaskBase extends AbstractTaskBase {
           TaskType.CreateKubernetesUniverse,
           TaskType.ReadOnlyClusterCreate,
           TaskType.ReadOnlyClusterDelete,
-          TaskType.EditUniverse,
+          TaskType.ReadOnlyKubernetesClusterCreate,
+          TaskType.ReadOnlyKubernetesClusterDelete,
           TaskType.AddNodeToUniverse,
           TaskType.RemoveNodeFromUniverse,
           TaskType.DeleteNodeFromUniverse,
@@ -427,6 +430,9 @@ public abstract class UniverseTaskBase extends AbstractTaskBase {
   }
 
   private final AtomicReference<ExecutionContext> executionContext = new AtomicReference<>();
+
+  /** Ensures MarkRollbackUnsafe is enqueued only once per task build. */
+  private boolean markRollbackUnsafeAdded;
 
   public class ExecutionContext {
     private final UUID universeUuid;
@@ -1215,21 +1221,37 @@ public abstract class UniverseTaskBase extends AbstractTaskBase {
   }
 
   /**
-   * Returns the target universe definition to diff against the pre-lock snapshot when capturing
-   * state transition delta during freeze. Return null to skip capture.
-   *
-   * <p>Today this is typically the interim task params (e.g. {@code ToBeAdded} nodes). TODO
-   * (PLAT-21497): derive the post-success steady-state UDTP instead.
+   * Returns the post-success steady-state universe definition to diff against the pre-lock snapshot
+   * when capturing state transition delta during freeze. Derives from interim task params (e.g.
+   * {@code ToBeAdded}/{@code ToBeRemoved}/{@code masterState}). Subclasses may override to
+   * customize or return null to skip capture.
    */
   @Nullable
-  protected UniverseDefinitionTaskParams getStateTransitionCaptureTarget() {
-    return null;
+  protected UniverseDefinitionTaskParams getTargetUniverseDetails() {
+    UniverseDefinitionTaskParams target =
+        Json.fromJson(Json.toJson(taskParams()), UniverseDefinitionTaskParams.class);
+    if (target.nodeDetailsSet == null) {
+      return target;
+    }
+    target.nodeDetailsSet.removeIf(node -> node.state == NodeState.ToBeRemoved);
+    for (NodeDetails node : target.nodeDetailsSet) {
+      if (node.state == NodeState.ToBeAdded) {
+        node.state = NodeState.Live;
+      }
+      if (node.masterState == MasterState.ToStart) {
+        node.isMaster = true;
+      } else if (node.masterState == MasterState.ToStop) {
+        node.isMaster = false;
+      }
+      node.masterState = null;
+    }
+    return target;
   }
 
   /**
    * Captures the delta between the clean pre-task universe definition and the intended target
-   * definition. Invoked from {@link com.yugabyte.yw.commissioner.tasks.subtasks.FreezeUniverse}
-   * after the freeze callback, using the pre-lock snapshot as {@code beforeUDTP}.
+   * definition. Invoked from the freeze callback wrapper in {@link #createFreezeUniverseTask} after
+   * the freeze callback, using the pre-lock snapshot as {@code beforeUDTP}.
    */
   protected void captureStateTransitionDelta(
       Universe universe,
@@ -1346,11 +1368,24 @@ public abstract class UniverseTaskBase extends AbstractTaskBase {
     FreezeUniverse.Params params = new FreezeUniverse.Params();
     params.setUniverseUUID(universe.getUniverseUUID());
     params.setUniverse(universe);
-    params.setCallback(callback);
     params.setExecutionContext(getOrCreateExecutionContext());
+    // Compute target after the freeze callback so taskParams() are finalized. EditUniverse
+    // already finalizes params in precheck; this keeps the generic path correct for other tasks.
     if (isFirstTry()) {
-      params.setStateTransitionCaptureTarget(getStateTransitionCaptureTarget());
+      UniverseDefinitionTaskParams beforeDetails = universe.getUniverseDetails();
+      Consumer<Universe> originalCallback = callback;
+      callback =
+          univ -> {
+            if (originalCallback != null) {
+              originalCallback.accept(univ);
+            }
+            UniverseDefinitionTaskParams target = getTargetUniverseDetails();
+            if (target != null) {
+              captureStateTransitionDelta(univ, beforeDetails, target);
+            }
+          };
     }
+    params.setCallback(callback);
     task.initialize(params);
     subTaskGroup.addSubTask(task);
     getRunnableTask().addSubTaskGroup(subTaskGroup);
@@ -1454,14 +1489,7 @@ public abstract class UniverseTaskBase extends AbstractTaskBase {
 
     // Add audit log config from the primary cluster
     Universe universe = Universe.getOrBadRequest(taskParams().getUniverseUUID());
-    params.auditLogConfig =
-        universe.getUniverseDetails().getPrimaryCluster().userIntent.auditLogConfig;
-    params.metricsExportConfig =
-        universe.getUniverseDetails().getPrimaryCluster().userIntent.metricsExportConfig;
-
-    // Add query log config from primary cluster
-    params.queryLogConfig =
-        universe.getUniverseDetails().getPrimaryCluster().userIntent.queryLogConfig;
+    params.telemetryConfig = OtelCollectorUtil.getCurrentTelemetryConfig(universe);
 
     // The software package to install for this cluster.
     params.ybSoftwareVersion = userIntent.ybSoftwareVersion;
@@ -1501,6 +1529,34 @@ public abstract class UniverseTaskBase extends AbstractTaskBase {
     subTaskGroup.addSubTask(task);
     getRunnableTask().addSubTaskGroup(subTaskGroup);
     return subTaskGroup;
+  }
+
+  /**
+   * Creates a subtask that flips {@code state_transition_details.rollbackSafe} to false when the
+   * task crosses the rollback checkpoint.
+   */
+  public SubTaskGroup createMarkRollbackUnsafeTask() {
+    SubTaskGroup subTaskGroup = createSubTaskGroup("MarkRollbackUnsafe");
+    MarkRollbackUnsafe.Params params = new MarkRollbackUnsafe.Params();
+    params.setUniverseUUID(taskParams().getUniverseUUID());
+    MarkRollbackUnsafe task = createTask(MarkRollbackUnsafe.class);
+    task.initialize(params);
+    task.setUserTaskUUID(getUserTaskUUID());
+    subTaskGroup.addSubTask(task);
+    getRunnableTask().addSubTaskGroup(subTaskGroup);
+    return subTaskGroup;
+  }
+
+  /**
+   * Enqueues {@link #createMarkRollbackUnsafeTask()} at most once so the checkpoint flip sits
+   * immediately before the placement update on the master leader.
+   */
+  protected void createMarkRollbackUnsafeTaskOnce() {
+    if (markRollbackUnsafeAdded) {
+      return;
+    }
+    createMarkRollbackUnsafeTask().setSubTaskGroupType(SubTaskGroupType.ConfigureUniverse);
+    markRollbackUnsafeAdded = true;
   }
 
   /** Create a task to mark the change on a universe as success. */
@@ -4687,6 +4743,9 @@ public abstract class UniverseTaskBase extends AbstractTaskBase {
     params.commandType = KubernetesCommandExecutor.CommandType.COPY_PACKAGE;
     params.setUniverseUUID(taskParams().getUniverseUUID());
     params.ybcServerName = node.nodeName;
+    // Capture the stable node identifier alongside the name so KubernetesCommandExecutor
+    // can survive a rename between here and subtask execution (see resolveTargetNode).
+    params.nodeUuid = node.nodeUuid;
     params.setYbcSoftwareVersion(ybcSoftwareVersion);
     params.ybcGflags = ybcGflags;
     params.providerUUID = providerUUID;
@@ -4720,6 +4779,9 @@ public abstract class UniverseTaskBase extends AbstractTaskBase {
     params.commandType = KubernetesCommandExecutor.CommandType.YBC_ACTION;
     params.setUniverseUUID(taskParams().getUniverseUUID());
     params.ybcServerName = node.nodeName;
+    // Capture the stable node identifier alongside the name so KubernetesCommandExecutor
+    // can survive a rename between here and subtask execution (see resolveTargetNode).
+    params.nodeUuid = node.nodeUuid;
     params.isReadOnlyCluster = isReadOnlyCluster;
     params.providerUUID = providerUUID;
     params.command = command;
