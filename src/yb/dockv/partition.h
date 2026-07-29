@@ -40,6 +40,7 @@
 
 #include "yb/common/common_fwd.h"
 #include "yb/common/column_id.h"
+#include "yb/dockv/dockv_fwd.h"
 #include "yb/dockv/partial_row.h"
 
 #include "yb/util/enums.h"
@@ -534,5 +535,15 @@ class PartitionSchema {
   RangeSchema range_schema_;
   std::optional<YBHashSchema> hash_schema_;  // Defined only for table that is hash-partitioned.
 };
+
+// Range-key counterparts of PartitionSchema::EncodePgsqlHash, for range-sharded tables where the
+// partition key is the encoded range key rather than a hash. A partial list of range column values
+// widens to its whole range: -Inf on the lower side (`lower_bound`), +Inf on the upper.
+template <class Col>
+Result<KeyEntryValues> GetRangeComponents(
+    const Schema& schema, const Col& range_cols, bool lower_bound);
+
+template <class Col>
+Result<std::string> GetRangePartitionKey(const Schema& schema, const Col& range_cols);
 
 }  // namespace yb::dockv

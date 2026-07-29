@@ -49,6 +49,8 @@
 #include "yb/common/schema.h"
 
 #include "yb/dockv/doc_key.h"
+#include "yb/dockv/key_entry_value.h"
+#include "yb/dockv/value_type.h"
 
 #include "yb/gutil/hash/hash.h"
 #include "yb/gutil/map-util.h"
@@ -1543,5 +1545,70 @@ void PartitionSchema::ProcessHashKeyEntry(const LWPgsqlExpressionPB& expr, std::
 void PartitionSchema::ProcessHashKeyEntry(const PgsqlExpressionPB& expr, std::string* out) {
   AppendToKey(expr.value(), out);
 }
+
+template <class Col>
+Result<std::vector<KeyEntryValue>> GetRangeComponents(
+    const Schema& schema, const Col& range_cols, const bool lower_bound) {
+  size_t column_idx = 0;
+  auto range_cols_it = range_cols.begin();
+  const auto num_range_key_columns = schema.num_range_key_columns();
+  KeyEntryValues result;
+  for (const auto& col_id : schema.column_ids()) {
+    if (!schema.is_range_column(col_id)) {
+      continue;
+    }
+
+    const ColumnSchema& column_schema = VERIFY_RESULT(schema.column_by_id(col_id));
+
+    if (schema.table_properties().partitioning_version() > 0) {
+      if (column_idx < static_cast<size_t>(range_cols.size())) {
+        result.push_back(KeyEntryValue::FromQLValuePBForKey(
+            range_cols_it->value(), column_schema.sorting_type()));
+      } else {
+        result.emplace_back(
+            lower_bound ? KeyEntryType::kLowest : KeyEntryType::kHighest);
+      }
+    } else {
+      if (column_idx >= static_cast<size_t>(range_cols.size()) ||
+          range_cols_it->value().value_case() == QLValuePB::VALUE_NOT_SET) {
+        result.emplace_back(
+            lower_bound ? KeyEntryType::kLowest : KeyEntryType::kHighest);
+      } else {
+        result.push_back(KeyEntryValue::FromQLValuePB(
+            range_cols_it->value(), column_schema.sorting_type()));
+      }
+    }
+
+    ++range_cols_it;
+    if (++column_idx == num_range_key_columns) {
+      break;
+    }
+  }
+
+  if (!lower_bound) {
+    result.emplace_back(KeyEntryType::kHighest);
+  }
+  return result;
+}
+
+template <class Col>
+Result<std::string> GetRangePartitionKey(
+    const Schema& schema, const Col& range_cols) {
+  RSTATUS_DCHECK(!schema.num_hash_key_columns(), IllegalState,
+      "Cannot get range partition key for hash partitioned table");
+
+  auto range_components = VERIFY_RESULT(GetRangeComponents(schema, range_cols, true));
+  return DocKey(std::move(range_components)).Encode().ToStringBuffer();
+}
+
+#define YB_INSTANTIATE_RANGE_KEY_FUNCS(Col) \
+    template Result<KeyEntryValues> GetRangeComponents<Col>(const Schema&, const Col&, bool); \
+    template Result<std::string> GetRangePartitionKey<Col>(const Schema&, const Col&);
+
+YB_INSTANTIATE_RANGE_KEY_FUNCS(google::protobuf::RepeatedPtrField<PgsqlExpressionPB>)
+YB_INSTANTIATE_RANGE_KEY_FUNCS(ArenaList<LWPgsqlExpressionPB>)
+
+#undef YB_INSTANTIATE_RANGE_KEY_FUNCS
+
 
 }  // namespace yb::dockv

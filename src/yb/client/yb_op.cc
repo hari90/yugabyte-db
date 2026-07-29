@@ -94,6 +94,11 @@ void SetPartitionKey(const Slice& value, LWPgsqlWriteRequestPB* request) {
   request->dup_partition_key(value);
 }
 
+// Range-key encoding lives in yb_dockv so callers that must not link yb_client -- e.g. the thin
+// client in src/yb/thin_client -- can encode range keys too.
+using dockv::GetRangeComponents;
+using dockv::GetRangePartitionKey;
+
 template <typename Req>
 void GetPartitionKey(const Req& request, std::string* partition_key) {
   if (request.has_partition_key()) {
@@ -298,60 +303,7 @@ Status InitRangePartitionKey(
   return Status::OK();
 }
 
-template <class Col>
-Result<std::vector<dockv::KeyEntryValue>> GetRangeComponents(
-    const Schema& schema, const Col& range_cols, const bool lower_bound) {
-  size_t column_idx = 0;
-  auto range_cols_it = range_cols.begin();
-  const auto num_range_key_columns = schema.num_range_key_columns();
-  dockv::KeyEntryValues result;
-  for (const auto& col_id : schema.column_ids()) {
-    if (!schema.is_range_column(col_id)) {
-      continue;
-    }
 
-    const ColumnSchema& column_schema = VERIFY_RESULT(schema.column_by_id(col_id));
-
-    if (schema.table_properties().partitioning_version() > 0) {
-      if (column_idx < static_cast<size_t>(range_cols.size())) {
-        result.push_back(dockv::KeyEntryValue::FromQLValuePBForKey(
-            range_cols_it->value(), column_schema.sorting_type()));
-      } else {
-        result.emplace_back(
-            lower_bound ? dockv::KeyEntryType::kLowest : dockv::KeyEntryType::kHighest);
-      }
-    } else {
-      if (column_idx >= static_cast<size_t>(range_cols.size()) ||
-          range_cols_it->value().value_case() == QLValuePB::VALUE_NOT_SET) {
-        result.emplace_back(
-            lower_bound ? dockv::KeyEntryType::kLowest : dockv::KeyEntryType::kHighest);
-      } else {
-        result.push_back(dockv::KeyEntryValue::FromQLValuePB(
-            range_cols_it->value(), column_schema.sorting_type()));
-      }
-    }
-
-    ++range_cols_it;
-    if (++column_idx == num_range_key_columns) {
-      break;
-    }
-  }
-
-  if (!lower_bound) {
-    result.emplace_back(dockv::KeyEntryType::kHighest);
-  }
-  return result;
-}
-
-template <class Col>
-Result<std::string> GetRangePartitionKey(
-    const Schema& schema, const Col& range_cols) {
-  RSTATUS_DCHECK(!schema.num_hash_key_columns(), IllegalState,
-      "Cannot get range partition key for hash partitioned table");
-
-  auto range_components = VERIFY_RESULT(GetRangeComponents(schema, range_cols, true));
-  return dockv::DocKey(std::move(range_components)).Encode().ToStringBuffer();
-}
 
 template<class Req>
 Status InitReadPartitionKey(
