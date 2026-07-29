@@ -1180,12 +1180,28 @@ void ybthin_read_async(
     }
     // Route last: the partition key depends on the scan direction, the bounds and the paging
     // state, so every one of them has to be set by now.
-    // A fresh backward range scan starts at the last tablet and walks down; a continuation stays
-    // on the tablet its paging state names.
+    // A fresh backward range scan starts on the tablet holding the high end of its key range and
+    // walks down; a continuation stays on the tablet its paging state names. Starting at the last
+    // tablet regardless of the bounds would hand back an empty first page whenever the scan's range
+    // stops short of it -- which a caller reading a single page (descending, limit 1) sees as
+    // "no rows".
     uint32_t tablet = pinned_tablet[i];
     if (tablet == kNoTablet && spec->is_forward_scan == 0 &&
         table->schema.num_hash_key_columns() == 0 && table->partitions.size() > 1) {
-      tablet = static_cast<uint32_t>(table->partitions.size() - 1);
+      std::string high_key;
+      if (spec->n_range > 0) {
+        auto upper = dockv::GetRangeComponents(
+            table->schema, read->range_column_values(), /* lower_bound= */ false);
+        if (!upper.ok()) {
+          cb(ctx, FromStatus(upper.status()), nullptr);
+          return;
+        }
+        high_key = dockv::DocKey(std::move(*upper)).Encode().ToStringBuffer();
+      }
+      tablet = high_key.empty()
+          ? static_cast<uint32_t>(table->partitions.size() - 1)
+          : static_cast<uint32_t>(
+                dockv::FindPartitionStartIndex(table->partitions, high_key));
     }
     call->op_tablet[i] = tablet;
     build = RouteRead(*table, spec->n_range > 0, tablet, read);

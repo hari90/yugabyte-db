@@ -546,4 +546,10 @@ Result<KeyEntryValues> GetRangeComponents(
 template <class Col>
 Result<std::string> GetRangePartitionKey(const Schema& schema, const Col& range_cols);
 
+// Index of the tablet whose range covers `partition_key`: the highest partition start <= the key.
+// `partitions` are the table's tablet start keys, ascending, the first one empty.
+size_t FindPartitionStartIndex(
+    const std::vector<PartitionKey>& partitions, std::string_view partition_key,
+    size_t group_by = 1);
+
 }  // namespace yb::dockv
