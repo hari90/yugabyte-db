@@ -1606,7 +1606,7 @@ size_t FindPartitionStartIndex(
   CHECK(!partitions.empty()) << "Invalid table partition list <empty list>";
   CHECK(partitions.begin()->empty()) << "Invalid table partition list " << AsString(partitions)
                                      << ", the first partition key is expected to be empty";
-  // Highest entry less than or equal to partition_key: upper_bound gives the next one, so step back.
+  // Highest entry <= partition_key: upper_bound gives the next one, so step back one.
   auto it = std::upper_bound(partitions.begin() + 1, partitions.end(), partition_key) - 1;
   return group_by <= 1 ? it - partitions.begin()
                        : (it - partitions.begin()) / group_by * group_by;
