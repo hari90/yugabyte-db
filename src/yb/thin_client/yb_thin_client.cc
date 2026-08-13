@@ -421,8 +421,13 @@ void SetReadTimeSerial(ReadTimeOptionsPB* rto, uint64_t serial) {
 // range_column_values (only writes use those), so a supplied range key prefix is first encoded
 // into bounds; a partial prefix widens to its whole range. A backward scan then walks the key to
 // the tablet it actually starts in, mirroring what YBPgsqlReadOp::GetPartitionKey does.
-Status RouteRead(const ybthin_table& table, bool has_range_values, yb::PgsqlReadRequestPB* read) {
-  if (has_range_values) {
+Status RouteRead(const ybthin_table& table, yb::PgsqlReadRequestPB* read) {
+  // Derive the bounds from the REQUEST's range key prefix, not the caller's range_values: an Eq on
+  // the key column after the prefix is folded INTO range_column_values above, and a deeper prefix
+  // is a narrower range. Gating on the caller's count instead left an Eq that folded into an EMPTY
+  // prefix with no bounds at all, so the scan ran to the end of the table -- one empty page and a
+  // continuation per remaining tablet -- rather than stopping at the end of its key range.
+  if (!read->range_column_values().empty()) {
     auto lower = VERIFY_RESULT(dockv::GetRangeComponents(
         table.schema, read->range_column_values(), /* lower_bound= */ true));
     auto upper = VERIFY_RESULT(dockv::GetRangeComponents(
@@ -1029,6 +1034,15 @@ void ybthin_read_async(
       cb(ctx, MakeStatus(YBTHIN_INVALID, "more key values than key columns"), nullptr);
       return;
     }
+    // A range key PREFIX is a legitimate partial key -- a hash one is not. The hash code is
+    // computed over the hash columns as a group, so a short list hashes to an unrelated tablet and
+    // the scan quietly reads the wrong one (DocDB only DCHECKs the count). Bind all or none.
+    if (spec->n_hash != 0 && spec->n_hash != table->schema.num_hash_key_columns()) {
+      cb(ctx, MakeStatus(
+             YBTHIN_INVALID, "hash_values must bind every hash key column, or none of them"),
+         nullptr);
+      return;
+    }
     // DocDB takes range_column_values as the range key prefix and forbids nulls in it. Reject
     // rather than bind one: a null would make the prefix mean something the caller did not ask
     // for, and the scan would quietly return the wrong rows.
@@ -1140,7 +1154,7 @@ void ybthin_read_async(
     }
     // Route last: the partition key depends on the scan direction, the bounds and the paging
     // state, so every one of them has to be set by now.
-    build = RouteRead(*table, spec->n_range > 0, read);
+    build = RouteRead(*table, read);
     if (!build.ok()) {
       cb(ctx, FromStatus(build), nullptr);
       return;
