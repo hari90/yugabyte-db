@@ -1041,6 +1041,177 @@ TEST_F(PgThinClientTest, DeepRangeKeyPrefixes) {
   ybthin_client_destroy(client);
 }
 
+// A scan must STOP at the end of its key range, not at the end of the table.
+//
+// A range key prefix fixes where a scan starts. If nothing fixes where it ends, the scan runs from
+// its start key to the physical end of the table in whichever direction it scans, crossing every
+// remaining tablet and handing back an empty page plus a continuation for each. Results stay
+// correct -- DocDB filters per tablet -- so this is invisible to a caller that only checks rows,
+// but a caller that pages to exhaustion pays one round trip per remaining tablet, and one that caps
+// consecutive empty pages eventually trips its own guard and reports the scan as wedged.
+//
+// The table below puts each bucket in its own tablet, so EVERY key range read here lives in exactly
+// one tablet and every scan must finish in a single page. Page counts, not row counts, are the
+// assertion: a scan that refuses to end shows up as a page count that tracks the number of tablets
+// ahead of it, in whichever direction it scans.
+TEST_F(PgThinClientTest, RangeScanStopsAtTheEndOfItsKeyRange) {
+  constexpr int kNumBuckets = 6;
+
+  auto conn = ASSERT_RESULT(Connect());
+  ASSERT_OK(conn.Execute(
+      "CREATE TABLE wals_diag ("
+      "  bucket_id SMALLINT NOT NULL, branch_id TEXT NOT NULL, segno BIGINT NOT NULL,"
+      "  chunk_offset BIGINT NOT NULL, chunk_size INTEGER NOT NULL, data BYTEA NOT NULL,"
+      "  PRIMARY KEY (bucket_id ASC, branch_id ASC, segno ASC, chunk_offset ASC))"
+      " SPLIT AT VALUES ((1), (2), (3), (4), (5))"));
+  // The same shape with the leading key column DESCENDING. A prefix's bounds are padded with
+  // kLowest/kHighest, which are markers in ENCODED key order -- so they must land the same way
+  // whichever direction a column sorts. Callers do key on a DESC column (see the is_forward_scan
+  // note in yb_thin_client.h), and the split points run high-to-low to match the key order.
+  ASSERT_OK(conn.Execute(
+      "CREATE TABLE wals_diag_desc ("
+      "  bucket_id SMALLINT NOT NULL, branch_id TEXT NOT NULL, segno BIGINT NOT NULL,"
+      "  chunk_offset BIGINT NOT NULL, chunk_size INTEGER NOT NULL, data BYTEA NOT NULL,"
+      "  PRIMARY KEY (bucket_id DESC, branch_id ASC, segno ASC, chunk_offset ASC))"
+      " SPLIT AT VALUES ((4), (3), (2), (1), (0))"));
+  // One row per bucket, all at the same (branch, segno, chunk_offset) -- so a bucket's whole key
+  // range, at any prefix depth, is one row in one tablet.
+  for (const char* t : {"wals_diag", "wals_diag_desc"}) {
+    ASSERT_OK(conn.ExecuteFormat(
+        "INSERT INTO $0 SELECT b, 'br', 7, 0, 100, '\\xfeed'::bytea "
+        "FROM generate_series(0, $1) b", t, kNumBuckets - 1));
+  }
+
+  const auto db_oid = ASSERT_RESULT(FetchOid(&conn, "SELECT oid FROM pg_database "
+                                                     "WHERE datname = current_database()"));
+  const auto table_oid = ASSERT_RESULT(FetchOid(&conn, "SELECT 'wals_diag'::regclass::oid"));
+  const auto desc_table_oid = ASSERT_RESULT(
+      FetchOid(&conn, "SELECT 'wals_diag_desc'::regclass::oid"));
+
+  const auto addr = TServerAddr();
+  const char* addrs[] = {addr.c_str()};
+  ybthin_client* client = nullptr;
+  {
+    auto st = ybthin_client_create(
+        addrs, 1, /* tls= */ nullptr, /* pool= */ nullptr, /* rpc_timeout_ms= */ 60000,
+        /* num_reactors= */ 0, &client);
+    ASSERT_EQ(st.code, YBTHIN_OK) << (st.message ? st.message : "");
+  }
+  const std::string branch = "br";
+  auto text_br = [&] {
+    return ybthin_bind{YBTHIN_BIND_TEXT, 0,
+                       reinterpret_cast<const uint8_t*>(branch.data()), branch.size()};
+  };
+  auto i16 = [](int64_t v) { return ybthin_bind{YBTHIN_BIND_I16, v, nullptr, 0}; };
+  auto i64 = [](int64_t v) { return ybthin_bind{YBTHIN_BIND_I64, v, nullptr, 0}; };
+
+  // Every assertion below is about page counts, so it holds for either sort direction: each bucket
+  // owns a tablet in both tables, only their order on disk differs.
+  auto check_table = [&](uint32_t oid, const char* label) {
+    SCOPED_TRACE(label);
+    ybthin_table* table = nullptr;
+    ybthin_table_info info = {};
+    {
+      auto st = ybthin_table_open(client, db_oid, oid, &table, &info);
+      ASSERT_EQ(st.code, YBTHIN_OK) << (st.message ? st.message : "");
+    }
+    ASSERT_EQ(info.n_columns, 6);
+    const int32_t segno_id = info.columns[2].id, chunk_id = info.columns[3].id;
+    int32_t targets[] = {segno_id, chunk_id};
+
+    // Pages a scan by hand and reports (pages, rows). Paging by hand rather than asserting on rows
+    // is the point: a scan that never ends is a page count, not a hang.
+    struct Paged { int pages; size_t rows; };
+    auto page_out = [&](const ybthin_read_spec& spec) -> Result<Paged> {
+      Paged out_counts = {0, 0};
+      std::vector<uint8_t> ps;
+      do {
+        std::promise<ReadOutcome> promise;
+        auto future = promise.get_future();
+        ybthin_read_op op = {};
+        op.table = table;
+        op.spec = spec;
+        op.paging_state_in = ps.empty() ? nullptr : ps.data();
+        op.paging_state_in_len = ps.size();
+        ybthin_read_async(client, &op, 1, /* read_time_ht= */ 0, &OnReadDone, &promise);
+        auto out = future.get();
+        SCHECK_EQ(out.code, YBTHIN_OK, IllegalState, out.message);
+        out_counts.rows += out.n_rows;
+        ps = std::move(out.paging_state);
+        SCHECK_LT(++out_counts.pages, 100, IllegalState, "paging did not terminate");
+      } while (!ps.empty());
+      return out_counts;
+    };
+
+    // The safekeeper's covering arm, one per bucket: a (bucket_id, branch_id, segno) prefix scanned
+    // descending, limit 1. Unbounded, bucket B walks B tablets down to tablet 0 -- so the failure
+    // grows with the bucket, and the deepest bucket is the one that trips a caller's empty-page cap.
+    // The forward arm is the mirror image: it walks the tablets above B.
+    for (int bucket = 0; bucket < kNumBuckets; ++bucket) {
+      const ybthin_bind prefix[] = {i16(bucket), text_br(), i64(7), i64(0)};
+      for (size_t n_range = 1; n_range <= 4; ++n_range) {
+        for (int forward = 0; forward <= 1; ++forward) {
+          ybthin_read_spec spec = {};
+          spec.range_values = prefix;
+          spec.n_range = n_range;
+          spec.target_ids = targets;
+          spec.n_targets = 2;
+          spec.limit = 1;
+          spec.is_forward_scan = forward;
+          auto paged = ASSERT_RESULT(page_out(spec));
+          ASSERT_EQ(paged.rows, 1u)
+              << "bucket " << bucket << ", " << n_range << "-column prefix, "
+              << (forward ? "ascending" : "descending");
+          ASSERT_EQ(paged.pages, 1)
+              << "bucket " << bucket << ", " << n_range << "-column prefix, "
+              << (forward ? "ascending" : "descending") << ": took " << paged.pages
+              << " pages; this key range lives in a single tablet, so the scan walked past its end";
+        }
+      }
+    }
+
+    // Same, with the prefix's last column supplied as an Eq cond instead: the shim folds it into
+    // the prefix, so the bounds must be derived AFTER that fold or the range stays a tablet wide.
+    for (int bucket = 0; bucket < kNumBuckets; ++bucket) {
+      const ybthin_bind prefix[] = {i16(bucket), text_br()};
+      ybthin_cond eq[] = {{segno_id, YBTHIN_EQ, i64(7)}};
+      ybthin_read_spec spec = {};
+      spec.range_values = prefix;
+      spec.n_range = 2;
+      spec.conds = eq;
+      spec.n_conds = 1;
+      spec.target_ids = targets;
+      spec.n_targets = 2;
+      spec.limit = 1;
+      spec.is_forward_scan = 0;
+      auto paged = ASSERT_RESULT(page_out(spec));
+      ASSERT_EQ(paged.rows, 1u) << "bucket " << bucket << ", Eq on segno, descending";
+      ASSERT_EQ(paged.pages, 1) << "bucket " << bucket << ", Eq on segno, descending: took "
+                                << paged.pages << " pages";
+    }
+
+    // An UNBOUNDED scan still has to cross every tablet -- the fix must not truncate a full scan.
+    for (int forward = 0; forward <= 1; ++forward) {
+      ybthin_read_spec spec = {};
+      spec.target_ids = targets;
+      spec.n_targets = 2;
+      spec.limit = 1;
+      spec.is_forward_scan = forward;
+      auto paged = ASSERT_RESULT(page_out(spec));
+      ASSERT_EQ(paged.rows, static_cast<size_t>(kNumBuckets))
+          << "unbounded " << (forward ? "ascending" : "descending") << " scan dropped rows";
+    }
+
+    ybthin_columns_free(info.columns, info.n_columns);
+    ybthin_table_close(table);
+  };
+
+  check_table(table_oid, "bucket_id ASC");
+  check_table(desc_table_oid, "bucket_id DESC");
+
+  ybthin_client_destroy(client);
+}
+
 // TLS variant: the cluster runs with node-to-node encryption, and the thin client connects over TLS
 // authenticating the server against the test CA. Also asserts the TLS-only endpoint rejects a
 // plaintext client.

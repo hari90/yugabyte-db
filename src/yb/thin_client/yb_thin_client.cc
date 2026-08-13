@@ -438,12 +438,29 @@ Status RouteWrite(const ybthin_table& table, yb::PgsqlWriteRequestPB* write) {
   return Status::OK();
 }
 
-// Derives a read's partition key. A read is routed off its scan bounds rather than its
-// range_column_values (only writes use those), so a supplied range key prefix is first encoded
-// into bounds; a partial prefix widens to its whole range.
+// The doc key range a range key prefix selects: [low, high). A full key selects the one row's
+// range, a partial prefix everything under it, an empty prefix the whole table. These are the SAME
+// components DocDB derives from range_column_values for its own in-tablet scan bounds
+// (docdb::DocPgsqlScanSpec), so stamping them on the request never narrows the scan.
+struct PrefixKeyRange {
+  std::string low;   // inclusive
+  std::string high;  // exclusive
+};
+
+Result<PrefixKeyRange> RangePrefixKeyRange(
+    const Schema& schema,
+    const google::protobuf::RepeatedPtrField<yb::PgsqlExpressionPB>& range_cols) {
+  auto low = VERIFY_RESULT(dockv::GetRangeComponents(schema, range_cols, /* lower_bound= */ true));
+  auto high = VERIFY_RESULT(
+      dockv::GetRangeComponents(schema, range_cols, /* lower_bound= */ false));
+  return PrefixKeyRange{
+      .low = dockv::DocKey(schema, std::move(low)).Encode().ToStringBuffer(),
+      .high = dockv::DocKey(schema, std::move(high)).Encode().ToStringBuffer()};
+}
+
 // Confines `read` to tablet `i`, mirroring pggate's PgReadRange::SetPartitionBounds: tablet i
 // covers [partitions[i], partitions[i+1]). Bounds already on the request win where they are
-// tighter, so a caller-supplied range still applies.
+// tighter, so the scan's own key range still applies.
 void SetTabletBounds(const ybthin_table& table, size_t i, yb::PgsqlReadRequestPB* read) {
   const auto& parts = table.partitions;
   if (i > 0) {
@@ -465,11 +482,9 @@ void SetTabletBounds(const ybthin_table& table, size_t i, yb::PgsqlReadRequestPB
 Status RouteRead(
     const ybthin_table& table, bool has_range_values, uint32_t tablet_index,
     yb::PgsqlReadRequestPB* read) {
-  // Deliberately no lower/upper bound from the prefix. DocDB already takes range_column_values as
-  // the range key prefix and derives the scan range itself, folding in any condition_expr on the
-  // columns after it (see pggate PgDmlRead::ProcessEmptyKeyBinds). Stamping bounds computed from
-  // the prefix ALONE contradicts the range DocDB derives from an Eq on the next key column, and
-  // the scan comes back empty.
+  // The scan's key range is already stamped on `read` as lower_bound/upper_bound by the caller (via
+  // RangePrefixKeyRange): DocDB derives the same range from range_column_values for its in-tablet
+  // scan, but the TABLET traversal is driven by the bounds alone.
   // InitHashPartitionKey's paging branch assumes the hash code bounds are already set, because
   // pggate reuses one request object for every page of a scan. The shim builds a fresh request per
   // page, so set them here or a continuation would scan unbounded and re-read the first page.
@@ -560,6 +575,9 @@ struct ReadCall {
   std::vector<std::vector<ybthin_value_type>> op_target_types;
   // Tablet each op is confined to, for a fanned-out backward range scan; kNoTablet otherwise.
   std::vector<uint32_t> op_tablet;
+  // Lowest tablet such a scan can reach -- the one holding the low end of its key range. Walking
+  // below it would page through tablets that cannot hold a matching row.
+  std::vector<uint32_t> op_min_tablet;
 };
 
 struct WriteCall {
@@ -753,7 +771,7 @@ void FinishRead(ReadCall* raw) {
       }
       op.paging_state().SerializeToString(&srv);
       emit = true;
-    } else if (tablet != kNoTablet && tablet > 0) {
+    } else if (tablet != kNoTablet && tablet > call->op_min_tablet[i]) {
       next_tablet = tablet - 1;  // srv stays empty: a fresh page on the next tablet down
       emit = true;
     }
@@ -1085,6 +1103,7 @@ void ybthin_read_async(
   auto& req = call->req;
   call->op_target_types.resize(n_ops);
   call->op_tablet.assign(n_ops, kNoTablet);
+  call->op_min_tablet.assign(n_ops, 0);
   Status build = Status::OK();
   for (size_t i = 0; i < n_ops; ++i) {
     const ybthin_table* table = ops[i].table;
@@ -1107,6 +1126,15 @@ void ybthin_read_async(
     if (spec->n_hash > table->schema.num_hash_key_columns() ||
         spec->n_range > table->schema.num_range_key_columns()) {
       cb(ctx, MakeStatus(YBTHIN_INVALID, "more key values than key columns"), nullptr);
+      return;
+    }
+    // A range key PREFIX is a legitimate partial key -- a hash one is not. The hash code is
+    // computed over the hash columns as a group, so a short list hashes to an unrelated tablet and
+    // the scan quietly reads the wrong one (DocDB only DCHECKs the count). Bind all or none.
+    if (spec->n_hash != 0 && spec->n_hash != table->schema.num_hash_key_columns()) {
+      cb(ctx, MakeStatus(
+             YBTHIN_INVALID, "hash_values must bind every hash key column, or none of them"),
+         nullptr);
       return;
     }
     // DocDB takes range_column_values as the range key prefix and forbids nulls in it. Reject
@@ -1218,32 +1246,55 @@ void ybthin_read_async(
         return;
       }
     }
+    // Stamp the scan's key range as lower_bound/upper_bound. The range key prefix fixes where the
+    // scan STARTS; without these bounds nothing fixes where it ENDS, and the scan runs from its
+    // start key to the physical end of the table in whichever direction it scans, returning an
+    // empty page plus a continuation for every remaining tablet. Both ends are needed because the
+    // roles swap with the direction: a forward scan stops at the upper bound (tablet.cc
+    // NextReadPartitionKey), a backward one at the lower.
+    // The bounds are derived from the prefix ALONE. Conditions on the key columns after it narrow
+    // the range further, but DocDB already folds those in per tablet (docdb::DocPgsqlScanSpec keeps
+    // whichever of the two bounds is tighter), so the prefix range is all this needs to carry.
+    uint32_t tablet = pinned_tablet[i];
+    uint32_t min_tablet = 0;
+    // Note this checks the REQUEST's range values, not the spec's: an Eq folded in above extends
+    // the prefix, and a deeper prefix is a narrower range.
+    if (range_sharded && !read->range_column_values().empty()) {
+      auto range = RangePrefixKeyRange(table->schema, read->range_column_values());
+      if (!range.ok()) {
+        cb(ctx, FromStatus(range.status()), nullptr);
+        return;
+      }
+      read->mutable_lower_bound()->set_key(range->low);
+      read->mutable_lower_bound()->set_is_inclusive(true);
+      read->mutable_upper_bound()->set_key(range->high);
+      read->mutable_upper_bound()->set_is_inclusive(false);
+      min_tablet = static_cast<uint32_t>(
+          dockv::FindPartitionStartIndex(table->partitions, range->low));
+      // A fresh backward range scan starts on the tablet holding the high end of its key range and
+      // walks down to min_tablet; a continuation stays on the tablet its paging state names.
+      // Starting at the last tablet regardless of the bounds would hand back an empty first page
+      // whenever the scan's range stops short of it -- which a caller reading a single page
+      // (descending, limit 1) sees as "no rows".
+      if (tablet == kNoTablet && spec->is_forward_scan == 0 && table->partitions.size() > 1) {
+        auto idx = dockv::FindPartitionStartIndex(table->partitions, range->high);
+        // high is exclusive, so a range ending exactly on a boundary stops in the tablet below it
+        // (mirrors client/yb_op.cc FindPartitionKeyByUpperBound).
+        if (idx > 0 && table->partitions[idx] == range->high) {
+          --idx;
+        }
+        tablet = static_cast<uint32_t>(idx);
+      }
+    }
+    // An unbounded backward scan still starts at the last tablet and walks the whole table down.
+    if (tablet == kNoTablet && spec->is_forward_scan == 0 && range_sharded &&
+        table->partitions.size() > 1) {
+      tablet = static_cast<uint32_t>(table->partitions.size() - 1);
+    }
     // Route last: the partition key depends on the scan direction, the bounds and the paging
     // state, so every one of them has to be set by now.
-    // A fresh backward range scan starts on the tablet holding the high end of its key range and
-    // walks down; a continuation stays on the tablet its paging state names. Starting at the last
-    // tablet regardless of the bounds would hand back an empty first page whenever the scan's range
-    // stops short of it -- which a caller reading a single page (descending, limit 1) sees as
-    // "no rows".
-    uint32_t tablet = pinned_tablet[i];
-    if (tablet == kNoTablet && spec->is_forward_scan == 0 &&
-        table->schema.num_hash_key_columns() == 0 && table->partitions.size() > 1) {
-      std::string high_key;
-      if (spec->n_range > 0) {
-        auto upper = dockv::GetRangeComponents(
-            table->schema, read->range_column_values(), /* lower_bound= */ false);
-        if (!upper.ok()) {
-          cb(ctx, FromStatus(upper.status()), nullptr);
-          return;
-        }
-        high_key = dockv::DocKey(std::move(*upper)).Encode().ToStringBuffer();
-      }
-      tablet = high_key.empty()
-          ? static_cast<uint32_t>(table->partitions.size() - 1)
-          : static_cast<uint32_t>(
-                dockv::FindPartitionStartIndex(table->partitions, high_key));
-    }
     call->op_tablet[i] = tablet;
+    call->op_min_tablet[i] = min_tablet;
     build = RouteRead(*table, spec->n_range > 0, tablet, read);
     if (!build.ok()) {
       cb(ctx, FromStatus(build), nullptr);
