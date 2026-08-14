@@ -40,6 +40,7 @@
 #include "yb/yql/pgwrapper/libpq_utils.h"
 #include "yb/yql/pgwrapper/pg_mini_test_base.h"
 
+DECLARE_bool(TEST_asyncrpc_finished_set_timedout);
 DECLARE_bool(use_node_to_node_encryption);
 DECLARE_bool(use_client_to_server_encryption);
 DECLARE_bool(allow_insecure_connections);
@@ -1209,6 +1210,81 @@ TEST_F(PgThinClientTest, RangeScanStopsAtTheEndOfItsKeyRange) {
   check_table(table_oid, "bucket_id ASC");
   check_table(desc_table_oid, "bucket_id DESC");
 
+  ybthin_client_destroy(client);
+}
+
+// A write the server has ALREADY replicated must report success, not failure.
+//
+// DocDB dedupes writes on (client_id, request_id) and rejects a replay of an id it has already
+// replicated: "Duplicate request N from client C" (consensus/retryable_requests.cc). An id only
+// reaches that set by going through Raft, so the verdict means the write is DURABLE. For the
+// idempotent upserts this ABI can express, that is the caller's success condition.
+//
+// Reported from production: a caller whose upsert drew that verdict treated it as fatal, dropped
+// the connection, reconnected, replayed byte-identically, drew the identical verdict, and looped
+// roughly once a second indefinitely -- 8340 rejections against one request id with no backoff.
+// The reply is deterministic, so no amount of retrying or waiting can clear it; only reading it
+// correctly can. Note that upsert-mode idempotence does NOT save this: retryable_requests sits
+// above DocDB's row layer and rejects the replay before it can become a no-op write.
+//
+// TEST_asyncrpc_finished_set_timedout reproduces that shape exactly -- the write replicates, the
+// client is told it timed out, and the resend reuses the same retryable request id (async_rpc.cc:
+// "we are trying to resend all ops from this RPC and need to reuse retryable request ID"), so the
+// tablet rejects the resend as a duplicate.
+TEST_F(PgThinClientTest, AlreadyReplicatedWriteReportsSuccess) {
+  auto conn = ASSERT_RESULT(Connect());
+  ASSERT_OK(conn.Execute(
+      "CREATE TABLE dup_w (k int, v bytea, PRIMARY KEY(k ASC))"));
+
+  const auto db_oid = ASSERT_RESULT(FetchOid(&conn, "SELECT oid FROM pg_database "
+                                                     "WHERE datname = current_database()"));
+  const auto table_oid = ASSERT_RESULT(FetchOid(&conn, "SELECT 'dup_w'::regclass::oid"));
+
+  const auto addr = TServerAddr();
+  const char* addrs[] = {addr.c_str()};
+  ybthin_client* client = nullptr;
+  {
+    auto st = ybthin_client_create(
+        addrs, 1, /* tls= */ nullptr, /* pool= */ nullptr, /* rpc_timeout_ms= */ 60000,
+        /* num_reactors= */ 0, &client);
+    ASSERT_EQ(st.code, YBTHIN_OK) << (st.message ? st.message : "");
+  }
+  ybthin_table* table = nullptr;
+  ybthin_table_info info = {};
+  {
+    auto st = ybthin_table_open(client, db_oid, table_oid, &table, &info);
+    ASSERT_EQ(st.code, YBTHIN_OK) << (st.message ? st.message : "");
+  }
+  const int32_t v_id = info.columns[1].id;
+
+  const std::string payload = "already-there";
+  ybthin_bind key[] = {I32(7)};
+  ybthin_bind value[] = {Bytea(payload)};
+  int32_t value_ids[] = {v_id};
+  ybthin_upsert_row row = {table, key, 1, value_ids, value, 1};
+
+  std::promise<WriteOutcome> promise;
+  auto future = promise.get_future();
+  // Replicate the write, then make the client believe it timed out so it resends the identical
+  // ops -- and with them the identical retryable request id.
+  ANNOTATE_UNPROTECTED_WRITE(FLAGS_TEST_asyncrpc_finished_set_timedout) = true;
+  ybthin_upsert_batch_async(client, &row, 1, &OnWriteDone, &promise);
+  SleepFor(3s);
+  // Let the resend through: it now carries an id the tablet has already replicated, so the tablet
+  // answers AlreadyPresent. That is the verdict under test.
+  ANNOTATE_UNPROTECTED_WRITE(FLAGS_TEST_asyncrpc_finished_set_timedout) = false;
+
+  auto out = future.get();
+  ASSERT_EQ(out.code, YBTHIN_OK)
+      << "an already-replicated write must report success, got: " << out.message;
+
+  // ...and the success report must be truthful: the row is really there, exactly once.
+  ASSERT_EQ(1, ASSERT_RESULT(conn.FetchRow<PGUint64>("SELECT count(*) FROM dup_w WHERE k = 7")));
+  ASSERT_EQ(payload, ASSERT_RESULT(conn.FetchRow<std::string>(
+                         "SELECT encode(v, 'escape') FROM dup_w WHERE k = 7")));
+
+  ybthin_columns_free(info.columns, info.n_columns);
+  ybthin_table_close(table);
   ybthin_client_destroy(client);
 }
 

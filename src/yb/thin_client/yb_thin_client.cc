@@ -42,6 +42,7 @@
 #include "yb/common/common_types.pb.h"
 #include "yb/common/entity_ids.h"
 #include "yb/common/pgsql_protocol.pb.h"
+#include "yb/common/pgsql_error.h"
 #include "yb/common/ql_type.h"
 #include "yb/common/schema.h"
 #include "yb/common/schema_pbutil.h"
@@ -212,6 +213,24 @@ ybthin_status_code ClassifyStatus(const Status& s) {
   if (s.IsTryAgain() || s.IsServiceUnavailable() || s.IsBusy()) return YBTHIN_TRY_AGAIN;
   if (s.IsInvalidArgument() || s.IsNotSupported()) return YBTHIN_INVALID;
   return YBTHIN_OTHER;
+}
+
+// True for the retryable-request layer's "I already applied this" verdict on a WRITE.
+//
+// DocDB dedupes writes on (client_id, request_id) and rejects a replay of an id it has already
+// REPLICATED (consensus/retryable_requests.cc, "Duplicate request $0 from client $1"). Reaching
+// that set means the write went through Raft and is durable, so for an idempotent upsert -- which
+// is every write this ABI can express -- the caller's success condition is already met. Reporting
+// it as an error instead wedges a caller that replays on failure: the replay is byte-identical, so
+// it is rejected identically, forever.
+//
+// Deliberately NOT a plain IsAlreadyPresent() test. pggate overloads that same category to carry a
+// unique violation (pg_perform_future.cc PatchStatus, pg_operation_buffer.cc), so match only a
+// status with no PGSQL error code attached -- a PG-level error always carries one. The shim decodes
+// PgsqlResponsePB itself and never runs PatchStatus, so today the two cannot collide here; this
+// keeps that true if a future path starts forwarding pggate-shaped statuses.
+bool IsAlreadyReplicatedWrite(const Status& s) {
+  return s.IsAlreadyPresent() && !yb::PgsqlError::ValueFromStatus(s);
 }
 
 ybthin_status FromStatus(const Status& s) {
@@ -714,6 +733,13 @@ void FinishWrite(WriteCall* raw) {
   }
   Status app_status = yb::ResponseStatus(call->resp);
   if (!app_status.ok()) {
+    // A replay the server already replicated is durable, so the batch succeeded -- see
+    // IsAlreadyReplicatedWrite. Reporting it as an error is what turns a caller's retry into a
+    // permanent loop.
+    if (IsAlreadyReplicatedWrite(app_status)) {
+      call->cb(call->ctx, OkStatus());
+      return;
+    }
     auto st = FromStatus(app_status);
     MaybeMarkSessionDead(call->session, st);
     call->cb(call->ctx, st);
@@ -722,6 +748,10 @@ void FinishWrite(WriteCall* raw) {
   // Every per-row op must have succeeded — a dropped row is an error, never a silent short write.
   for (const auto& op : call->resp.responses()) {
     if (op.status() != yb::PgsqlResponsePB::PGSQL_STATUS_OK) {
+      if (op.error_status_size() > 0 &&
+          IsAlreadyReplicatedWrite(yb::StatusFromPB(op.error_status(0)))) {
+        continue;  // this row's write is already durable
+      }
       call->cb(call->ctx, PgsqlResponseError(op));
       return;
     }
