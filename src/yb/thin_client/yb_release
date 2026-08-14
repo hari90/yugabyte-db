@@ -80,6 +80,27 @@ log "Full-LTO build root: $build_root"
 
 lto_out="$build_root/lib/$lib_name"
 
+# Build PostgreSQL before computing the link command, not after. The whole-program link step below
+# reads postgres_build/src/common/libpgcommon_srv.a (python/yugabyte/lto.py
+# add_pgcommon_srv_library) even though --incomplete-build means it needs no other built artifact.
+# That archive is NOT a declared CMake by-product -- only libpgcommon.a and libpgport.a are, because
+# Odyssey links those (see the top-level CMakeLists.txt) -- so it cannot be asked of ninja by name.
+# It is produced as a side effect of the PostgreSQL make that builds libpgcommon.a, so request that
+# target here. Without this, a tree that has never built PostgreSQL -- a fresh clone, CI, or a build
+# root that was cleaned -- aborts with `ar -t ... libpgcommon_srv.a` failing on a file nothing
+# created, and the failure only stays hidden on machines where an earlier build happened to leave
+# one behind.
+# -k 0, and the exit code is deliberately not fatal: building these pulls in byproduct .so links
+# that trip the --no-undefined check --no-tcmalloc turns on, exactly as the closure build below
+# does. The archive check that follows is the real gate.
+log "Building the PostgreSQL static libraries the whole-program link reads"
+( cd "$build_root" && YB_BUILD_ROOT="$build_root" \
+    ninja -k 0 postgres_build/src/common/libpgcommon.a postgres_build/src/port/libpgport.a ) \
+  || log "note: a non-closure byproduct failed to link (expected with --no-tcmalloc); continuing"
+pgcommon_srv="$build_root/postgres_build/src/common/libpgcommon_srv.a"
+[[ -f "$pgcommon_srv" ]] || fatal "PostgreSQL build did not produce $pgcommon_srv, which the \
+whole-program link step reads"
+
 # Emit the whole-program link command (bitcode objects + static libraries, engine libs excluded)
 # without running the linker. This needs only the configured build graph, not built objects
 # (--incomplete-build), and its output names every object the client links -- our build work-list.
