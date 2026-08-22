@@ -100,6 +100,17 @@ class PgWrapper : public ProcessWrapper {
 
   static std::string GetPostgresExecutablePath();
 
+  // Validates a set of generated PG config files by running
+  //   postgres -D <dir> -C <parameter>
+  // which makes postgres parse postgresql.conf, hba and ident, print one parameter and
+  // exit. Nothing is started and no data directory is modified.
+  //
+  // Unlike validation through a SQL connection, this works when PG is not running --
+  // which is exactly when a bad ysql_pg_conf_csv is most likely to be the reason.
+  // Returns the error postgres itself reported, so the operator sees the real complaint
+  // rather than a generic rejection.
+  static Status ValidateConfigViaPostgresBinary(const PgConfigPaths& paths);
+
   struct PgUpgradeParams {
     std::string ysql_user_name;
     std::string data_dir;

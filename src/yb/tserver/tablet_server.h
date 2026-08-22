@@ -410,6 +410,7 @@ class TabletServer : public DbServerBase, public TabletServerIf {
   void RegisterPgProcessRestarter(std::function<Status(void)> restarter) override;
   void RegisterPgProcessKiller(std::function<Status(void)> killer) override;
   void RegisterPgConfigGenerator(pgwrapper::PgConfigGenerator generator) override;
+  void RegisterPgConfigValidator(pgwrapper::PgConfigValidator validator) override;
   void RegisterConnectionManagerRestarter(std::function<Status(void)> restarter);
 
   Status StartYSQLLeaseRefresher();
@@ -702,6 +703,7 @@ class TabletServer : public DbServerBase, public TabletServerIf {
   std::function<Status(void)> pg_restarter_;
   std::function<Status(void)> pg_killer_;
   pgwrapper::PgConfigGenerator pg_config_generator_;
+  pgwrapper::PgConfigValidator pg_config_validator_;
 
   std::function<Status(void)> conn_manager_restarter_;
 

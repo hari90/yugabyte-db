@@ -274,6 +274,7 @@ DECLARE_bool(ysql_enable_auto_analyze_infra);
 DECLARE_int32(update_min_cdc_indices_interval_secs);
 DECLARE_uint64(ysql_lease_refresher_rpc_timeout_ms);
 DECLARE_string(ysql_pg_conf_csv);
+DECLARE_bool(ysql_validate_pg_conf_via_binary);
 DECLARE_string(ysql_hba_conf_csv);
 DECLARE_string(ysql_ident_conf_csv);
 DECLARE_string(tmp_dir);
@@ -706,7 +707,33 @@ std::map<std::string, std::string> TabletServer::ValidateConfCsvViaPg(
 
   auto conn_result = CreateInternalPGConn(
       "yugabyte", kDefaultInternalPgUser, /*simple_query_protocol=*/false, deadline);
-  if (!conn_result.ok()) return fail_all(conn_result.status());
+  if (!conn_result.ok()) {
+    // No usable PG connection. Rejecting every flag here is the wrong answer: the most
+    // likely reason PG is unreachable is a bad config, and this is the path an operator
+    // would use to fix it. Fall back to asking the postgres binary directly, which needs
+    // nothing running.
+    if (!FLAGS_ysql_validate_pg_conf_via_binary || !pg_config_validator_) {
+      return fail_all(conn_result.status());
+    }
+    LOG(INFO) << "No PG connection for config validation (" << conn_result.status()
+              << "); falling back to the postgres binary pre-check";
+    auto binary_status = pg_config_validator_(paths);
+    if (!binary_status.ok()) {
+      // postgres could not even be asked, so nothing was validated. Say so rather than
+      // letting an unvalidated value through.
+      if (binary_status.IsInvalidArgument()) {
+        // A real rejection. Attribute it to the conf flags actually being changed.
+        for (const auto& [flag_name, _] : conf_flags) {
+          errors[flag_name] = binary_status.message().ToBuffer();
+        }
+        return errors;
+      }
+      return fail_all(binary_status);
+    }
+    VLOG(1) << "Validated PG conf files via the postgres binary in "
+            << (MonoTime::Now() - start_time);
+    return errors;
+  }
   auto conn = std::move(*conn_result);
 
   using OptStr = std::optional<std::string>;
@@ -2542,6 +2569,10 @@ void TabletServer::RegisterPgProcessRestarter(std::function<Status(void)> restar
 
 void TabletServer::RegisterPgProcessKiller(std::function<Status(void)> killer) {
   pg_killer_ = std::move(killer);
+}
+
+void TabletServer::RegisterPgConfigValidator(pgwrapper::PgConfigValidator validator) {
+  pg_config_validator_ = std::move(validator);
 }
 
 void TabletServer::RegisterPgConfigGenerator(pgwrapper::PgConfigGenerator generator) {

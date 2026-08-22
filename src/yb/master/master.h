@@ -246,6 +246,7 @@ class Master : public tserver::DbServerBase {
   void RegisterPgProcessRestarter(std::function<Status(void)> restarter) override {}
   void RegisterPgProcessKiller(std::function<Status(void)> killer) override {}
   void RegisterPgConfigGenerator(pgwrapper::PgConfigGenerator generator) override {}
+  void RegisterPgConfigValidator(pgwrapper::PgConfigValidator validator) override {}
 
  protected:
   Status RegisterServices();

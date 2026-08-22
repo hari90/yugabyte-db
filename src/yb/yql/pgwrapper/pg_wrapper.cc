@@ -145,6 +145,12 @@ DEFINE_RUNTIME_string(ysql_pg_conf_csv, "",
     "Check https://www.postgresql.org/docs/current/view-pg-settings.html for information about "
     "which parameters take effect at runtime.");
 
+DEFINE_RUNTIME_bool(ysql_validate_pg_conf_via_binary, true,
+    "Before accepting a change to ysql_pg_conf_csv, ysql_hba_conf_csv or "
+    "ysql_ident_conf_csv, run the postgres binary with -C against the generated config to "
+    "confirm postgres itself accepts it. Used when validation through a live PG connection "
+    "is unavailable. Never modifies a data directory.");
+
 DEFINE_RUNTIME_string(ysql_hba_conf_csv, "",
               "CSV formatted line represented list of postgres hba rules (in order)");
 TAG_FLAG(ysql_hba_conf_csv, sensitive_info);
@@ -1383,6 +1389,66 @@ void PgWrapper::PrepareSharedMemoryNegotiation(PgWrapperContext* server) {
   shared_mem_uuid_ = server->permanent_uuid();
 }
 
+namespace {
+
+// The parameter `postgres -C` is asked for. `data_directory` is deliberately chosen
+// because it is not runtime-computed: postgres can answer it once the config files
+// parse, then exits immediately, without touching shared memory, taking the data
+// directory lock, or caring whether another postmaster is running.
+constexpr auto kConfigProbeParameter = "data_directory";
+
+}  // namespace
+
+Status PgWrapper::ValidateConfigViaPostgresBinary(const PgConfigPaths& paths) {
+  const auto postgres_executable = GetPostgresExecutablePath();
+  RETURN_NOT_OK(CheckExecutableValid(postgres_executable));
+
+  // The caller generated these files into a scratch directory. Pointing postgres at that
+  // same directory is what keeps a malformed candidate config away from the live data
+  // directory.
+  const auto data_dir = DirName(paths.guc_conf_path);
+
+  const std::vector<std::string> argv{
+      postgres_executable,
+      "-D", data_dir,
+      "-C", kConfigProbeParameter,
+      "-c", Format("config_file=$0", paths.guc_conf_path),
+      "-c", Format("hba_file=$0", paths.hba_conf_path),
+      "-c", Format("ident_file=$0", paths.ident_conf_path),
+  };
+  VLOG(1) << "Validating PG config with: " << AsString(argv);
+
+  Subprocess proc(postgres_executable, argv);
+  // Deliberately NOT SetCommonEnv. This invocation has to parse config and exit;
+  // enabling the YB layer would drag in master addresses, shared memory and the address
+  // negotiator for a check that needs none of them, and would make the pre-check depend
+  // on the very subsystems it is supposed to run without.
+  proc.SetEnv("YB_PG_FALLBACK_SYSTEM_USER_NAME", "postgres");
+  proc.SetEnv("YB_PG_ALLOW_RUNNING_AS_ANY_USER", "1");
+#ifdef OS_MACOSX
+  if (getenv("LC_ALL") == nullptr) {
+    proc.SetEnv("LC_ALL", "en_US.UTF-8");
+  }
+#endif
+
+  // Subprocess::Call returns a non-OK Status when the child exits non-zero, and collects
+  // stderr, which is where postgres writes the offending file, line and reason.
+  std::string stdout_str, stderr_str;
+  const auto call_status = proc.Call(&stdout_str, &stderr_str);
+  if (call_status.ok()) {
+    VLOG(1) << "postgres accepted the generated configuration in " << data_dir;
+    return Status::OK();
+  }
+
+  auto detail = stderr_str.empty() ? stdout_str : stderr_str;
+  boost::algorithm::trim_right(detail);
+  if (detail.empty()) {
+    // No complaint to relay -- report the process failure rather than inventing a reason.
+    return call_status.CloneAndPrepend("postgres config validation failed");
+  }
+  return STATUS_FORMAT(InvalidArgument, "postgres rejected the configuration: $0", detail);
+}
+
 string PgWrapper::GetPostgresExecutablePath() {
   return JoinPathSegments(GetPostgresInstallRoot(), "bin", "postgres");
 }
@@ -1583,6 +1649,9 @@ PgSupervisor::PgSupervisor(PgProcessConf conf, PgWrapperContext* server)
             const std::string& ident_conf_csv) -> Result<PgConfigPaths> {
           return WritePgConfigFiles(tmp_dir, ysql_pg_conf_csv, hba_conf_csv, ident_conf_csv);
         });
+    server_->RegisterPgConfigValidator([](const PgConfigPaths& paths) -> Status {
+      return PgWrapper::ValidateConfigViaPostgresBinary(paths);
+    });
   }
 }
 
