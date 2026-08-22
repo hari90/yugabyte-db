@@ -36,6 +36,11 @@ using PgConfigGenerator = std::function<Result<PgConfigPaths>(
     const std::string& hba_conf_csv,
     const std::string& ident_conf_csv)>;
 
+// Callback type: validates already-generated PG config files by running the postgres
+// binary itself, without needing a live PG connection. Returns OK if postgres accepts
+// the files, otherwise a Status carrying postgres' own complaint.
+using PgConfigValidator = std::function<Status(const PgConfigPaths& paths)>;
+
 class PgWrapperContext {
  public:
   virtual ~PgWrapperContext() = default;
@@ -43,6 +48,7 @@ class PgWrapperContext {
   virtual void RegisterPgProcessRestarter(std::function<Status(void)> restarter) = 0;
   virtual void RegisterPgProcessKiller(std::function<Status(void)> killer) = 0;
   virtual void RegisterPgConfigGenerator(PgConfigGenerator generator) = 0;
+  virtual void RegisterPgConfigValidator(PgConfigValidator validator) = 0;
   virtual Status StartSharedMemoryNegotiation() = 0;
   virtual Status StopSharedMemoryNegotiation() = 0;
   virtual int SharedMemoryNegotiationFd() = 0;

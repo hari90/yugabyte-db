@@ -971,6 +971,92 @@ TEST_F(PgWrapperFlagsTest, RuntimeUpdateHbaAndIdent) {
   ASSERT_EQ(row_count, 0);
 }
 
+// ------------------------------------------------------------------------------------------------
+// PgWrapper::ValidateConfigViaPostgresBinary
+// ------------------------------------------------------------------------------------------------
+
+// Exercises the pre-check directly against the real postgres binary, with no cluster and
+// no PG connection -- which is the situation the pre-check exists for.
+class ValidatePgConfigViaBinaryTest : public YBTest {
+ protected:
+  // Writes the three config files a postmaster reads into a scratch directory and returns
+  // their paths. Only postgresql.conf content varies across these tests; hba and ident are
+  // written empty but present, because postgres insists they exist.
+  Result<pgwrapper::PgConfigPaths> WriteConfigFiles(const std::string& postgresql_conf) {
+    const auto dir = JoinPathSegments(GetTestDataDirectory(), Format("conf_$0", conf_seq_++));
+    RETURN_NOT_OK(Env::Default()->CreateDirs(dir));
+
+    pgwrapper::PgConfigPaths paths{
+        .hba_conf_path = JoinPathSegments(dir, "ysql_hba.conf"),
+        .guc_conf_path = JoinPathSegments(dir, "postgresql.conf"),
+        .ident_conf_path = JoinPathSegments(dir, "ysql_ident.conf"),
+    };
+    RETURN_NOT_OK(WriteStringToFile(Env::Default(), postgresql_conf, paths.guc_conf_path));
+    RETURN_NOT_OK(WriteStringToFile(Env::Default(), "", paths.hba_conf_path));
+    RETURN_NOT_OK(WriteStringToFile(Env::Default(), "", paths.ident_conf_path));
+    return paths;
+  }
+
+ private:
+  int conf_seq_ = 0;
+};
+
+TEST_F_EX(PgWrapperFlagsTest, ValidatePgConfigViaBinaryAcceptsGoodConfig,
+          ValidatePgConfigViaBinaryTest) {
+  auto paths = ASSERT_RESULT(WriteConfigFiles("log_min_messages = warning\n"
+                                              "max_connections = 100\n"));
+  ASSERT_OK(PgWrapper::ValidateConfigViaPostgresBinary(paths));
+}
+
+TEST_F_EX(PgWrapperFlagsTest, ValidatePgConfigViaBinaryRejectsUnknownParameter,
+          ValidatePgConfigViaBinaryTest) {
+  auto paths = ASSERT_RESULT(WriteConfigFiles("definitely_not_a_real_guc = 7\n"));
+  const auto status = PgWrapper::ValidateConfigViaPostgresBinary(paths);
+  ASSERT_NOK(status);
+  ASSERT_TRUE(status.IsInvalidArgument()) << status;
+  // The operator has to see postgres' own complaint, not a generic rejection -- that
+  // pass-through is the reason for shelling out to the binary at all.
+  ASSERT_STR_CONTAINS(status.ToString(), "definitely_not_a_real_guc");
+}
+
+TEST_F_EX(PgWrapperFlagsTest, ValidatePgConfigViaBinaryRejectsBadValue,
+          ValidatePgConfigViaBinaryTest) {
+  // A recognised parameter with a value outside its permitted range.
+  auto paths = ASSERT_RESULT(WriteConfigFiles("max_connections = -5\n"));
+  const auto status = PgWrapper::ValidateConfigViaPostgresBinary(paths);
+  ASSERT_NOK(status);
+  ASSERT_TRUE(status.IsInvalidArgument()) << status;
+  ASSERT_STR_CONTAINS(status.ToString(), "max_connections");
+}
+
+TEST_F_EX(PgWrapperFlagsTest, ValidatePgConfigViaBinaryRejectsSyntaxError,
+          ValidatePgConfigViaBinaryTest) {
+  auto paths = ASSERT_RESULT(WriteConfigFiles("log_min_messages = 'unterminated\n"));
+  ASSERT_NOK(PgWrapper::ValidateConfigViaPostgresBinary(paths));
+}
+
+TEST_F_EX(PgWrapperFlagsTest, ValidatePgConfigViaBinaryLeavesTheDataDirAlone,
+          ValidatePgConfigViaBinaryTest) {
+  // `postgres -C data_directory` must parse and exit. If it ever started up far enough to
+  // take the data directory, it would leave a lock file behind -- and running it against a
+  // live tserver's data directory would then be unsafe.
+  auto paths = ASSERT_RESULT(WriteConfigFiles("log_min_messages = warning\n"));
+  ASSERT_OK(PgWrapper::ValidateConfigViaPostgresBinary(paths));
+
+  const auto dir = DirName(paths.guc_conf_path);
+  ASSERT_FALSE(Env::Default()->FileExists(JoinPathSegments(dir, "postmaster.pid")));
+  ASSERT_FALSE(Env::Default()->FileExists(JoinPathSegments(dir, "postmaster.opts")));
+}
+
+TEST_F_EX(PgWrapperFlagsTest, ValidatePgConfigViaBinaryIsRepeatable,
+          ValidatePgConfigViaBinaryTest) {
+  // The pre-check runs on every flag change, so it must not depend on being the first.
+  auto paths = ASSERT_RESULT(WriteConfigFiles("max_connections = 100\n"));
+  for (int i = 0; i < 3; ++i) {
+    ASSERT_OK(PgWrapper::ValidateConfigViaPostgresBinary(paths)) << "iteration " << i;
+  }
+}
+
 class ValidateYsqlPgConfCsvTest : public YBTest {};
 
 TEST_F_EX(PgWrapperFlagsTest, ValidateYsqlPgConfCsv, ValidateYsqlPgConfCsvTest) {
